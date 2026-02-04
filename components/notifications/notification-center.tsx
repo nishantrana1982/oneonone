@@ -163,9 +163,9 @@ export function NotificationCenter() {
         )}
       </button>
 
-      {/* Dropdown */}
+      {/* Dropdown - positioned to the right of the bell icon, above the bottom */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-96 max-h-[500px] bg-white dark:bg-charcoal rounded-2xl border border-off-white dark:border-medium-gray/20 shadow-2xl overflow-hidden z-50 animate-in fade-in-0 zoom-in-95 duration-200">
+        <div className="absolute left-full bottom-0 ml-2 w-96 max-h-[500px] bg-white dark:bg-charcoal rounded-2xl border border-off-white dark:border-medium-gray/20 shadow-2xl overflow-hidden z-50 animate-in fade-in-0 zoom-in-95 duration-200">
           {/* Header */}
           <div className="px-4 py-3 border-b border-off-white dark:border-medium-gray/20 flex items-center justify-between">
             <h3 className="font-semibold text-dark-gray dark:text-white">Notifications</h3>
