@@ -49,6 +49,8 @@ export function SettingsClient() {
   const [testing, setTesting] = useState(false)
   const [testingS3, setTestingS3] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [openaiMessage, setOpenaiMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [awsMessage, setAwsMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   // Form state
   const [openaiApiKey, setOpenaiApiKey] = useState('')
@@ -175,6 +177,9 @@ export function SettingsClient() {
 
   const handleSave = async (section: 'openai' | 'aws' | 'recording') => {
     setSaving(true)
+    // Clear section-specific messages
+    if (section === 'openai') setOpenaiMessage(null)
+    if (section === 'aws') setAwsMessage(null)
     setMessage(null)
 
     try {
@@ -190,10 +195,12 @@ export function SettingsClient() {
           updates.openaiApiKey = openaiApiKey
         }
       } else if (section === 'aws') {
+        // Always include region and bucket (even if empty to allow clearing)
         updates = {
-          awsRegion,
-          awsS3Bucket,
+          awsRegion: awsRegion || null,
+          awsS3Bucket: awsS3Bucket || null,
         }
+        // Only include credentials if provided (not empty and not masked)
         if (awsAccessKeyId && !awsAccessKeyId.includes('****')) {
           updates.awsAccessKeyId = awsAccessKeyId
         }
@@ -213,18 +220,32 @@ export function SettingsClient() {
       if (response.ok) {
         const data = await response.json()
         setSettings(data)
-        setMessage({ type: 'success', text: 'Settings saved successfully' })
-        // Clear sensitive input fields after save
-        setOpenaiApiKey('')
-        setAwsAccessKeyId('')
-        setAwsSecretKey('')
+        
+        // Set section-specific success message
+        const successMsg = { type: 'success' as const, text: 'Settings saved successfully' }
+        if (section === 'openai') {
+          setOpenaiMessage(successMsg)
+          setOpenaiApiKey('')
+        } else if (section === 'aws') {
+          setAwsMessage(successMsg)
+          setAwsAccessKeyId('')
+          setAwsSecretKey('')
+        } else {
+          setMessage(successMsg)
+        }
       } else {
         const error = await response.json()
-        setMessage({ type: 'error', text: error.error || 'Failed to save settings' })
+        const errorMsg = { type: 'error' as const, text: error.error || 'Failed to save settings' }
+        if (section === 'openai') setOpenaiMessage(errorMsg)
+        else if (section === 'aws') setAwsMessage(errorMsg)
+        else setMessage(errorMsg)
       }
     } catch (error) {
       console.error('Error saving settings:', error)
-      setMessage({ type: 'error', text: 'Failed to save settings' })
+      const errorMsg = { type: 'error' as const, text: 'Failed to save settings' }
+      if (section === 'openai') setOpenaiMessage(errorMsg)
+      else if (section === 'aws') setAwsMessage(errorMsg)
+      else setMessage(errorMsg)
     } finally {
       setSaving(false)
     }
@@ -232,7 +253,7 @@ export function SettingsClient() {
 
   const handleTestOpenAI = async () => {
     setTesting(true)
-    setMessage(null)
+    setOpenaiMessage(null)
 
     try {
       const response = await fetch('/api/settings', {
@@ -244,13 +265,13 @@ export function SettingsClient() {
       const data = await response.json()
 
       if (response.ok) {
-        setMessage({ type: 'success', text: data.message })
+        setOpenaiMessage({ type: 'success', text: data.message })
       } else {
-        setMessage({ type: 'error', text: data.error })
+        setOpenaiMessage({ type: 'error', text: data.error })
       }
     } catch (error) {
       console.error('Error testing OpenAI:', error)
-      setMessage({ type: 'error', text: 'Failed to test connection' })
+      setOpenaiMessage({ type: 'error', text: 'Failed to test connection' })
     } finally {
       setTesting(false)
     }
@@ -258,7 +279,7 @@ export function SettingsClient() {
 
   const handleTestS3 = async () => {
     setTestingS3(true)
-    setMessage(null)
+    setAwsMessage(null)
 
     try {
       const response = await fetch('/api/settings', {
@@ -270,13 +291,13 @@ export function SettingsClient() {
       const data = await response.json()
 
       if (response.ok) {
-        setMessage({ type: 'success', text: data.message })
+        setAwsMessage({ type: 'success', text: data.message })
       } else {
-        setMessage({ type: 'error', text: data.error })
+        setAwsMessage({ type: 'error', text: data.error })
       }
     } catch (error) {
       console.error('Error testing S3:', error)
-      setMessage({ type: 'error', text: 'Failed to test S3 connection' })
+      setAwsMessage({ type: 'error', text: 'Failed to test S3 connection' })
     } finally {
       setTestingS3(false)
     }
@@ -323,6 +344,24 @@ export function SettingsClient() {
         </div>
 
         <div className="p-5 space-y-4">
+          {/* OpenAI Message */}
+          {openaiMessage && (
+            <div className={`rounded-xl p-3 flex items-center gap-3 ${
+              openaiMessage.type === 'success' 
+                ? 'bg-green-500/10 border border-green-500/20' 
+                : 'bg-red-500/10 border border-red-500/20'
+            }`}>
+              {openaiMessage.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+              )}
+              <p className={`text-sm ${openaiMessage.type === 'success' ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
+                {openaiMessage.text}
+              </p>
+            </div>
+          )}
+
           {/* API Key Status */}
           <div className="flex items-center gap-2 text-sm">
             <span className={`w-2 h-2 rounded-full ${settings?.openaiApiKeySet ? 'bg-green-500' : 'bg-red-500'}`} />
@@ -483,6 +522,24 @@ export function SettingsClient() {
         </div>
 
         <div className="p-5 space-y-4">
+          {/* AWS Message */}
+          {awsMessage && (
+            <div className={`rounded-xl p-3 flex items-center gap-3 ${
+              awsMessage.type === 'success' 
+                ? 'bg-green-500/10 border border-green-500/20' 
+                : 'bg-red-500/10 border border-red-500/20'
+            }`}>
+              {awsMessage.type === 'success' ? (
+                <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+              )}
+              <p className={`text-sm ${awsMessage.type === 'success' ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
+                {awsMessage.text}
+              </p>
+            </div>
+          )}
+
           {/* Status */}
           <div className="flex items-center gap-2 text-sm">
             <span className={`w-2 h-2 rounded-full ${settings?.awsSecretKeySet ? 'bg-green-500' : 'bg-yellow-500'}`} />
