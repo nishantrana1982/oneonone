@@ -12,17 +12,31 @@ cd /var/www/oneonone || exit
 echo "📥 Pulling latest code..."
 git pull
 
-# Create .env file with correct values
-echo "📝 Creating .env file..."
-cat > .env << 'EOF'
-DATABASE_URL="postgresql://amiuser:AmiSecure2026@localhost:5432/ami_oneonone"
-NEXTAUTH_SECRET="ami-oneonone-super-secret-key-2026"
-NEXTAUTH_URL="http://13.127.6.212.nip.io"
-NODE_ENV="development"
-GOOGLE_CLIENT_ID="1035016968012-7jh1s9hqqag8q33lj2r971b60sug5vfg.apps.googleusercontent.com"
-GOOGLE_CLIENT_SECRET="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"
+# Check if .env exists, if not create from template
+if [ ! -f .env ]; then
+  echo "📝 Creating .env file from template..."
+  echo "⚠️  Please edit .env with your actual credentials!"
+  cat > .env << 'EOF'
+# Database
+DATABASE_URL="postgresql://amiuser:YOUR_DB_PASSWORD@localhost:5432/ami_oneonone"
+
+# NextAuth
+NEXTAUTH_SECRET="generate-a-random-secret-key"
+NEXTAUTH_URL="https://your-domain.com"
+NODE_ENV="production"
+
+# Google OAuth (get from Google Cloud Console)
+GOOGLE_CLIENT_ID="your-google-client-id"
+GOOGLE_CLIENT_SECRET="your-google-client-secret"
+
+# OpenAI (optional - can be set in app settings)
 OPENAI_API_KEY=""
 EOF
+  echo "❌ .env created but needs configuration. Please edit it and run deploy.sh again."
+  exit 1
+else
+  echo "✅ .env file exists, using existing configuration"
+fi
 
 # Install dependencies (if needed)
 echo "📦 Installing dependencies..."
