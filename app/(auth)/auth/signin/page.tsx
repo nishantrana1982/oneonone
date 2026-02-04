@@ -1,39 +1,14 @@
 'use client'
 
 import { signIn } from 'next-auth/react'
-import { useSearchParams, useRouter } from 'next/navigation'
-import { useState, Suspense } from 'react'
-import { Users, ChevronRight, User, Shield, Loader2 } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
+import { Users, Loader2 } from 'lucide-react'
 
 function SignInContent() {
   const searchParams = useSearchParams()
-  const router = useRouter()
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
   const error = searchParams.get('error')
-  const [testLoading, setTestLoading] = useState<string | null>(null)
-
-  const handleTestLogin = async (role: 'EMPLOYEE' | 'REPORTER' | 'SUPER_ADMIN') => {
-    setTestLoading(role)
-    try {
-      const response = await fetch('/api/auth/test-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role }),
-      })
-
-      if (response.ok) {
-        router.push(callbackUrl)
-        router.refresh()
-      } else {
-        alert('Test login failed. Please try again.')
-      }
-    } catch (error) {
-      console.error('Test login error:', error)
-      alert('Test login failed. Please try again.')
-    } finally {
-      setTestLoading(null)
-    }
-  }
 
   return (
     <div className="min-h-screen bg-off-white dark:bg-dark-gray flex flex-col">
@@ -59,6 +34,8 @@ function SignInContent() {
               <p className="text-sm text-red-600 dark:text-red-400 text-center">
                 {error === 'AccessDenied'
                   ? 'Access denied. Please use your company email.'
+                  : error === 'OAuthAccountNotLinked'
+                  ? 'This email is already linked to another account.'
                   : 'An error occurred. Please try again.'}
               </p>
             </div>
@@ -78,81 +55,9 @@ function SignInContent() {
             Continue with Google
           </button>
 
-          {/* Divider */}
-          <div className="relative my-8">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-light-gray/30 dark:border-medium-gray/30" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-off-white dark:bg-charcoal px-4 text-xs font-medium text-medium-gray uppercase tracking-wider">
-                Demo Accounts
-              </span>
-            </div>
-          </div>
-
-          {/* Test Login Options */}
-          <div className="space-y-3">
-            <button
-              onClick={() => handleTestLogin('EMPLOYEE')}
-              disabled={testLoading !== null}
-              className="w-full group flex items-center gap-4 bg-white dark:bg-charcoal rounded-xl px-4 py-3.5 text-left transition-all duration-200 shadow-sm hover:shadow-md border border-light-gray/20 dark:border-medium-gray/20 disabled:opacity-50"
-            >
-              <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
-                <User className="w-5 h-5 text-blue-500" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-dark-gray dark:text-white text-[15px]">Employee</p>
-                <p className="text-[13px] text-medium-gray truncate">View meetings & tasks</p>
-              </div>
-              {testLoading === 'EMPLOYEE' ? (
-                <Loader2 className="w-5 h-5 text-medium-gray animate-spin" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-light-gray group-hover:text-medium-gray transition-colors" />
-              )}
-            </button>
-
-            <button
-              onClick={() => handleTestLogin('REPORTER')}
-              disabled={testLoading !== null}
-              className="w-full group flex items-center gap-4 bg-white dark:bg-charcoal rounded-xl px-4 py-3.5 text-left transition-all duration-200 shadow-sm hover:shadow-md border border-light-gray/20 dark:border-medium-gray/20 disabled:opacity-50"
-            >
-              <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
-                <Users className="w-5 h-5 text-green-500" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-dark-gray dark:text-white text-[15px]">Team Lead</p>
-                <p className="text-[13px] text-medium-gray truncate">Manage team meetings</p>
-              </div>
-              {testLoading === 'REPORTER' ? (
-                <Loader2 className="w-5 h-5 text-medium-gray animate-spin" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-light-gray group-hover:text-medium-gray transition-colors" />
-              )}
-            </button>
-
-            <button
-              onClick={() => handleTestLogin('SUPER_ADMIN')}
-              disabled={testLoading !== null}
-              className="w-full group flex items-center gap-4 bg-white dark:bg-charcoal rounded-xl px-4 py-3.5 text-left transition-all duration-200 shadow-sm hover:shadow-md border border-light-gray/20 dark:border-medium-gray/20 disabled:opacity-50"
-            >
-              <div className="w-10 h-10 rounded-full bg-dark-gray/10 dark:bg-white/10 flex items-center justify-center">
-                <Shield className="w-5 h-5 text-dark-gray dark:text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-dark-gray dark:text-white text-[15px]">Admin</p>
-                <p className="text-[13px] text-medium-gray truncate">Full system access</p>
-              </div>
-              {testLoading === 'SUPER_ADMIN' ? (
-                <Loader2 className="w-5 h-5 text-medium-gray animate-spin" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-light-gray group-hover:text-medium-gray transition-colors" />
-              )}
-            </button>
-          </div>
-
           {/* Footer Note */}
           <p className="mt-8 text-center text-[13px] text-medium-gray">
-            Demo accounts are pre-configured for testing
+            Use your company Google account to sign in
           </p>
         </div>
       </div>
