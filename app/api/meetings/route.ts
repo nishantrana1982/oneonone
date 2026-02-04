@@ -79,15 +79,23 @@ export async function POST(request: NextRequest) {
 
     // Create Google Calendar event
     try {
-      const { createCalendarEvent } = await import('@/lib/google-calendar')
-      await createCalendarEvent(
-        meeting.id,
-        meeting.employee.email,
-        meeting.reporter.email,
-        new Date(meetingDate),
-        meeting.employee.name,
-        meeting.reporter.name
-      )
+      const { createCalendarEvent, isCalendarEnabled } = await import('@/lib/google-calendar')
+      
+      // Check if calendar is enabled for the reporter
+      const calendarEnabled = await isCalendarEnabled(reporterId)
+      
+      if (calendarEnabled) {
+        const calendarResult = await createCalendarEvent(
+          meeting.id,
+          meeting.employee.email,
+          meeting.reporter.email,
+          reporterId,
+          new Date(meetingDate),
+          meeting.employee.name,
+          meeting.reporter.name
+        )
+        console.log('Calendar event created:', calendarResult)
+      }
     } catch (error) {
       console.error('Failed to create calendar event:', error)
       // Continue even if calendar creation fails

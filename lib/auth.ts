@@ -82,6 +82,21 @@ export const authOptions: NextAuthOptions = {
       if (account && user) {
         token.accessToken = account.access_token
         token.refreshToken = account.refresh_token
+        
+        // Store tokens in database for Calendar API access
+        if (account.access_token && account.refresh_token) {
+          await prisma.account.updateMany({
+            where: {
+              userId: user.id,
+              provider: 'google',
+            },
+            data: {
+              access_token: account.access_token,
+              refresh_token: account.refresh_token,
+              expires_at: account.expires_at,
+            },
+          })
+        }
       }
       return token
     },
