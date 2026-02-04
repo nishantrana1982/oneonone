@@ -5,7 +5,9 @@ export type { UserRole, MeetingStatus, TodoStatus, TodoPriority }
 export interface User {
   id: string
   email: string
-  name: string
+  name: string | null
+  image?: string | null
+  emailVerified?: Date | null
   avatar?: string | null
   role: UserRole
   reportsToId?: string | null
