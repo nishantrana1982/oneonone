@@ -1,0 +1,42 @@
+import { getCurrentUser } from '@/lib/auth-helpers'
+import { prisma } from '@/lib/prisma'
+import { redirect } from 'next/navigation'
+import { ProfileClient } from './profile-client'
+
+export default async function ProfilePage() {
+  const currentUser = await getCurrentUser()
+  if (!currentUser) redirect('/auth/signin')
+
+  const user = await prisma.user.findUnique({
+    where: { id: currentUser.id },
+    include: {
+      department: { select: { id: true, name: true } },
+      reportsTo: { select: { id: true, name: true, email: true } },
+    },
+  })
+
+  if (!user) redirect('/auth/signin')
+
+  const departments = await prisma.department.findMany({
+    orderBy: { name: 'asc' },
+  })
+
+  return (
+    <ProfileClient 
+      user={{
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar,
+        phone: user.phone,
+        title: user.title,
+        bio: user.bio,
+        role: user.role,
+        department: user.department,
+        reportsTo: user.reportsTo,
+        createdAt: user.createdAt.toISOString(),
+      }}
+      departments={departments}
+    />
+  )
+}

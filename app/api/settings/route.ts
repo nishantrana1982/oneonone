@@ -1,0 +1,135 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { requireRole } from '@/lib/auth-helpers'
+import { getSettings, updateSettings } from '@/lib/settings'
+import { maskApiKey } from '@/lib/encryption'
+import { UserRole } from '@prisma/client'
+
+// GET - Fetch settings (masked for security)
+export async function GET() {
+  try {
+    await requireRole([UserRole.SUPER_ADMIN])
+    
+    const settings = await getSettings()
+
+    // Return masked sensitive values
+    return NextResponse.json({
+      openaiApiKey: maskApiKey(settings.openaiApiKey),
+      openaiApiKeySet: !!settings.openaiApiKey,
+      openaiModel: settings.openaiModel,
+      whisperModel: settings.whisperModel,
+      awsRegion: settings.awsRegion,
+      awsAccessKeyId: maskApiKey(settings.awsAccessKeyId),
+      awsAccessKeyIdSet: !!settings.awsAccessKeyId,
+      awsSecretKey: maskApiKey(settings.awsSecretKey),
+      awsSecretKeySet: !!settings.awsSecretKey,
+      awsS3Bucket: settings.awsS3Bucket,
+      maxRecordingMins: settings.maxRecordingMins,
+    })
+  } catch (error) {
+    console.error('Error fetching settings:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch settings' },
+      { status: 500 }
+    )
+  }
+}
+
+// PUT - Update settings
+export async function PUT(request: NextRequest) {
+  try {
+    await requireRole([UserRole.SUPER_ADMIN])
+    
+    const body = await request.json()
+    const {
+      openaiApiKey,
+      openaiModel,
+      whisperModel,
+      awsRegion,
+      awsAccessKeyId,
+      awsSecretKey,
+      awsS3Bucket,
+      maxRecordingMins,
+    } = body
+
+    const updates: any = {}
+
+    // Only update fields that are explicitly provided
+    // Empty string means clear, undefined means don't change
+    if (openaiApiKey !== undefined) updates.openaiApiKey = openaiApiKey || null
+    if (openaiModel !== undefined) updates.openaiModel = openaiModel
+    if (whisperModel !== undefined) updates.whisperModel = whisperModel
+    if (awsRegion !== undefined) updates.awsRegion = awsRegion || null
+    if (awsAccessKeyId !== undefined) updates.awsAccessKeyId = awsAccessKeyId || null
+    if (awsSecretKey !== undefined) updates.awsSecretKey = awsSecretKey || null
+    if (awsS3Bucket !== undefined) updates.awsS3Bucket = awsS3Bucket || null
+    if (maxRecordingMins !== undefined) updates.maxRecordingMins = parseInt(maxRecordingMins) || 25
+
+    await updateSettings(updates)
+
+    // Return updated settings (masked)
+    const settings = await getSettings()
+    return NextResponse.json({
+      openaiApiKey: maskApiKey(settings.openaiApiKey),
+      openaiApiKeySet: !!settings.openaiApiKey,
+      openaiModel: settings.openaiModel,
+      whisperModel: settings.whisperModel,
+      awsRegion: settings.awsRegion,
+      awsAccessKeyId: maskApiKey(settings.awsAccessKeyId),
+      awsAccessKeyIdSet: !!settings.awsAccessKeyId,
+      awsSecretKey: maskApiKey(settings.awsSecretKey),
+      awsSecretKeySet: !!settings.awsSecretKey,
+      awsS3Bucket: settings.awsS3Bucket,
+      maxRecordingMins: settings.maxRecordingMins,
+      message: 'Settings updated successfully',
+    })
+  } catch (error) {
+    console.error('Error updating settings:', error)
+    return NextResponse.json(
+      { error: 'Failed to update settings' },
+      { status: 500 }
+    )
+  }
+}
+
+// POST - Test OpenAI connection
+export async function POST(request: NextRequest) {
+  try {
+    await requireRole([UserRole.SUPER_ADMIN])
+    
+    const body = await request.json()
+    const { action } = body
+
+    if (action === 'test-openai') {
+      const settings = await getSettings()
+      
+      if (!settings.openaiApiKey) {
+        return NextResponse.json(
+          { error: 'OpenAI API key not configured' },
+          { status: 400 }
+        )
+      }
+
+      // Test the API key with a simple request
+      const OpenAI = (await import('openai')).default
+      const openai = new OpenAI({ apiKey: settings.openaiApiKey })
+      
+      try {
+        await openai.models.list()
+        return NextResponse.json({ success: true, message: 'OpenAI connection successful' })
+      } catch (err: any) {
+        return NextResponse.json(
+          { error: `OpenAI connection failed: ${err.message}` },
+          { status: 400 }
+        )
+      }
+    }
+
+    return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
+  } catch (error) {
+    console.error('Error testing settings:', error)
+    return NextResponse.json(
+      { error: 'Failed to test settings' },
+      { status: 500 }
+    )
+  }
+}

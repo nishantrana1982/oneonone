@@ -1,0 +1,397 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String              @id @default(uuid())
+  email              String              @unique
+  name               String
+  avatar             String?
+  role               UserRole            @default(EMPLOYEE)
+  reportsToId        String?
+  departmentId       String?
+  isActive           Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  bio                String?
+  phone              String?
+  title              String?
+  accounts           Account[]
+  auditLogs          AuditLog[]
+  dashboardWidgets   DashboardWidget[]
+  meetingsAsEmployee Meeting[]           @relation("EmployeeMeetings")
+  meetingsAsReporter Meeting[]           @relation("ReporterMeetings")
+  notifications      Notification[]
+  recurringSchedules RecurringSchedule[] @relation("RecurringScheduleReporter")
+  recurringSchedulesAsEmployee RecurringSchedule[] @relation("RecurringScheduleEmployee")
+  sessions           Session[]
+  todosAssigned      Todo[]              @relation("AssignedTodos")
+  todosCreated       Todo[]              @relation("CreatedTodos")
+  department         Department?         @relation(fields: [departmentId], references: [id])
+  reportsTo          User?               @relation("ReportingHierarchy", fields: [reportsToId], references: [id])
+  directReports      User[]              @relation("ReportingHierarchy")
+
+  @@index([reportsToId])
+  @@index([departmentId])
+  @@index([email])
+}
+
+model Account {
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Department {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     User[]
+}
+
+model Meeting {
+  id                       String             @id @default(uuid())
+  employeeId               String
+  reporterId               String
+  meetingDate              DateTime
+  checkInPersonal          String?
+  checkInProfessional      String?
+  priorityGoalProfessional String?
+  priorityGoalAgency       String?
+  progressReport           String?
+  goodNews                 String?
+  supportNeeded            String?
+  priorityDiscussions      String?
+  headsUp                  String?
+  anythingElse             String?
+  status                   MeetingStatus      @default(SCHEDULED)
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+  notes                    String?
+  recurringScheduleId      String?
+  reminder24hSent          Boolean            @default(false)
+  reminderSent             Boolean            @default(false)
+  attachments              Attachment[]
+  calendarEvent            CalendarEvent?
+  employee                 User               @relation("EmployeeMeetings", fields: [employeeId], references: [id])
+  recurringSchedule        RecurringSchedule? @relation(fields: [recurringScheduleId], references: [id])
+  reporter                 User               @relation("ReporterMeetings", fields: [reporterId], references: [id])
+  recording                MeetingRecording?
+  todos                    Todo[]
+
+  @@index([employeeId])
+  @@index([reporterId])
+  @@index([meetingDate])
+  @@index([status])
+  @@index([recurringScheduleId])
+}
+
+model Todo {
+  id           String       @id @default(uuid())
+  meetingId    String?
+  assignedToId String
+  createdById  String
+  title        String
+  description  String?
+  dueDate      DateTime?
+  priority     TodoPriority @default(MEDIUM)
+  status       TodoStatus   @default(NOT_STARTED)
+  completedAt  DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  assignedTo   User         @relation("AssignedTodos", fields: [assignedToId], references: [id])
+  createdBy    User         @relation("CreatedTodos", fields: [createdById], references: [id])
+  meeting      Meeting?     @relation(fields: [meetingId], references: [id])
+
+  @@index([assignedToId])
+  @@index([createdById])
+  @@index([meetingId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+model CalendarEvent {
+  id                 String   @id @default(uuid())
+  meetingId          String   @unique
+  googleEventId      String   @unique
+  googleCalendarLink String?
+  scheduledAt        DateTime
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  meeting            Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@index([meetingId])
+  @@index([googleEventId])
+}
+
+model MeetingRecording {
+  id             String          @id @default(uuid())
+  meetingId      String          @unique
+  audioUrl       String?
+  audioKey       String?
+  duration       Int?
+  fileSize       Int?
+  transcript     String?
+  language       String?
+  summary        String?
+  keyPoints      Json?
+  autoTodos      Json?
+  sentiment      Json?
+  qualityScore   Int?
+  qualityDetails Json?
+  status         RecordingStatus @default(UPLOADING)
+  errorMessage   String?
+  recordedAt     DateTime?
+  processedAt    DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  meeting        Meeting         @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@index([meetingId])
+  @@index([status])
+  @@index([language])
+}
+
+model SystemSettings {
+  id                   String   @id @default("system")
+  openaiApiKey         String?
+  openaiModel          String   @default("gpt-4o")
+  whisperModel         String   @default("whisper-1")
+  awsRegion            String?
+  awsAccessKeyId       String?
+  awsSecretKey         String?
+  awsS3Bucket          String?
+  maxRecordingMins     Int      @default(25)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  enableEmailReminders Boolean  @default(true)
+  reminderHoursBefore  Int      @default(24)
+}
+
+model RecurringSchedule {
+  id              String             @id @default(uuid())
+  reporterId      String
+  employeeId      String
+  frequency       RecurringFrequency @default(BIWEEKLY)
+  dayOfWeek       Int
+  timeOfDay       String
+  isActive        Boolean            @default(true)
+  nextMeetingDate DateTime?
+  lastGeneratedAt DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  meetings        Meeting[]
+  reporter        User               @relation("RecurringScheduleReporter", fields: [reporterId], references: [id])
+  employee        User               @relation("RecurringScheduleEmployee", fields: [employeeId], references: [id])
+
+  @@index([reporterId])
+  @@index([employeeId])
+  @@index([isActive])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  link      String?
+  data      Json?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+model Attachment {
+  id         String   @id @default(uuid())
+  meetingId  String
+  fileName   String
+  fileType   String
+  fileSize   Int
+  s3Key      String
+  s3Url      String?
+  uploadedBy String
+  createdAt  DateTime @default(now())
+  meeting    Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@index([meetingId])
+}
+
+model DashboardWidget {
+  id         String     @id @default(uuid())
+  userId     String
+  widgetType WidgetType
+  position   Int        @default(0)
+  isVisible  Boolean    @default(true)
+  config     Json?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, widgetType])
+  @@index([userId])
+}
+
+model AuditLog {
+  id         String      @id @default(uuid())
+  userId     String
+  action     AuditAction
+  entityType String
+  entityId   String?
+  details    Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime    @default(now())
+  user       User        @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([entityType])
+  @@index([createdAt])
+}
+
+model BackupHistory {
+  id           String       @id @default(uuid())
+  type         BackupType
+  status       BackupStatus @default(PENDING)
+  fileName     String?
+  fileSize     Int?
+  s3Key        String?
+  tables       Json?
+  recordCount  Json?
+  createdBy    String?
+  errorMessage String?
+  startedAt    DateTime     @default(now())
+  completedAt  DateTime?
+
+  @@index([status])
+  @@index([startedAt])
+}
+
+enum UserRole {
+  EMPLOYEE
+  REPORTER
+  SUPER_ADMIN
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum TodoStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  DONE
+}
+
+enum TodoPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum RecordingStatus {
+  UPLOADING
+  UPLOADED
+  TRANSCRIBING
+  ANALYZING
+  COMPLETED
+  FAILED
+}
+
+enum RecurringFrequency {
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+}
+
+enum NotificationType {
+  MEETING_REMINDER
+  MEETING_SCHEDULED
+  MEETING_CANCELLED
+  TODO_ASSIGNED
+  TODO_DUE_SOON
+  TODO_OVERDUE
+  FORM_SUBMITTED
+  RECORDING_READY
+  SYSTEM
+}
+
+enum WidgetType {
+  UPCOMING_MEETINGS
+  PENDING_TODOS
+  RECENT_ACTIVITY
+  TEAM_OVERVIEW
+  QUICK_ACTIONS
+  MEETING_STATS
+  TODO_STATS
+  DEPARTMENT_SUMMARY
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  EXPORT
+  IMPORT
+  CLEAR_DATA
+  SETTINGS_CHANGE
+}
+
+enum BackupType {
+  FULL
+  PARTIAL
+  SCHEDULED
+}
+
+enum BackupStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
