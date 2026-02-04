@@ -34,7 +34,7 @@ export default async function EmployeesPage() {
       },
       include: {
         department: true,
-        reportsTo: { select: { name: true } },
+        reportsTo: { select: { name: true, email: true } },
         _count: {
           select: {
             meetingsAsEmployee: true,

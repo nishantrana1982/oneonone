@@ -54,7 +54,7 @@ export default async function MeetingsPage() {
     recurringSchedules = await prisma.recurringSchedule.findMany({
       include: {
         employee: { select: { id: true, name: true, email: true } },
-        reporter: { select: { name: true } },
+        reporter: { select: { name: true, email: true } },
       },
       orderBy: { createdAt: 'desc' },
     })

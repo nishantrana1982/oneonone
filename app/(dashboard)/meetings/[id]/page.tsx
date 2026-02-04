@@ -30,8 +30,8 @@ export default async function MeetingDetailPage({
       },
       todos: {
         include: {
-          assignedTo: { select: { name: true } },
-          createdBy: { select: { name: true } },
+          assignedTo: { select: { name: true, email: true } },
+          createdBy: { select: { name: true, email: true } },
         },
         orderBy: { createdAt: 'desc' },
       },

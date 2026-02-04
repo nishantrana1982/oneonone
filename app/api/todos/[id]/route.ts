@@ -40,7 +40,7 @@ export async function PATCH(
       data: updateData,
       include: {
         assignedTo: { select: { name: true, email: true } },
-        createdBy: { select: { name: true } },
+        createdBy: { select: { name: true, email: true } },
         meeting: { select: { id: true, meetingDate: true } },
       },
     })

@@ -74,7 +74,7 @@ export async function GET(
         },
       },
       include: {
-        reporter: { select: { name: true } },
+        reporter: { select: { name: true, email: true } },
       },
       orderBy: { meetingDate: 'desc' },
     })

@@ -39,7 +39,7 @@ export async function POST(
         status: 'COMPLETED',
       },
       include: {
-        employee: { select: { name: true } },
+        employee: { select: { name: true, email: true } },
         reporter: { select: { name: true, email: true } },
       },
     })

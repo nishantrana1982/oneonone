@@ -87,8 +87,8 @@ export default async function DashboardPage() {
         ? { OR: [{ employeeId: user.id }, { reporterId: user.id }] }
         : {},
     include: {
-      employee: { select: { name: true } },
-      reporter: { select: { name: true } },
+      employee: { select: { name: true, email: true } },
+      reporter: { select: { name: true, email: true } },
     },
     orderBy: { meetingDate: 'desc' },
     take: 5,

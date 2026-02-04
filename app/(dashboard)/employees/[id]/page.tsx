@@ -42,7 +42,7 @@ export default async function EmployeeDetailPage({
   const meetings = await prisma.meeting.findMany({
     where: { employeeId: employee.id },
     include: {
-      reporter: { select: { name: true } },
+      reporter: { select: { name: true, email: true } },
     },
     orderBy: { meetingDate: 'desc' },
     take: 10,
