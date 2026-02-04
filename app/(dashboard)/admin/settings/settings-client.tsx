@@ -540,17 +540,39 @@ export function SettingsClient() {
             </div>
           )}
 
-          {/* Status */}
-          <div className="flex items-center gap-2 text-sm">
-            <span className={`w-2 h-2 rounded-full ${settings?.awsSecretKeySet ? 'bg-green-500' : 'bg-yellow-500'}`} />
-            <span className="text-medium-gray">
-              AWS Credentials: {settings?.awsSecretKeySet ? (
-                <span className="text-green-600 dark:text-green-400">Configured</span>
-              ) : (
-                <span className="text-yellow-600 dark:text-yellow-400">Using environment variables</span>
-              )}
-            </span>
-          </div>
+          {/* Status - Check ALL required fields */}
+          {(() => {
+            const hasRegion = !!settings?.awsRegion
+            const hasAccessKey = !!settings?.awsAccessKeyIdSet
+            const hasSecretKey = !!settings?.awsSecretKeySet
+            const hasBucket = !!settings?.awsS3Bucket
+            const isFullyConfigured = hasRegion && hasAccessKey && hasSecretKey && hasBucket
+            const isPartiallyConfigured = hasRegion || hasAccessKey || hasSecretKey || hasBucket
+            
+            return (
+              <div className="flex items-center gap-2 text-sm">
+                <span className={`w-2 h-2 rounded-full ${
+                  isFullyConfigured ? 'bg-green-500' : isPartiallyConfigured ? 'bg-yellow-500' : 'bg-red-500'
+                }`} />
+                <span className="text-medium-gray">
+                  S3 Configuration: {isFullyConfigured ? (
+                    <span className="text-green-600 dark:text-green-400">Fully Configured</span>
+                  ) : isPartiallyConfigured ? (
+                    <span className="text-yellow-600 dark:text-yellow-400">
+                      Incomplete ({[
+                        !hasRegion && 'Region',
+                        !hasAccessKey && 'Access Key',
+                        !hasSecretKey && 'Secret Key',
+                        !hasBucket && 'Bucket'
+                      ].filter(Boolean).join(', ')} missing)
+                    </span>
+                  ) : (
+                    <span className="text-red-600 dark:text-red-400">Not configured</span>
+                  )}
+                </span>
+              </div>
+            )
+          })()}
 
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
