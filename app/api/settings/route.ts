@@ -124,6 +124,59 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    if (action === 'test-s3') {
+      const settings = await getSettings()
+      
+      const region = settings.awsRegion || process.env.AWS_REGION
+      const accessKeyId = settings.awsAccessKeyId || process.env.AWS_ACCESS_KEY_ID
+      const secretAccessKey = settings.awsSecretKey || process.env.AWS_SECRET_ACCESS_KEY
+      const bucket = settings.awsS3Bucket || process.env.AWS_S3_BUCKET
+
+      if (!region || !accessKeyId || !secretAccessKey || !bucket) {
+        return NextResponse.json(
+          { error: 'AWS S3 not fully configured. Please provide Region, Access Key, Secret Key, and Bucket Name.' },
+          { status: 400 }
+        )
+      }
+
+      try {
+        const { S3Client, HeadBucketCommand } = await import('@aws-sdk/client-s3')
+        
+        const s3Client = new S3Client({
+          region,
+          credentials: {
+            accessKeyId,
+            secretAccessKey,
+          },
+        })
+
+        // Test by checking if bucket exists and is accessible
+        await s3Client.send(new HeadBucketCommand({ Bucket: bucket }))
+        
+        return NextResponse.json({ 
+          success: true, 
+          message: `S3 connection successful! Bucket "${bucket}" is accessible.` 
+        })
+      } catch (err: any) {
+        let errorMessage = err.message
+        
+        if (err.name === 'NotFound' || err.$metadata?.httpStatusCode === 404) {
+          errorMessage = `Bucket "${bucket}" not found. Please check the bucket name.`
+        } else if (err.name === 'InvalidAccessKeyId' || err.Code === 'InvalidAccessKeyId') {
+          errorMessage = 'Invalid Access Key ID. Please check your credentials.'
+        } else if (err.name === 'SignatureDoesNotMatch') {
+          errorMessage = 'Invalid Secret Access Key. Please check your credentials.'
+        } else if (err.name === 'AccessDenied' || err.$metadata?.httpStatusCode === 403) {
+          errorMessage = `Access denied to bucket "${bucket}". Please check IAM permissions.`
+        }
+        
+        return NextResponse.json(
+          { error: `S3 connection failed: ${errorMessage}` },
+          { status: 400 }
+        )
+      }
+    }
+
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
   } catch (error) {
     console.error('Error testing settings:', error)

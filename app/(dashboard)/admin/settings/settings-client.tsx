@@ -47,6 +47,7 @@ export function SettingsClient() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
+  const [testingS3, setTestingS3] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   // Form state
@@ -252,6 +253,32 @@ export function SettingsClient() {
       setMessage({ type: 'error', text: 'Failed to test connection' })
     } finally {
       setTesting(false)
+    }
+  }
+
+  const handleTestS3 = async () => {
+    setTestingS3(true)
+    setMessage(null)
+
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test-s3' }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setMessage({ type: 'success', text: data.message })
+      } else {
+        setMessage({ type: 'error', text: data.error })
+      }
+    } catch (error) {
+      console.error('Error testing S3:', error)
+      setMessage({ type: 'error', text: 'Failed to test S3 connection' })
+    } finally {
+      setTestingS3(false)
     }
   }
 
@@ -531,14 +558,25 @@ export function SettingsClient() {
             </div>
           </div>
 
-          <button
-            onClick={() => handleSave('aws')}
-            disabled={saving}
-            className="flex items-center gap-2 px-5 py-2.5 bg-dark-gray dark:bg-white text-white dark:text-dark-gray rounded-xl font-medium hover:bg-charcoal dark:hover:bg-off-white disabled:opacity-50 transition-colors"
-          >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            Save AWS Settings
-          </button>
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              onClick={() => handleSave('aws')}
+              disabled={saving}
+              className="flex items-center gap-2 px-5 py-2.5 bg-dark-gray dark:bg-white text-white dark:text-dark-gray rounded-xl font-medium hover:bg-charcoal dark:hover:bg-off-white disabled:opacity-50 transition-colors"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Save AWS Settings
+            </button>
+
+            <button
+              onClick={handleTestS3}
+              disabled={testingS3}
+              className="flex items-center gap-2 px-5 py-2.5 border border-off-white dark:border-medium-gray/20 text-dark-gray dark:text-white rounded-xl font-medium hover:bg-off-white dark:hover:bg-charcoal disabled:opacity-50 transition-colors"
+            >
+              {testingS3 ? <Loader2 className="w-4 h-4 animate-spin" /> : <TestTube className="w-4 h-4" />}
+              Test S3 Connection
+            </button>
+          </div>
         </div>
       </div>
 
