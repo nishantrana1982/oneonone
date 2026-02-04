@@ -7,14 +7,14 @@ import { UserRole } from '@prisma/client'
 
 interface User {
   id: string
-  name: string
+  name: string | null
   email: string
   role: UserRole
   isActive: boolean
   departmentId: string | null
   reportsToId: string | null
   department: { name: string } | null
-  reportsTo: { name: string } | null
+  reportsTo: { name: string | null } | null
 }
 
 interface Department {
