@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
       todos = await prisma.todo.findMany({
         where: { assignedToId: user.id },
         include: {
-          createdBy: { select: { name: true, email: true } },
+          createdBy: { select: { name: true } },
           assignedTo: { select: { name: true, email: true } },
           meeting: { select: { id: true, meetingDate: true } },
         },
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     } else {
       todos = await prisma.todo.findMany({
         include: {
-          createdBy: { select: { name: true, email: true } },
+          createdBy: { select: { name: true } },
           assignedTo: { select: { name: true, email: true } },
           meeting: { select: { id: true, meetingDate: true } },
         },

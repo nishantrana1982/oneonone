@@ -193,7 +193,7 @@ export function RecurringSchedulesClient({ employees, initialSchedules }: Props)
               >
                 <option value="">Select...</option>
                 {availableEmployees.map((emp) => (
-                  <option key={emp.id} value={emp.id}>{emp.name || emp.email}</option>
+                  <option key={emp.id} value={emp.id}>{emp.name}</option>
                 ))}
               </select>
             </div>

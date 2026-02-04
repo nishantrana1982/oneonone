@@ -7,14 +7,14 @@ import { UserRole } from '@prisma/client'
 
 interface User {
   id: string
-  name: string | null
+  name: string
   email: string
   role: UserRole
   isActive: boolean
   departmentId: string | null
   reportsToId: string | null
   department: { name: string } | null
-  reportsTo: { name: string | null } | null
+  reportsTo: { name: string } | null
 }
 
 interface Department {
@@ -61,7 +61,7 @@ export function UserManagement({ users, departments, reporters }: UserManagement
 
   const openEditModal = (user: User) => {
     setFormData({
-      name: user.name || '',
+      name: user.name,
       email: user.email,
       role: user.role,
       departmentId: user.departmentId || '',
@@ -197,10 +197,10 @@ export function UserManagement({ users, departments, reporters }: UserManagement
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange/20 to-orange/10 flex items-center justify-center">
                         <span className="text-xs font-medium text-orange">
-                          {(user.name || user.email).split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                          {user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                         </span>
                       </div>
-                      <span className="font-medium text-dark-gray dark:text-white">{user.name || user.email}</span>
+                      <span className="font-medium text-dark-gray dark:text-white">{user.name}</span>
                     </div>
                   </td>
                   <td className="py-4 px-6 text-sm text-medium-gray">{user.email}</td>
@@ -333,7 +333,7 @@ export function UserManagement({ users, departments, reporters }: UserManagement
                   <option value="">No Manager</option>
                   {reporters.filter(r => r.id !== editingUser?.id).map((reporter) => (
                     <option key={reporter.id} value={reporter.id}>
-                      {reporter.name || reporter.email} ({reporter.role.replace('_', ' ')})
+                      {reporter.name} ({reporter.role.replace('_', ' ')})
                     </option>
                   ))}
                 </select>

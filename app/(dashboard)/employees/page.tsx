@@ -34,7 +34,7 @@ export default async function EmployeesPage() {
       },
       include: {
         department: true,
-        reportsTo: { select: { name: true, email: true } },
+        reportsTo: { select: { name: true } },
         _count: {
           select: {
             meetingsAsEmployee: true,
@@ -115,11 +115,11 @@ export default async function EmployeesPage() {
               >
                 <div className="w-12 h-12 rounded-full bg-off-white dark:bg-dark-gray flex items-center justify-center">
                   <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-                    {(employee.name || employee.email).split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                    {employee.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-dark-gray dark:text-white">{employee.name || employee.email}</p>
+                  <p className="font-medium text-dark-gray dark:text-white">{employee.name}</p>
                   <p className="text-sm text-medium-gray">{employee.email}</p>
                 </div>
                 {employee.department && (

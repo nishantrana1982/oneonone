@@ -2,9 +2,34 @@ import { NextAuthOptions } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
 import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import { prisma } from './prisma'
+import { Adapter } from 'next-auth/adapters'
+
+// Custom adapter that ensures name is never null
+function CustomPrismaAdapter(): Adapter {
+  const adapter = PrismaAdapter(prisma)
+  
+  return {
+    ...adapter,
+    createUser: async (data) => {
+      // Ensure name is never null - use email prefix as fallback
+      const name = data.name || data.email?.split('@')[0] || 'User'
+      
+      const user = await prisma.user.create({
+        data: {
+          email: data.email!,
+          name: name,
+          image: data.image,
+          emailVerified: data.emailVerified,
+        },
+      })
+      
+      return user
+    },
+  }
+}
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
+  adapter: CustomPrismaAdapter(),
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,

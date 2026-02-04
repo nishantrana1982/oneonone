@@ -815,7 +815,7 @@ export function InsightsClient({ departments, isSuperAdmin }: InsightsClientProp
                   <div className="flex items-start justify-between gap-4 mb-3">
                     <div>
                       <p className="font-medium text-dark-gray dark:text-white">
-                        {result.meeting?.employee.name || result.meeting?.employee.email || 'Unknown'}
+                        {result.meeting?.employee.name || 'Unknown'}
                       </p>
                       <p className="text-sm text-medium-gray">
                         {result.meeting?.employee.department} • {result.meeting?.date && new Date(result.meeting.date).toLocaleDateString()}

@@ -130,8 +130,8 @@ export async function GET(request: NextRequest) {
     const meetings = await prisma.meeting.findMany({
       where: meetingWhere,
       include: {
-        employee: { select: { name: true, email: true, department: { select: { name: true } } } },
-        reporter: { select: { name: true, email: true } },
+        employee: { select: { name: true, department: { select: { name: true } } } },
+        reporter: { select: { name: true } },
       },
       orderBy: { meetingDate: 'desc' },
     })
@@ -140,7 +140,7 @@ export async function GET(request: NextRequest) {
     const todos = await prisma.todo.findMany({
       where: todoWhere,
       include: {
-        assignedTo: { select: { name: true, email: true } },
+        assignedTo: { select: { name: true } },
       },
     })
 
