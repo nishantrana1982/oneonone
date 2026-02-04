@@ -138,7 +138,7 @@ export function ProfileClient({ user, departments }: ProfileClientProps) {
                   <User className="w-4 h-4" />
                   <span className="text-xs font-medium">Reports To</span>
                 </div>
-                <p className="text-dark-gray dark:text-white font-medium">{user.reportsTo.name}</p>
+                <p className="text-dark-gray dark:text-white font-medium">{user.reportsTo.name || user.reportsTo.email}</p>
               </div>
             )}
 

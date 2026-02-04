@@ -238,7 +238,7 @@ export function DashboardWidgets({
                       </div>
                       <div className="flex-1">
                         <p className="text-sm font-medium text-dark-gray dark:text-white">
-                          {meeting.employee?.name || meeting.reporter?.name}
+                          {meeting.employee?.name || meeting.employee?.email || meeting.reporter?.name || meeting.reporter?.email}
                         </p>
                         <p className="text-xs text-medium-gray">
                           {new Date(meeting.meetingDate).toLocaleDateString()}

@@ -255,11 +255,11 @@ export function AuditLogsClient() {
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-charcoal to-medium-gray flex items-center justify-center text-white text-sm font-medium">
-                              {log.user.name.charAt(0).toUpperCase()}
+                              {(log.user.name || log.user.email).charAt(0).toUpperCase()}
                             </div>
                             <div>
                               <p className="text-sm font-medium text-dark-gray dark:text-white">
-                                {log.user.name}
+                                {log.user.name || log.user.email}
                               </p>
                               <p className="text-xs text-medium-gray">{log.user.email}</p>
                             </div>

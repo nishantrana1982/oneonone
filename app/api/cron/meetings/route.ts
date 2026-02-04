@@ -151,8 +151,8 @@ async function sendMeetingReminders(results: any) {
         await sendEmail({
           to: meeting.employee.email,
           subject: 'Meeting Reminder: One-on-One Tomorrow',
-          text: `Hi ${meeting.employee.name},\n\nThis is a reminder that you have a one-on-one meeting scheduled with ${meeting.reporter.name} tomorrow at ${meeting.meetingDate.toLocaleTimeString()}.\n\nPlease prepare any topics you'd like to discuss.\n\nBest,\nAMI One-on-One System`,
-          html: `<p>Hi ${meeting.employee.name},</p><p>This is a reminder that you have a one-on-one meeting scheduled with <strong>${meeting.reporter.name}</strong> tomorrow at <strong>${meeting.meetingDate.toLocaleTimeString()}</strong>.</p><p>Please prepare any topics you'd like to discuss.</p><p>Best,<br/>AMI One-on-One System</p>`,
+          text: `Hi ${meeting.employee.name || 'there'},\n\nThis is a reminder that you have a one-on-one meeting scheduled with ${meeting.reporter.name || meeting.reporter.email} tomorrow at ${meeting.meetingDate.toLocaleTimeString()}.\n\nPlease prepare any topics you'd like to discuss.\n\nBest,\nAMI One-on-One System`,
+          html: `<p>Hi ${meeting.employee.name || 'there'},</p><p>This is a reminder that you have a one-on-one meeting scheduled with <strong>${meeting.reporter.name || meeting.reporter.email}</strong> tomorrow at <strong>${meeting.meetingDate.toLocaleTimeString()}</strong>.</p><p>Please prepare any topics you'd like to discuss.</p><p>Best,<br/>AMI One-on-One System</p>`,
         })
       } catch (emailError) {
         console.error('Failed to send reminder email:', emailError)

@@ -165,7 +165,7 @@ export function TodoList({ todos, currentUserId, userRole }: TodoListProps) {
                       {/* Meta Info */}
                       <div className="flex items-center gap-4 mt-3 text-xs text-medium-gray">
                         <span className="flex items-center gap-1">
-                          <span className="font-medium">Assigned to:</span> {todo.assignedTo.name}
+                          <span className="font-medium">Assigned to:</span> {todo.assignedTo.name || todo.assignedTo.email}
                         </span>
                         {todo.dueDate && (
                           <span className={`flex items-center gap-1 ${isOverdue ? 'text-red-500 font-medium' : ''}`}>

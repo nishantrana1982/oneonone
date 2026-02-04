@@ -120,11 +120,11 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
                     />
                     <div className="w-10 h-10 rounded-full bg-off-white dark:bg-dark-gray flex items-center justify-center">
                       <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                        {employee.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                        {(employee.name || employee.email).split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                       </span>
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium text-dark-gray dark:text-white">{employee.name}</p>
+                      <p className="font-medium text-dark-gray dark:text-white">{employee.name || employee.email}</p>
                       <p className="text-sm text-medium-gray">{employee.email}</p>
                     </div>
                     {watchedEmployee === employee.id && (

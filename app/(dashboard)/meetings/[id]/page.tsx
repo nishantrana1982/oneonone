@@ -119,7 +119,7 @@ export default async function MeetingDetailPage({
             </div>
             <div>
               <p className="text-sm text-medium-gray">Employee</p>
-              <p className="font-medium text-dark-gray dark:text-white">{meeting.employee.name}</p>
+              <p className="font-medium text-dark-gray dark:text-white">{meeting.employee.name || meeting.employee.email}</p>
               <p className="text-sm text-medium-gray">{meeting.employee.email}</p>
             </div>
           </div>
@@ -132,7 +132,7 @@ export default async function MeetingDetailPage({
             </div>
             <div>
               <p className="text-sm text-medium-gray">Reporter</p>
-              <p className="font-medium text-dark-gray dark:text-white">{meeting.reporter.name}</p>
+              <p className="font-medium text-dark-gray dark:text-white">{meeting.reporter.name || meeting.reporter.email}</p>
               <p className="text-sm text-medium-gray">{meeting.reporter.email}</p>
             </div>
           </div>
@@ -251,9 +251,9 @@ export default async function MeetingDetailPage({
             <AddTodoForm
               meetingId={meeting.id}
               employeeId={meeting.employeeId}
-              employeeName={meeting.employee.name}
+              employeeName={meeting.employee.name || meeting.employee.email}
               reporterId={meeting.reporterId}
-              reporterName={meeting.reporter.name}
+              reporterName={meeting.reporter.name || meeting.reporter.email}
             />
           )}
         </div>
@@ -299,7 +299,7 @@ export default async function MeetingDetailPage({
                             <p className="text-sm text-medium-gray mt-1">{todo.description}</p>
                           )}
                           <div className="flex items-center gap-4 mt-2 text-xs text-medium-gray">
-                            <span>Assigned to: {todo.assignedTo.name}</span>
+                            <span>Assigned to: {todo.assignedTo.name || todo.assignedTo.email}</span>
                             {todo.dueDate && (
                               <span>Due: {new Date(todo.dueDate).toLocaleDateString()}</span>
                             )}

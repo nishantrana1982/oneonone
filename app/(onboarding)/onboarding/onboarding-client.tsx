@@ -97,7 +97,7 @@ export function OnboardingClient({ user, managers, departments }: OnboardingClie
           </svg>
         </div>
         <h1 className="text-2xl font-bold text-dark-gray dark:text-white mb-2">
-          Welcome, {user.name}!
+          Welcome{user.name ? `, ${user.name}` : ''}!
         </h1>
         <p className="text-medium-gray">
           Set up your profile to get started
@@ -239,12 +239,12 @@ export function OnboardingClient({ user, managers, departments }: OnboardingClie
                   >
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-full bg-dark-gray dark:bg-white flex items-center justify-center text-white dark:text-dark-gray font-semibold">
-                        {manager.name.charAt(0).toUpperCase()}
+                        {(manager.name || manager.email).charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-dark-gray dark:text-white truncate">
-                            {manager.name}
+                            {manager.name || manager.email}
                           </span>
                           <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
                             manager.role === UserRole.SUPER_ADMIN

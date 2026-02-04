@@ -203,7 +203,7 @@ export default async function DashboardPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-dark-gray dark:text-white truncate">
-                      {user.role === UserRole.EMPLOYEE ? meeting.reporter.name : meeting.employee.name}
+                      {user.role === UserRole.EMPLOYEE ? (meeting.reporter.name || meeting.reporter.email) : (meeting.employee.name || meeting.employee.email)}
                     </p>
                     <p className="text-sm text-medium-gray">
                       {new Date(meeting.meetingDate).toLocaleDateString('en-US', {

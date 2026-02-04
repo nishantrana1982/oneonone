@@ -73,12 +73,12 @@ export default async function EmployeeDetailPage({
         <div className="flex items-center gap-5">
           <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-orange/20 to-orange/10 flex items-center justify-center">
             <span className="text-2xl font-bold text-orange">
-              {employee.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+              {(employee.name || employee.email).split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
             </span>
           </div>
           <div>
             <h1 className="text-3xl font-bold text-dark-gray dark:text-white mb-1">
-              {employee.name}
+              {employee.name || employee.email}
             </h1>
             <p className="text-medium-gray flex items-center gap-2">
               <Mail className="w-4 h-4" />
@@ -86,7 +86,7 @@ export default async function EmployeeDetailPage({
             </p>
           </div>
         </div>
-        <QuarterlySummary userId={employee.id} userName={employee.name} />
+        <QuarterlySummary userId={employee.id} userName={employee.name || employee.email} />
       </div>
 
       {/* Info Cards */}
@@ -175,7 +175,7 @@ export default async function EmployeeDetailPage({
                 </div>
                 <div className="flex-1">
                   <p className="font-medium text-dark-gray dark:text-white">
-                    Meeting with {meeting.reporter.name}
+                    Meeting with {meeting.reporter.name || meeting.reporter.email}
                   </p>
                   <p className="text-sm text-medium-gray">
                     {new Date(meeting.meetingDate).toLocaleDateString('en-US', {

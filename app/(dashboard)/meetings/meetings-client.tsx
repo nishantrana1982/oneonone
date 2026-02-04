@@ -319,7 +319,7 @@ export function MeetingsClient({ meetings, recurringSchedules, currentUserId, us
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-dark-gray dark:text-white">
-                        {schedule.employee.name}
+                        {schedule.employee.name || schedule.employee.email}
                       </p>
                       <p className="text-sm text-medium-gray">
                         {schedule.frequency === 'BIWEEKLY' ? 'Bi-weekly' : schedule.frequency.toLowerCase()} • {dayNames[schedule.dayOfWeek]} at {formatTime(schedule.timeOfDay)}
