@@ -43,6 +43,10 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
     try {
       const meetingDateTime = new Date(`${data.meetingDate}T${data.meetingTime}`)
 
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'new-meeting-form.tsx:onSubmit',message:'Form submit - time values',data:{rawDate:data.meetingDate,rawTime:data.meetingTime,combinedString:`${data.meetingDate}T${data.meetingTime}`,parsedDateTime:meetingDateTime.toString(),isoString:meetingDateTime.toISOString(),browserTimezone:Intl.DateTimeFormat().resolvedOptions().timeZone,browserOffset:meetingDateTime.getTimezoneOffset()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+
       const response = await fetch('/api/meetings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
