@@ -54,9 +54,7 @@ npx prisma db push
 echo "🏗️ Building app (this may take a few minutes)..."
 NODE_OPTIONS="--max-old-space-size=3072" npm run build || { echo "❌ Build failed."; exit 1; }
 
-# Seed database with test data (optional; skip on failure)
-echo "🌱 Seeding database..."
-npx prisma db seed || true
+# Do NOT run db seed on deploy - seed wipes real data. Use only for local/dev.
 
 # Restart PM2 (ecosystem config sets cwd so next start finds .next in app dir)
 echo "🔄 Restarting app..."
