@@ -16,7 +16,7 @@ export async function POST(
   try {
     const user = await requireRole([UserRole.REPORTER, UserRole.SUPER_ADMIN])
     const body = await request.json()
-    const { key, duration } = body
+    const { key, duration, language } = body // language is ISO-639-1 code: en, hi, gu, mr, etc.
 
     // Check if OpenAI is configured first
     const settings = await getSettings()
@@ -61,7 +61,7 @@ export async function POST(
     // Start processing synchronously (will complete in background via maxDuration)
     // We use setImmediate to return the response first, then process
     setImmediate(() => {
-      processRecording(params.id, key, meeting.employee.name, meeting.reporter.name, user.id)
+      processRecording(params.id, key, meeting.employee.name, meeting.reporter.name, user.id, language)
         .catch(err => console.error('Background processing error:', err))
     })
 
@@ -83,7 +83,8 @@ async function processRecording(
   key: string,
   employeeName: string,
   reporterName: string,
-  userId: string
+  userId: string,
+  language?: string // ISO-639-1 code: en, hi, gu, mr, etc.
 ) {
   try {
     console.log(`[Recording] Starting transcription for meeting ${meetingId}`)
@@ -148,8 +149,8 @@ async function processRecording(
     }
 
     // Transcribe with Whisper
-    console.log(`[Recording] Starting Whisper transcription...`)
-    const transcription = await transcribeAudio(audioBuffer, 'recording.webm')
+    console.log(`[Recording] Starting Whisper transcription with language: ${language || 'auto-detect'}...`)
+    const transcription = await transcribeAudio(audioBuffer, 'recording.webm', language)
     console.log(`[Recording] Transcription complete. Language: ${transcription.language}, Duration: ${transcription.duration}s`)
 
     // Update with transcription

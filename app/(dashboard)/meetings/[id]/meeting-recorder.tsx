@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Mic, MicOff, Square, Loader2, CheckCircle2, AlertCircle, Play, Pause, RefreshCw } from 'lucide-react'
+import { Mic, MicOff, Square, Loader2, CheckCircle2, AlertCircle, Play, Pause, RefreshCw, Globe } from 'lucide-react'
 
 interface MeetingRecorderProps {
   meetingId: string
@@ -19,6 +19,21 @@ const PROCESSING_STAGES = [
   { status: 'COMPLETED', label: 'Complete!', progress: 100 },
 ]
 
+// Language options for transcription (ISO-639-1 codes)
+const LANGUAGE_OPTIONS = [
+  { code: 'auto', label: 'Auto-detect' },
+  { code: 'en', label: 'English' },
+  { code: 'hi', label: 'Hindi (हिन्दी)' },
+  { code: 'gu', label: 'Gujarati (ગુજરાતી)' },
+  { code: 'mr', label: 'Marathi (मराठी)' },
+  { code: 'ta', label: 'Tamil (தமிழ்)' },
+  { code: 'te', label: 'Telugu (తెలుగు)' },
+  { code: 'kn', label: 'Kannada (ಕನ್ನಡ)' },
+  { code: 'ml', label: 'Malayalam (മലയാളം)' },
+  { code: 'bn', label: 'Bengali (বাংলা)' },
+  { code: 'pa', label: 'Punjabi (ਪੰਜਾਬੀ)' },
+]
+
 export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStatus: initialStatus, errorMessage: initialError }: MeetingRecorderProps) {
   const router = useRouter()
   const [isRecording, setIsRecording] = useState(false)
@@ -28,6 +43,7 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
+  const [selectedLanguage, setSelectedLanguage] = useState('auto') // ISO-639-1 code
   
   // Processing status state
   const [currentStatus, setCurrentStatus] = useState(initialStatus)
@@ -245,12 +261,16 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
         
         setCurrentStatus('UPLOADED')
         
-        // Start processing
+        // Start processing with language hint
         setIsProcessing(true)
         const processResponse = await fetch(`/api/meetings/${meetingId}/recording/process`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key: localData.key, duration: recordingTime }),
+          body: JSON.stringify({ 
+            key: localData.key, 
+            duration: recordingTime,
+            language: selectedLanguage !== 'auto' ? selectedLanguage : undefined,
+          }),
         })
 
         if (!processResponse.ok) {
@@ -277,12 +297,16 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
 
         setCurrentStatus('UPLOADED')
 
-        // Confirm upload and start processing
+        // Confirm upload and start processing with language hint
         setIsProcessing(true)
         const processResponse = await fetch(`/api/meetings/${meetingId}/recording/process`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key, duration: recordingTime }),
+          body: JSON.stringify({ 
+            key, 
+            duration: recordingTime,
+            language: selectedLanguage !== 'auto' ? selectedLanguage : undefined,
+          }),
         })
 
         if (!processResponse.ok) {
@@ -560,7 +584,23 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
 
       {/* Start recording button */}
       {!isRecording && !audioBlob && (
-        <div className="text-center">
+        <div className="text-center space-y-4">
+          {/* Language selector */}
+          <div className="flex items-center justify-center gap-2">
+            <Globe className="w-4 h-4 text-medium-gray" />
+            <select
+              value={selectedLanguage}
+              onChange={(e) => setSelectedLanguage(e.target.value)}
+              className="px-3 py-2 rounded-xl border border-off-white dark:border-medium-gray/20 bg-white dark:bg-charcoal text-dark-gray dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange/50"
+            >
+              {LANGUAGE_OPTIONS.map((lang) => (
+                <option key={lang.code} value={lang.code}>
+                  {lang.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          
           <button
             onClick={startRecording}
             className="inline-flex items-center gap-3 px-8 py-4 text-lg font-medium bg-gradient-to-r from-red-500 to-orange text-white rounded-2xl hover:opacity-90 transition-opacity shadow-lg"
@@ -570,8 +610,11 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
             </div>
             Start Recording
           </button>
-          <p className="text-xs text-medium-gray mt-3">
-            Recording will be automatically transcribed and analyzed
+          <p className="text-xs text-medium-gray">
+            {selectedLanguage === 'auto' 
+              ? 'Language will be auto-detected. Select a specific language for better accuracy.'
+              : `Recording will be transcribed in ${LANGUAGE_OPTIONS.find(l => l.code === selectedLanguage)?.label}`
+            }
           </p>
         </div>
       )}

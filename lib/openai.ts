@@ -57,23 +57,32 @@ export interface AnalysisResult {
   commonThemes: string[]
 }
 
-export async function transcribeAudio(audioBuffer: Buffer, filename: string): Promise<TranscriptionResult> {
+export async function transcribeAudio(audioBuffer: Buffer, filename: string, language?: string): Promise<TranscriptionResult> {
   try {
     const openai = await getOpenAIClient()
     const models = await getModels()
     
-    console.log(`[OpenAI] Starting transcription with model: ${models.whisperModel}`)
+    console.log(`[OpenAI] Starting transcription with model: ${models.whisperModel}, language: ${language || 'auto-detect'}`)
     console.log(`[OpenAI] Audio buffer size: ${audioBuffer.length} bytes`)
     
     // Create a File object from the buffer - convert to Uint8Array for compatibility
     const uint8Array = new Uint8Array(audioBuffer)
     const file = new File([uint8Array], filename, { type: 'audio/webm' })
 
-    const response = await openai.audio.transcriptions.create({
+    // Build transcription options - include language if specified
+    const transcriptionOptions: any = {
       file: file,
       model: models.whisperModel,
       response_format: 'verbose_json',
-    })
+    }
+    
+    // If language is specified, pass it to Whisper to improve accuracy
+    // ISO-639-1 codes: en=English, hi=Hindi, gu=Gujarati, mr=Marathi, etc.
+    if (language && language !== 'auto') {
+      transcriptionOptions.language = language
+    }
+
+    const response = await openai.audio.transcriptions.create(transcriptionOptions)
 
     console.log(`[OpenAI] Transcription successful. Text length: ${response.text?.length || 0}`)
 
