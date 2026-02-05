@@ -227,6 +227,8 @@ export default async function MeetingDetailPage({
                 duration: meeting.recording.duration,
                 audioPlaybackUrl: null, // Will be fetched client-side with signed URL
               }}
+              employeeId={meeting.employeeId}
+              reporterId={meeting.reporterId}
             />
           )}
         </div>

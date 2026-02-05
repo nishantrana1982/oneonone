@@ -3,7 +3,7 @@ import { requireRole, canAccessEmployeeData } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { getSignedDownloadUrl, isS3Configured, readFromLocalStorage } from '@/lib/s3'
 import { transcribeAudio, analyzeTranscript } from '@/lib/openai'
-import { UserRole, TodoPriority } from '@prisma/client'
+import { UserRole } from '@prisma/client'
 import { getSettings } from '@/lib/settings'
 
 // Set max duration for this route (5 minutes for processing)
@@ -188,31 +188,8 @@ async function processRecording(
       },
     })
 
-    // Create auto-generated todos
-    const meeting = await prisma.meeting.findUnique({
-      where: { id: meetingId },
-      include: { employee: true, reporter: true },
-    })
-
-    if (meeting && analysis.suggestedTodos && analysis.suggestedTodos.length > 0) {
-      console.log(`[Recording] Creating ${analysis.suggestedTodos.length} auto todos...`)
-      for (const todo of analysis.suggestedTodos) {
-        const assignedToId = todo.assignTo === 'employee' 
-          ? meeting.employeeId 
-          : meeting.reporterId
-
-        await prisma.todo.create({
-          data: {
-            meetingId,
-            title: `[Auto] ${todo.title}`,
-            description: todo.description,
-            priority: todo.priority as TodoPriority,
-            assignedToId,
-            createdById: userId,
-          },
-        })
-      }
-    }
+    // Note: Suggested todos are now shown in the UI with "Add to To-Do" buttons
+    // Users can manually add the ones they want instead of auto-creating all of them
 
     console.log(`[Recording] Processing complete for meeting ${meetingId}`)
 

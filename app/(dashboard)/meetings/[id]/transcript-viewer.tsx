@@ -12,7 +12,9 @@ import {
   ChevronDown,
   ChevronUp,
   Trash2,
-  Loader2
+  Loader2,
+  Plus,
+  Check
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
@@ -49,6 +51,8 @@ interface TranscriptViewerProps {
     duration: number | null
     audioPlaybackUrl: string | null
   }
+  employeeId?: string
+  reporterId?: string
 }
 
 const languageNames: Record<string, string> = {
@@ -59,12 +63,14 @@ const languageNames: Record<string, string> = {
   ta: 'Tamil',
 }
 
-export function TranscriptViewer({ recording }: TranscriptViewerProps) {
+export function TranscriptViewer({ recording, employeeId, reporterId }: TranscriptViewerProps) {
   const router = useRouter()
   const [showFullTranscript, setShowFullTranscript] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [activeTab, setActiveTab] = useState<'summary' | 'transcript' | 'analysis'>('summary')
   const [audioUrl, setAudioUrl] = useState<string | null>(recording.audioPlaybackUrl)
+  const [addedTodos, setAddedTodos] = useState<Set<number>>(new Set())
+  const [addingTodo, setAddingTodo] = useState<number | null>(null)
 
   // Fetch signed audio URL on mount
   useEffect(() => {
@@ -108,6 +114,43 @@ export function TranscriptViewer({ recording }: TranscriptViewerProps) {
       alert('Failed to delete recording')
     } finally {
       setIsDeleting(false)
+    }
+  }
+
+  const handleAddTodo = async (todo: { title: string; description: string; assignTo: string; priority: string }, index: number) => {
+    if (!employeeId || !reporterId) {
+      alert('Unable to add todo: missing participant information')
+      return
+    }
+
+    setAddingTodo(index)
+    try {
+      const assignedToId = todo.assignTo === 'employee' ? employeeId : reporterId
+
+      const response = await fetch('/api/todos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: todo.title,
+          description: todo.description,
+          assignedToId,
+          meetingId: recording.meetingId,
+          priority: todo.priority,
+        }),
+      })
+
+      if (response.ok) {
+        setAddedTodos(prev => new Set([...prev, index]))
+        router.refresh()
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Failed to add todo')
+      }
+    } catch (error) {
+      console.error('Error adding todo:', error)
+      alert('Failed to add todo')
+    } finally {
+      setAddingTodo(null)
     }
   }
 
@@ -277,27 +320,56 @@ export function TranscriptViewer({ recording }: TranscriptViewerProps) {
             <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-6">
               <h4 className="font-semibold text-dark-gray dark:text-white mb-3 flex items-center gap-2">
                 <CheckSquare className="w-5 h-5 text-green-500" />
-                Auto-generated Action Items
+                Suggested Action Items
               </h4>
+              <p className="text-sm text-medium-gray mb-4">
+                These action items were automatically identified from the transcript. Click "Add" to add them to your to-do list.
+              </p>
               <div className="space-y-3">
                 {recording.autoTodos.map((todo, i) => (
                   <div key={i} className="p-3 rounded-xl bg-off-white dark:bg-charcoal">
                     <div className="flex items-start justify-between gap-3">
-                      <div>
+                      <div className="flex-1">
                         <p className="font-medium text-dark-gray dark:text-white">{todo.title}</p>
                         <p className="text-sm text-medium-gray mt-1">{todo.description}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                            todo.priority === 'HIGH' ? 'bg-red-500/10 text-red-500' :
+                            todo.priority === 'MEDIUM' ? 'bg-yellow-500/10 text-yellow-500' :
+                            'bg-green-500/10 text-green-500'
+                          }`}>
+                            {todo.priority}
+                          </span>
+                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-500/10 text-blue-500 capitalize">
+                            → {todo.assignTo}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          todo.priority === 'HIGH' ? 'bg-red-500/10 text-red-500' :
-                          todo.priority === 'MEDIUM' ? 'bg-yellow-500/10 text-yellow-500' :
-                          'bg-green-500/10 text-green-500'
-                        }`}>
-                          {todo.priority}
-                        </span>
-                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-500/10 text-blue-500 capitalize">
-                          {todo.assignTo}
-                        </span>
+                      <div className="flex-shrink-0">
+                        {addedTodos.has(i) ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-green-600 bg-green-500/10 rounded-lg">
+                            <Check className="w-4 h-4" />
+                            Added
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleAddTodo(todo, i)}
+                            disabled={addingTodo === i}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-orange hover:bg-orange/90 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            {addingTodo === i ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Adding...
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="w-4 h-4" />
+                                Add to To-Do
+                              </>
+                            )}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
