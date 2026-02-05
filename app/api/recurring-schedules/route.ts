@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     const schedules = await prisma.recurringSchedule.findMany({
       where: {
         reporterId: user.id,
+        isActive: true, // Filter out soft-deleted schedules
       },
       include: {
         _count: { select: { meetings: true } },

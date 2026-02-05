@@ -9,6 +9,7 @@ import { formatMeetingDateLong } from '@/lib/utils'
 import { AddTodoForm } from './add-todo-form'
 import { MeetingRecorder } from './meeting-recorder'
 import { MarkCompletedButton } from './mark-completed-button'
+import { DeleteMeetingButton } from './delete-meeting-button'
 import { TranscriptViewer } from './transcript-viewer'
 import { MeetingNotes } from './meeting-notes'
 import { FileAttachments } from './file-attachments'
@@ -99,6 +100,9 @@ export default async function MeetingDetailPage({
         <div className="flex flex-wrap items-center gap-3">
           {isReporter && meeting.status === 'SCHEDULED' && (
             <MarkCompletedButton meetingId={meeting.id} />
+          )}
+          {isReporter && (
+            <DeleteMeetingButton meetingId={meeting.id} />
           )}
           <span className={`px-4 py-2 rounded-full text-sm font-medium ${
             meeting.status === 'COMPLETED'
