@@ -65,13 +65,14 @@ export async function transcribeAudio(audioBuffer: Buffer, filename: string, lan
     console.log(`[OpenAI] Starting transcription with model: ${models.whisperModel}, language: ${language || 'auto-detect'}`)
     console.log(`[OpenAI] Audio buffer size: ${audioBuffer.length} bytes`)
     
-    // Create a File object from the buffer - convert to Uint8Array for compatibility
-    const uint8Array = new Uint8Array(audioBuffer)
-    const file = new File([uint8Array], filename, { type: 'audio/webm' })
+    // Use OpenAI's toFile helper to create a proper file object for Node.js
+    // This works correctly in both Node.js and Edge runtime
+    const { toFile } = await import('openai/uploads')
+    const audioFile = await toFile(audioBuffer, filename, { type: 'audio/webm' })
 
     // Build transcription options - include language if specified
     const transcriptionOptions: any = {
-      file: file,
+      file: audioFile,
       model: models.whisperModel,
       response_format: 'verbose_json',
     }
