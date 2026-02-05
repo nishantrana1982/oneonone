@@ -65,5 +65,6 @@ pm2 save
 
 echo ""
 echo "✅ Deployment complete!"
-echo "🌐 Open: http://13.127.6.212.nip.io"
+echo "🌐 App URL: set NEXTAUTH_URL in .env (e.g. https://oneonone.wliq.ai)"
+echo "📋 SSL: see deploy/SSL-SETUP.md and use deploy/nginx-ssl.conf on this server"
 echo ""

@@ -123,7 +123,7 @@ For production, use an Application Load Balancer:
 3. Clone repository and build
 4. Set up PM2 or systemd service
 5. Configure Nginx as reverse proxy
-6. Set up SSL with Let's Encrypt
+6. Set up SSL with Let's Encrypt — **see [deploy/SSL-SETUP.md](deploy/SSL-SETUP.md)** and use **deploy/nginx-ssl.conf** on the server
 
 ## Monitoring
 
