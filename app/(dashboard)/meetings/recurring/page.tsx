@@ -23,9 +23,9 @@ export default async function RecurringSchedulesPage() {
         orderBy: { name: 'asc' },
       })
 
-  // Get existing schedules
+  // Get existing schedules (filter out soft-deleted ones)
   const schedules = await prisma.recurringSchedule.findMany({
-    where: { reporterId: user.id },
+    where: { reporterId: user.id, isActive: true },
     orderBy: { createdAt: 'desc' },
   })
 

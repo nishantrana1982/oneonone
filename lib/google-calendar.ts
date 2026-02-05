@@ -60,17 +60,8 @@ export async function createCalendarEvent(
   employeeName: string,
   reporterName: string
 ) {
-  // #region agent log
-  console.log('[DEBUG] createCalendarEvent called:', { meetingId, employeeEmail, reporterEmail, reporterId, meetingDate: meetingDate.toISOString(), employeeName, reporterName });
-  // #endregion
   try {
-    // #region agent log
-    console.log('[DEBUG] Getting authenticated client for reporterId:', reporterId);
-    // #endregion
     const oauth2Client = await getAuthenticatedClient(reporterId)
-    // #region agent log
-    console.log('[DEBUG] Got authenticated client, creating calendar API');
-    // #endregion
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
 
     const event = {
@@ -103,18 +94,12 @@ export async function createCalendarEvent(
       },
     }
 
-    // #region agent log
-    console.log('[DEBUG] Inserting calendar event with:', JSON.stringify(event, null, 2));
-    // #endregion
     const response = await calendar.events.insert({
       calendarId: 'primary',
       requestBody: event,
       conferenceDataVersion: 1,
       sendUpdates: 'all', // Send invites to all attendees
     })
-    // #region agent log
-    console.log('[DEBUG] Calendar API response:', { id: response.data.id, htmlLink: response.data.htmlLink, hangoutLink: response.data.hangoutLink });
-    // #endregion
 
     if (response.data.id && response.data.htmlLink) {
       // Store calendar event in database
@@ -136,9 +121,6 @@ export async function createCalendarEvent(
 
     throw new Error('Failed to create calendar event')
   } catch (error: any) {
-    // #region agent log
-    console.error('[DEBUG] createCalendarEvent ERROR:', { message: error.message, code: error.code, status: error.status, errors: error.errors, stack: error.stack?.substring(0, 500) });
-    // #endregion
     console.error('Error creating calendar event:', error)
     
     // Check if it's an auth error
@@ -222,15 +204,9 @@ export async function isCalendarEnabled(userId: string): Promise<boolean> {
       },
     })
 
-    // #region agent log
-    console.log('[DEBUG] isCalendarEnabled check:', { userId, hasAccount: !!account, hasAccessToken: !!account?.access_token, hasRefreshToken: !!account?.refresh_token, scope: account?.scope });
-    // #endregion
-
     return !!(account?.access_token && account?.refresh_token)
   } catch (e) {
-    // #region agent log
-    console.error('[DEBUG] isCalendarEnabled error:', e);
-    // #endregion
+    console.error('Error checking calendar status:', e)
     return false
   }
 }

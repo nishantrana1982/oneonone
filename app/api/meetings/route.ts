@@ -50,11 +50,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { employeeId, meetingDate } = body
 
-    // #region agent log
-    const parsedDate = new Date(meetingDate);
-    console.log('[DEBUG] API received meetingDate:', { raw: meetingDate, parsed: parsedDate.toString(), isoBack: parsedDate.toISOString() });
-    // #endregion
-
     const employee = await prisma.user.findUnique({
       where: { id: employeeId },
     })
@@ -89,14 +84,7 @@ export async function POST(request: NextRequest) {
       // Check if calendar is enabled for the reporter
       const calendarEnabled = await isCalendarEnabled(reporterId)
       
-      // #region agent log
-      console.log('[DEBUG] Calendar check:', { reporterId, calendarEnabled });
-      // #endregion
-      
       if (calendarEnabled) {
-        // #region agent log
-        console.log('[DEBUG] Attempting to create calendar event for meeting:', meeting.id);
-        // #endregion
         const calendarResult = await createCalendarEvent(
           meeting.id,
           meeting.employee.email,
@@ -106,19 +94,11 @@ export async function POST(request: NextRequest) {
           meeting.employee.name,
           meeting.reporter.name
         )
-        // #region agent log
-        console.log('[DEBUG] Calendar event created successfully:', calendarResult);
-        // #endregion
         console.log('Calendar event created:', calendarResult)
       } else {
-        // #region agent log
-        console.log('[DEBUG] Calendar NOT enabled - skipping calendar event creation');
-        // #endregion
+        console.log('Calendar not enabled for reporter - skipping calendar event')
       }
     } catch (error) {
-      // #region agent log
-      console.error('[DEBUG] Calendar event creation FAILED with error:', error);
-      // #endregion
       console.error('Failed to create calendar event:', error)
       // Continue even if calendar creation fails
     }
