@@ -101,8 +101,11 @@ export async function transcribeAudio(audioBuffer: Buffer, filename: string, lan
     }
     
     // If language is specified, pass it to Whisper to improve accuracy
-    // ISO-639-1 codes: en=English, hi=Hindi, gu=Gujarati, mr=Marathi, etc.
-    if (language && language !== 'auto') {
+    // Note: OpenAI Whisper API only supports certain languages as explicit hints
+    // Supported: af, ar, hy, az, be, bs, bg, ca, zh, hr, cs, da, nl, en, et, fi, fr, gl, de, el, he, hi, hu, is, id, it, ja, kk, ko, lv, lt, mk, ms, mr, mi, ne, no, fa, pl, pt, ro, ru, sr, sk, sl, es, sw, sv, tl, ta, th, tr, uk, ur, vi, cy
+    // For unsupported languages (like Gujarati 'gu'), we let Whisper auto-detect
+    const supportedLanguages = ['af', 'ar', 'hy', 'az', 'be', 'bs', 'bg', 'ca', 'zh', 'hr', 'cs', 'da', 'nl', 'en', 'et', 'fi', 'fr', 'gl', 'de', 'el', 'he', 'hi', 'hu', 'is', 'id', 'it', 'ja', 'kk', 'ko', 'lv', 'lt', 'mk', 'ms', 'mr', 'mi', 'ne', 'no', 'fa', 'pl', 'pt', 'ro', 'ru', 'sr', 'sk', 'sl', 'es', 'sw', 'sv', 'tl', 'ta', 'th', 'tr', 'uk', 'ur', 'vi', 'cy']
+    if (language && language !== 'auto' && supportedLanguages.includes(language)) {
       transcriptionOptions.language = language
     }
     

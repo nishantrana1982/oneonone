@@ -20,11 +20,14 @@ const PROCESSING_STAGES = [
 ]
 
 // Language options for transcription (ISO-639-1 codes)
+// Note: Some languages are not explicitly supported by OpenAI's API and will use auto-detection
+// Supported by API: en, hi, mr, ta, te, kn, ml, bn, pa, ur
+// Auto-detect fallback: gu (Gujarati)
 const LANGUAGE_OPTIONS = [
   { code: 'auto', label: 'Auto-detect' },
   { code: 'en', label: 'English' },
   { code: 'hi', label: 'Hindi (हिन्दी)' },
-  { code: 'gu', label: 'Gujarati (ગુજરાતી)' },
+  { code: 'gu', label: 'Gujarati (ગુજરાતી) - Auto-detect' },
   { code: 'mr', label: 'Marathi (मराठी)' },
   { code: 'ta', label: 'Tamil (தமிழ்)' },
   { code: 'te', label: 'Telugu (తెలుగు)' },
@@ -32,6 +35,7 @@ const LANGUAGE_OPTIONS = [
   { code: 'ml', label: 'Malayalam (മലയാളം)' },
   { code: 'bn', label: 'Bengali (বাংলা)' },
   { code: 'pa', label: 'Punjabi (ਪੰਜਾਬੀ)' },
+  { code: 'ur', label: 'Urdu (اردو)' },
 ]
 
 export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStatus: initialStatus, errorMessage: initialError }: MeetingRecorderProps) {
