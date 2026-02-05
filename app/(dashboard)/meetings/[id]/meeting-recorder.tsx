@@ -210,16 +210,31 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
       const { uploadUrl, key, useLocalUpload } = await presignResponse.json()
 
       if (useLocalUpload) {
-        // Upload directly to server (local storage)
+        // Upload directly to server (local storage) with timeout so we don't hang forever
         console.log('Using local storage upload')
         const formData = new FormData()
         formData.append('file', audioBlob, 'recording.webm')
         formData.append('duration', recordingTime.toString())
-        
-        const localUploadResponse = await fetch(`/api/meetings/${meetingId}/recording/upload`, {
-          method: 'POST',
-          body: formData,
-        })
+
+        const uploadTimeoutMs = 5 * 60 * 1000 // 5 minutes
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), uploadTimeoutMs)
+
+        let localUploadResponse: Response
+        try {
+          localUploadResponse = await fetch(`/api/meetings/${meetingId}/recording/upload`, {
+            method: 'POST',
+            body: formData,
+            signal: controller.signal,
+          })
+        } catch (uploadErr: unknown) {
+          clearTimeout(timeoutId)
+          if (uploadErr instanceof Error && uploadErr.name === 'AbortError') {
+            throw new Error('Upload timed out. The recording may be too large or the connection is slow. Try a shorter recording.')
+          }
+          throw uploadErr
+        }
+        clearTimeout(timeoutId)
         
         if (!localUploadResponse.ok) {
           const errorData = await localUploadResponse.json().catch(() => ({}))
