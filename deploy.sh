@@ -58,9 +58,10 @@ NODE_OPTIONS="--max-old-space-size=3072" npm run build || { echo "❌ Build fail
 echo "🌱 Seeding database..."
 npx prisma db seed || true
 
-# Restart PM2
+# Restart PM2 (ecosystem config sets cwd so next start finds .next in app dir)
 echo "🔄 Restarting app..."
-pm2 restart oneonone || pm2 start npm --name "oneonone" -- start
+pm2 delete oneonone 2>/dev/null || true
+pm2 start ecosystem.config.cjs
 pm2 save
 
 echo ""
