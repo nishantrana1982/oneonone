@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -31,21 +32,51 @@ export function DatePicker({
   className
 }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [dropdownRect, setDropdownRect] = useState<{ top: number; left: number } | null>(null)
   const [viewDate, setViewDate] = useState(() => {
     if (value) return new Date(value)
     return new Date()
   })
   const containerRef = useRef<HTMLDivElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Parse the value to display
   const selectedDate = value ? new Date(value) : null
 
-  // Handle click outside
+  // Position dropdown when opening (and on scroll/resize so it stays aligned)
+  useEffect(() => {
+    if (!isOpen || !containerRef.current) {
+      setDropdownRect(null)
+      return
+    }
+    const updatePosition = () => {
+      if (!containerRef.current) return
+      const rect = containerRef.current.getBoundingClientRect()
+      const dropdownWidth = 320
+      let left = rect.left
+      if (left + dropdownWidth > window.innerWidth) left = window.innerWidth - dropdownWidth
+      if (left < 8) left = 8
+      setDropdownRect({
+        top: rect.bottom + 8,
+        left,
+      })
+    }
+    updatePosition()
+    window.addEventListener('scroll', updatePosition, true)
+    window.addEventListener('resize', updatePosition)
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true)
+      window.removeEventListener('resize', updatePosition)
+    }
+  }, [isOpen])
+
+  // Handle click outside (trigger or portaled dropdown)
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false)
-      }
+      const target = event.target as Node
+      if (containerRef.current?.contains(target)) return
+      if (dropdownRef.current?.contains(target)) return
+      setIsOpen(false)
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -213,9 +244,13 @@ export function DatePicker({
         </svg>
       </button>
 
-      {/* Dropdown Calendar */}
-      {isOpen && (
-        <div className="absolute z-[100] mt-2 left-0 w-[320px] bg-white dark:bg-charcoal rounded-2xl border border-off-white dark:border-medium-gray/20 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-200">
+      {/* Dropdown Calendar - portaled so it is never clipped by overflow */}
+      {isOpen && dropdownRect && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={dropdownRef}
+          className="fixed z-[9999] w-[320px] bg-white dark:bg-charcoal rounded-2xl border border-off-white dark:border-medium-gray/20 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-200"
+          style={{ top: dropdownRect.top, left: dropdownRect.left }}
+        >
           {/* Quick Select */}
           <div className="flex gap-2 p-3 border-b border-off-white dark:border-medium-gray/20 bg-off-white/50 dark:bg-charcoal/50">
             <button
@@ -327,7 +362,8 @@ export function DatePicker({
               </button>
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

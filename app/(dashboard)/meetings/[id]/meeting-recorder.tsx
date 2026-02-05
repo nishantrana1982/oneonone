@@ -247,24 +247,16 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
         console.log('Using S3 upload')
         await new Promise<void>((resolve, reject) => {
           const xhr = new XMLHttpRequest()
-          
           xhr.open('PUT', uploadUrl, true)
           xhr.setRequestHeader('Content-Type', 'audio/webm')
-          
           xhr.onload = () => {
             if (xhr.status >= 200 && xhr.status < 300) {
               resolve()
             } else {
-              console.warn('XHR upload status:', xhr.status)
-              resolve()
+              reject(new Error(`Upload failed (${xhr.status}). Check S3 bucket CORS and permissions.`))
             }
           }
-          
-          xhr.onerror = () => {
-            console.warn('XHR onerror - file may have uploaded')
-            resolve()
-          }
-          
+          xhr.onerror = () => reject(new Error('Network error during upload. Try again.'))
           xhr.send(audioBlob)
         })
 

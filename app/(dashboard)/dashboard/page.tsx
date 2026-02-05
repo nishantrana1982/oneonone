@@ -1,6 +1,7 @@
 import { getCurrentUser } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
+import { formatMeetingDateShort } from '@/lib/utils'
 import Link from 'next/link'
 import { Calendar, CheckSquare, Users, TrendingUp, Clock, AlertCircle, ChevronRight } from 'lucide-react'
 
@@ -206,12 +207,7 @@ export default async function DashboardPage() {
                       {user.role === UserRole.EMPLOYEE ? meeting.reporter.name : meeting.employee.name}
                     </p>
                     <p className="text-sm text-medium-gray">
-                      {new Date(meeting.meetingDate).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit'
-                      })}
+                      {formatMeetingDateShort(meeting.meetingDate)}
                     </p>
                   </div>
                   <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${

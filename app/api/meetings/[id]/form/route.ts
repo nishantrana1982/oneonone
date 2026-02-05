@@ -9,10 +9,12 @@ export async function POST(
   try {
     const user = await requireAuth()
     const body = await request.json()
+    const isDraft = body.draft === true
+    const isSubmit = !isDraft
 
     const meeting = await prisma.meeting.findUnique({
       where: { id: params.id },
-      include: { employee: true },
+      include: { employee: true, reporter: { select: { name: true, email: true } } },
     })
 
     if (!meeting) {
@@ -23,19 +25,50 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
+    const meetingDate = new Date(meeting.meetingDate)
+    const isPastMeeting = meetingDate.getTime() < Date.now()
+
+    // After meeting time, no edits if already submitted
+    if (meeting.formSubmittedAt && isPastMeeting) {
+      return NextResponse.json(
+        { error: 'Form cannot be edited after the meeting time.' },
+        { status: 403 }
+      )
+    }
+
+    const data = {
+      checkInPersonal: typeof body.checkInPersonal === 'string' ? body.checkInPersonal || null : null,
+      checkInProfessional: typeof body.checkInProfessional === 'string' ? body.checkInProfessional || null : null,
+      priorityGoalProfessional: typeof body.priorityGoalProfessional === 'string' ? body.priorityGoalProfessional || null : null,
+      priorityGoalAgency: typeof body.priorityGoalAgency === 'string' ? body.priorityGoalAgency || null : null,
+      progressReport: typeof body.progressReport === 'string' ? body.progressReport || null : null,
+      goodNews: typeof body.goodNews === 'string' ? body.goodNews || null : null,
+      supportNeeded: typeof body.supportNeeded === 'string' ? body.supportNeeded || null : null,
+      priorityDiscussions: typeof body.priorityDiscussions === 'string' ? body.priorityDiscussions || null : null,
+      headsUp: typeof body.headsUp === 'string' ? body.headsUp || null : null,
+      anythingElse: typeof body.anythingElse === 'string' ? body.anythingElse || null : null,
+    }
+
+    if (isDraft) {
+      // Save draft: update fields only, do not set formSubmittedAt or status
+      const updatedMeeting = await prisma.meeting.update({
+        where: { id: params.id },
+        data,
+        include: {
+          employee: { select: { name: true } },
+          reporter: { select: { name: true, email: true } },
+        },
+      })
+      return NextResponse.json(updatedMeeting)
+    }
+
+    // Submit: update fields, set formSubmittedAt and COMPLETED, send email only on first submit
+    const wasAlreadySubmitted = !!meeting.formSubmittedAt
     const updatedMeeting = await prisma.meeting.update({
       where: { id: params.id },
       data: {
-        checkInPersonal: body.checkInPersonal || null,
-        checkInProfessional: body.checkInProfessional || null,
-        priorityGoalProfessional: body.priorityGoalProfessional || null,
-        priorityGoalAgency: body.priorityGoalAgency || null,
-        progressReport: body.progressReport || null,
-        goodNews: body.goodNews || null,
-        supportNeeded: body.supportNeeded || null,
-        priorityDiscussions: body.priorityDiscussions || null,
-        headsUp: body.headsUp || null,
-        anythingElse: body.anythingElse || null,
+        ...data,
+        formSubmittedAt: wasAlreadySubmitted ? meeting.formSubmittedAt : new Date(),
         status: 'COMPLETED',
       },
       include: {
@@ -44,19 +77,19 @@ export async function POST(
       },
     })
 
-    // Send email notification to reporter
-    try {
-      const { sendFormSubmittedEmail } = await import('@/lib/email')
-      await sendFormSubmittedEmail(
-        updatedMeeting.reporter.email,
-        updatedMeeting.reporter.name,
-        updatedMeeting.employee.name,
-        updatedMeeting.meetingDate,
-        updatedMeeting.id
-      )
-    } catch (error) {
-      console.error('Failed to send email notification:', error)
-      // Continue even if email fails
+    if (!wasAlreadySubmitted) {
+      try {
+        const { sendFormSubmittedEmail } = await import('@/lib/email')
+        await sendFormSubmittedEmail(
+          updatedMeeting.reporter.email,
+          updatedMeeting.reporter.name,
+          updatedMeeting.employee.name,
+          updatedMeeting.meetingDate,
+          updatedMeeting.id
+        )
+      } catch (error) {
+        console.error('Failed to send email notification:', error)
+      }
     }
 
     return NextResponse.json(updatedMeeting)

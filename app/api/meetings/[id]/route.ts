@@ -46,6 +46,7 @@ export async function PATCH(
         const { updateCalendarEvent } = await import('@/lib/google-calendar')
         await updateCalendarEvent(
           meeting.calendarEvent.googleEventId,
+          meeting.reporterId,
           new Date(meetingDate),
           meeting.employee.name,
           meeting.reporter.name
@@ -89,7 +90,7 @@ export async function DELETE(
     if (meeting.calendarEvent) {
       try {
         const { deleteCalendarEvent } = await import('@/lib/google-calendar')
-        await deleteCalendarEvent(meeting.calendarEvent.googleEventId)
+        await deleteCalendarEvent(meeting.calendarEvent.googleEventId, meeting.reporterId)
       } catch (error) {
         console.error('Failed to delete calendar event:', error)
       }

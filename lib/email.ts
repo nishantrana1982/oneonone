@@ -1,14 +1,62 @@
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses'
+import nodemailer from 'nodemailer'
 
-const sesClient = new SESClient({
-  region: process.env.AWS_REGION || 'us-east-1',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-  },
-})
+// --- Transport: SMTP or AWS SES ---
 
-const FROM_EMAIL = process.env.AWS_SES_FROM_EMAIL || 'noreply@example.com'
+function isSmtpConfigured(): boolean {
+  const host = process.env.SMTP_HOST || ''
+  const user = process.env.SMTP_USER || ''
+  const pass = process.env.SMTP_PASSWORD || ''
+  const from = process.env.EMAIL_FROM || ''
+  return !!(host && user && pass && from)
+}
+
+function getFromEmail(): string {
+  if (process.env.EMAIL_FROM) return process.env.EMAIL_FROM
+  if (process.env.AWS_SES_FROM_EMAIL) return process.env.AWS_SES_FROM_EMAIL
+  return 'noreply@example.com'
+}
+
+// Lazy SMTP transporter (only when SMTP is configured)
+let smtpTransporter: nodemailer.Transporter | null = null
+function getSmtpTransporter(): nodemailer.Transporter {
+  if (!smtpTransporter) {
+    const port = parseInt(process.env.SMTP_PORT || '587', 10)
+    const secure = port === 465
+    smtpTransporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port,
+      secure,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASSWORD,
+      },
+    })
+  }
+  return smtpTransporter
+}
+
+// Lazy SES client (only when SES is used)
+let sesClient: SESClient | null = null
+function getSesClient(): SESClient {
+  if (!sesClient) {
+    sesClient = new SESClient({
+      region: process.env.AWS_REGION || 'us-east-1',
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+      },
+    })
+  }
+  return sesClient
+}
+
+function isSesConfigured(): boolean {
+  const from = process.env.AWS_SES_FROM_EMAIL || ''
+  const key = process.env.AWS_ACCESS_KEY_ID || ''
+  const secret = process.env.AWS_SECRET_ACCESS_KEY || ''
+  return !!(from && key && secret)
+}
 
 interface EmailOptions {
   to: string | string[]
@@ -17,41 +65,53 @@ interface EmailOptions {
   text?: string
 }
 
-export async function sendEmail({ to, subject, html, text }: EmailOptions) {
-  try {
-    const recipients = Array.isArray(to) ? to : [to]
+export async function sendEmail({ to, subject, html, text }: EmailOptions): Promise<string | null> {
+  const recipients = Array.isArray(to) ? to : [to]
+  const from = getFromEmail()
 
-    const command = new SendEmailCommand({
-      Source: FROM_EMAIL,
-      Destination: {
-        ToAddresses: recipients,
-      },
-      Message: {
-        Subject: {
-          Data: subject,
-          Charset: 'UTF-8',
-        },
-        Body: {
-          Html: {
-            Data: html,
-            Charset: 'UTF-8',
-          },
-          ...(text && {
-            Text: {
-              Data: text,
-              Charset: 'UTF-8',
-            },
-          }),
-        },
-      },
-    })
-
-    const response = await sesClient.send(command)
-    return response.MessageId
-  } catch (error) {
-    console.error('Error sending email:', error)
-    throw error
+  // Prefer SMTP if configured
+  if (isSmtpConfigured()) {
+    try {
+      const transporter = getSmtpTransporter()
+      const info = await transporter.sendMail({
+        from,
+        to: recipients,
+        subject,
+        html,
+        text: text || undefined,
+      })
+      return info.messageId || null
+    } catch (error) {
+      console.error('SMTP send error:', error)
+      throw error
+    }
   }
+
+  // Fall back to AWS SES if configured
+  if (isSesConfigured()) {
+    try {
+      const client = getSesClient()
+      const command = new SendEmailCommand({
+        Source: from,
+        Destination: { ToAddresses: recipients },
+        Message: {
+          Subject: { Data: subject, Charset: 'UTF-8' },
+          Body: {
+            Html: { Data: html, Charset: 'UTF-8' },
+            ...(text && { Text: { Data: text, Charset: 'UTF-8' } }),
+          },
+        },
+      })
+      const response = await client.send(command)
+      return response.MessageId || null
+    } catch (error) {
+      console.error('SES send error:', error)
+      throw error
+    }
+  }
+
+  console.warn('Email not sent: neither SMTP nor AWS SES is configured. Set SMTP_* or AWS SES in .env')
+  return null
 }
 
 export async function sendMeetingScheduledEmail(
@@ -101,7 +161,6 @@ export async function sendMeetingScheduledEmail(
     </html>
   `
 
-  // Send to both parties
   await Promise.all([
     sendEmail({
       to: employeeEmail,

@@ -142,8 +142,8 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
           </div>
         </div>
 
-        {/* Date and Time Selection */}
-        <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-hidden">
+        {/* Date and Time Selection - overflow-visible so date picker dropdown is not clipped */}
+        <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-visible">
           <div className="px-6 py-4 border-b border-off-white dark:border-medium-gray/20 flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
               <Calendar className="w-5 h-5 text-green-500" />

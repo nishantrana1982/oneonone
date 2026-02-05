@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { Calendar, User, FileText, CheckSquare, Clock, ArrowLeft, Mic } from 'lucide-react'
 import { UserRole } from '@prisma/client'
+import { formatMeetingDateLong } from '@/lib/utils'
 import { AddTodoForm } from './add-todo-form'
 import { MeetingRecorder } from './meeting-recorder'
 import { TranscriptViewer } from './transcript-viewer'
@@ -54,17 +55,10 @@ export default async function MeetingDetailPage({
   const meetingDate = new Date(meeting.meetingDate)
   const isPast = meetingDate < new Date()
   const hasFormData = meeting.checkInPersonal || meeting.checkInProfessional
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    })
-  }
+  const formSubmitted = !!meeting.formSubmittedAt || (meeting.status === 'COMPLETED' && !!hasFormData)
+  const canEditForm = isEmployee && (meeting.status === 'SCHEDULED' || (meeting.status === 'COMPLETED' && !isPast))
+  const showFillFormCta = canEditForm && !formSubmitted
+  const showEditFormCta = canEditForm && formSubmitted && !isPast
 
   const formSections = [
     { title: 'Check-In: Personal Best', content: meeting.checkInPersonal },
@@ -98,7 +92,7 @@ export default async function MeetingDetailPage({
           </h1>
           <p className="text-medium-gray flex items-center gap-2">
             <Calendar className="w-4 h-4" />
-            {formatDate(meetingDate)}
+            {formatMeetingDateLong(meetingDate)}
           </p>
         </div>
         <span className={`px-4 py-2 rounded-full text-sm font-medium ${
@@ -109,6 +103,58 @@ export default async function MeetingDetailPage({
           {meeting.status === 'COMPLETED' ? 'Completed' : isPast ? 'Pending Form' : 'Scheduled'}
         </span>
       </div>
+
+      {/* Form CTA – first thing employee sees: fill before meeting, or edit until meeting time */}
+      {showFillFormCta && (
+        <div className="rounded-2xl bg-amber-500/10 border-2 border-amber-500/30 p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                <FileText className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <p className="font-semibold text-dark-gray dark:text-white">Submit your form before the meeting</p>
+                <p className="text-sm text-medium-gray mt-0.5">
+                  {isPast
+                    ? 'Please fill out the one-on-one form for this meeting. You can save a draft and finish later.'
+                    : `Please fill and submit this form before your meeting on ${formatMeetingDateLong(meetingDate)}. You can save a draft and finish later.`}
+                </p>
+              </div>
+            </div>
+            <Link
+              href={`/meetings/${meeting.id}/form`}
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-amber-500 text-white rounded-xl font-medium hover:bg-amber-600 transition-colors shadow-lg shadow-amber-500/20 flex-shrink-0"
+            >
+              <FileText className="w-5 h-5" />
+              Fill &amp; Submit Form
+            </Link>
+          </div>
+        </div>
+      )}
+      {showEditFormCta && (
+        <div className="rounded-2xl bg-blue-500/10 border-2 border-blue-500/30 p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                <FileText className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <p className="font-semibold text-dark-gray dark:text-white">Edit your form before the meeting</p>
+                <p className="text-sm text-medium-gray mt-0.5">
+                  You can update your responses until the meeting time. After the meeting, the form cannot be edited.
+                </p>
+              </div>
+            </div>
+            <Link
+              href={`/meetings/${meeting.id}/form`}
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors shadow-lg shadow-blue-500/20 flex-shrink-0"
+            >
+              <FileText className="w-5 h-5" />
+              Edit Form
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Participants */}
       <div className="grid gap-4 md:grid-cols-2">
@@ -195,29 +241,6 @@ export default async function MeetingDetailPage({
         }))}
         canUpload={isReporter || isEmployee}
       />
-
-      {/* Action Button */}
-      {meeting.status === 'SCHEDULED' && isEmployee && isPast && (
-        <div className="rounded-2xl bg-amber-500/5 border border-amber-500/20 p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center">
-                <FileText className="w-6 h-6 text-amber-500" />
-              </div>
-              <div>
-                <p className="font-medium text-dark-gray dark:text-white">Form Required</p>
-                <p className="text-sm text-medium-gray">Please fill out the one-on-one form for this meeting</p>
-              </div>
-            </div>
-            <Link
-              href={`/meetings/${meeting.id}/form`}
-              className="px-5 py-2.5 bg-dark-gray dark:bg-white text-white dark:text-dark-gray rounded-xl font-medium hover:bg-charcoal dark:hover:bg-off-white transition-colors"
-            >
-              Fill Form
-            </Link>
-          </div>
-        </div>
-      )}
 
       {/* Form Responses */}
       {hasFormData && (

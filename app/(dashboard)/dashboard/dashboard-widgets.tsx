@@ -18,6 +18,7 @@ import {
   RotateCcw
 } from 'lucide-react'
 import { WidgetType } from '@prisma/client'
+import { formatMeetingDateShort } from '@/lib/utils'
 
 interface Widget {
   id: string
@@ -241,7 +242,7 @@ export function DashboardWidgets({
                           {meeting.employee?.name || meeting.reporter?.name}
                         </p>
                         <p className="text-xs text-medium-gray">
-                          {new Date(meeting.meetingDate).toLocaleDateString()}
+                          {formatMeetingDateShort(meeting.meetingDate)}
                         </p>
                       </div>
                       <span className={`text-xs px-2 py-1 rounded-full ${

@@ -102,7 +102,7 @@ async function processRecording(
     const s3Configured = await isS3Configured()
     
     if (s3Configured) {
-      // Download from S3
+      // Download from S3 (with fallback to local storage on 404)
       console.log(`[Recording] Getting download URL for key: ${key}`)
       let downloadUrl: string
       try {
@@ -116,12 +116,23 @@ async function processRecording(
         const audioResponse = await fetch(downloadUrl, {
           headers: { 'Accept': 'audio/*' }
         })
-        if (!audioResponse.ok) {
+        if (audioResponse.ok) {
+          audioBuffer = Buffer.from(await audioResponse.arrayBuffer())
+          console.log(`[Recording] Downloaded ${audioBuffer.length} bytes from S3`)
+        } else if (audioResponse.status === 404) {
+          // S3 object missing (e.g. upload failed or used local upload) – try local storage
+          console.log(`[Recording] S3 returned 404, trying local storage for key: ${key}`)
+          try {
+            audioBuffer = await readFromLocalStorage(key)
+            console.log(`[Recording] Read ${audioBuffer.length} bytes from local storage`)
+          } catch (localErr: any) {
+            throw new Error(`Audio not found in S3 (404) and not in local storage. The upload may have failed – try recording again.`)
+          }
+        } else {
           throw new Error(`HTTP ${audioResponse.status}: ${audioResponse.statusText}`)
         }
-        audioBuffer = Buffer.from(await audioResponse.arrayBuffer())
-        console.log(`[Recording] Downloaded ${audioBuffer.length} bytes from S3`)
       } catch (downloadError: any) {
+        if (downloadError.message?.includes('local storage')) throw downloadError
         throw new Error(`Failed to download audio from S3: ${downloadError.message}`)
       }
     } else {

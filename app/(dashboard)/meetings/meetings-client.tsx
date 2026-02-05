@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Calendar, Plus, Clock, CheckCircle2, AlertCircle, Repeat, Trash2, Play, Pause, ChevronRight } from 'lucide-react'
+import { formatMeetingDateShort } from '@/lib/utils'
 import { UserRole, RecurringFrequency } from '@prisma/client'
 
 interface Meeting {
@@ -255,13 +256,7 @@ export function MeetingsClient({ meetings, recurringSchedules, currentUserId, us
                           )}
                         </div>
                         <p className="text-sm text-medium-gray">
-                          {meetingDate.toLocaleDateString('en-US', {
-                            weekday: 'short',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: 'numeric',
-                            minute: '2-digit',
-                          })}
+                          {formatMeetingDateShort(meetingDate)}
                         </p>
                       </div>
                       <span className={`px-3 py-1 text-xs font-medium rounded-full ${

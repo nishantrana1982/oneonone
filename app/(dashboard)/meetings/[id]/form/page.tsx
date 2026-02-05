@@ -31,7 +31,15 @@ export default async function MeetingFormPage({
     return notFound()
   }
 
-  if (meeting.status !== 'SCHEDULED') {
+  // Allow form when: SCHEDULED, or COMPLETED but meeting is still in the future (can edit)
+  const meetingDate = new Date(meeting.meetingDate)
+  const isPastMeeting = meetingDate.getTime() < Date.now()
+  const canEdit =
+    meeting.status === 'SCHEDULED' ||
+    (meeting.status === 'COMPLETED' && !!meeting.formSubmittedAt && !isPastMeeting)
+  const isReadOnly = !!meeting.formSubmittedAt && isPastMeeting
+
+  if (meeting.status !== 'SCHEDULED' && !canEdit && !isReadOnly) {
     redirect(`/meetings/${meeting.id}`)
   }
 
@@ -48,5 +56,12 @@ export default async function MeetingFormPage({
     anythingElse: meeting.anythingElse || '',
   }
 
-  return <MeetingFormClient meetingId={meeting.id} initialData={initialData} />
+  return (
+    <MeetingFormClient
+      meetingId={meeting.id}
+      initialData={initialData}
+      isReadOnly={isReadOnly}
+      isSubmitted={!!meeting.formSubmittedAt}
+    />
+  )
 }

@@ -6,8 +6,9 @@ import { UserRole } from '@prisma/client'
 export default async function Layout({ children }: { children: React.ReactNode }) {
   const user = await requireAuth()
   
-  // Check if user needs onboarding (no reporting manager and not a super admin)
-  if (user.role !== UserRole.SUPER_ADMIN && !user.reportsToId) {
+  // Onboarding only for EMPLOYEEs who don't have a reporting manager yet.
+  // REPORTER and SUPER_ADMIN can use the app without selecting a manager.
+  if (user.role === UserRole.EMPLOYEE && !user.reportsToId) {
     redirect('/onboarding')
   }
   
