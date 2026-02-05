@@ -144,6 +144,10 @@ async function processRecording(
       }
     }
     
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process/route.ts:146',message:'Audio buffer read for processing',data:{key,bufferSize:audioBuffer.length,firstBytes:audioBuffer.slice(0,16).toString('hex'),s3Configured,language},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,E'})}).catch(()=>{});
+    // #endregion
+    
     if (audioBuffer.length < 1000) {
       throw new Error('Audio file is too small or empty')
     }

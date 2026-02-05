@@ -50,6 +50,9 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
   const [currentError, setCurrentError] = useState(initialError)
   const [isPolling, setIsPolling] = useState(false)
   
+  // Track if we've started uploading this session (fixes UI not updating after submit)
+  const [hasStartedUpload, setHasStartedUpload] = useState(false)
+  
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const timerRef = useRef<NodeJS.Timeout | null>(null)
@@ -205,6 +208,7 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
     setIsUploading(true)
     setError(null)
     setCurrentStatus('UPLOADING')
+    setHasStartedUpload(true) // Track that we've started uploading this session
 
     try {
       // Get presigned URL or check if using local storage
@@ -228,6 +232,11 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
       if (useLocalUpload) {
         // Upload directly to server (local storage) with timeout so we don't hang forever
         console.log('Using local storage upload')
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meeting-recorder.tsx:232',message:'Starting local upload',data:{blobSize:audioBlob.size,blobType:audioBlob.type,duration:recordingTime,language:selectedLanguage},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C,D'})}).catch(()=>{});
+        // #endregion
+        
         const formData = new FormData()
         formData.append('file', audioBlob, 'recording.webm')
         formData.append('duration', recordingTime.toString())
@@ -258,6 +267,10 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
         }
         
         const localData = await localUploadResponse.json()
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meeting-recorder.tsx:270',message:'Upload complete, starting processing',data:{key:localData.key,recordingId:localData.recordingId,duration:recordingTime,language:selectedLanguage},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
         
         setCurrentStatus('UPLOADED')
         
@@ -324,6 +337,11 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
 
     } catch (err) {
       console.error('Error uploading recording:', err)
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meeting-recorder.tsx:340',message:'Upload/process error',data:{error:err instanceof Error ? err.message : String(err),stack:err instanceof Error ? err.stack : undefined},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C,D,E'})}).catch(()=>{});
+      // #endregion
+      
       setError(err instanceof Error ? err.message : 'Failed to upload recording')
       setCurrentStatus('FAILED')
       setCurrentError(err instanceof Error ? err.message : 'Failed to upload recording')
@@ -348,9 +366,10 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
   const remainingTime = MAX_DURATION - recordingTime
 
   // If already has a recording and it's being processed
+  // Also check hasStartedUpload to show processing UI after upload starts (before page refresh)
   const isProcessingStatus = ['UPLOADING', 'UPLOADED', 'TRANSCRIBING', 'ANALYZING'].includes(currentStatus || '')
   
-  if (hasExistingRecording && isProcessingStatus) {
+  if ((hasExistingRecording || hasStartedUpload) && isProcessingStatus) {
     const progress = getCurrentProgress()
     
     return (
@@ -417,7 +436,7 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
   }
 
   // If has a completed recording
-  if (hasExistingRecording && currentStatus === 'COMPLETED') {
+  if ((hasExistingRecording || hasStartedUpload) && currentStatus === 'COMPLETED') {
     return (
       <div className="rounded-2xl bg-green-500/5 border border-green-500/20 p-6">
         <div className="flex items-center gap-4">
@@ -434,7 +453,7 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
   }
 
   // If has a failed recording
-  if (hasExistingRecording && currentStatus === 'FAILED') {
+  if ((hasExistingRecording || hasStartedUpload) && currentStatus === 'FAILED') {
     const handleRetry = async () => {
       // Delete the failed recording and allow re-recording
       try {

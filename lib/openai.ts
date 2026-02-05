@@ -65,14 +65,37 @@ export async function transcribeAudio(audioBuffer: Buffer, filename: string, lan
     console.log(`[OpenAI] Starting transcription with model: ${models.whisperModel}, language: ${language || 'auto-detect'}`)
     console.log(`[OpenAI] Audio buffer size: ${audioBuffer.length} bytes`)
     
-    // Use OpenAI's toFile helper to create a proper file object for Node.js
-    // This works correctly in both Node.js and Edge runtime
-    const { toFile } = await import('openai/uploads')
-    const audioFile = await toFile(audioBuffer, filename, { type: 'audio/webm' })
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'openai.ts:66',message:'Transcription started',data:{bufferSize:audioBuffer.length,firstBytes:audioBuffer.slice(0,16).toString('hex'),model:models.whisperModel,language},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,D'})}).catch(()=>{});
+    // #endregion
+    
+    // Create a Blob-like object that OpenAI SDK can handle in Node.js
+    // The SDK accepts: File, Blob, or Uploadable (which includes Buffer with name)
+    const fs = await import('fs')
+    const path = await import('path')
+    const os = await import('os')
+    
+    // Write buffer to temp file and create a readable stream
+    const tempDir = os.tmpdir()
+    const tempFilePath = path.join(tempDir, `recording_${Date.now()}.webm`)
+    await fs.promises.writeFile(tempFilePath, audioBuffer)
+    
+    // Verify file was written correctly
+    const stats = await fs.promises.stat(tempFilePath)
+    const verifyBuffer = await fs.promises.readFile(tempFilePath)
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'openai.ts:84',message:'Temp file written',data:{tempFilePath,fileSize:stats.size,verifySize:verifyBuffer.length,verifyFirstBytes:verifyBuffer.slice(0,16).toString('hex'),matchesOriginal:Buffer.compare(audioBuffer,verifyBuffer)===0},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    
+    console.log(`[OpenAI] Wrote temp file: ${tempFilePath} (${audioBuffer.length} bytes)`)
+    
+    // Create a readable stream from the file
+    const fileStream = fs.createReadStream(tempFilePath)
 
     // Build transcription options - include language if specified
     const transcriptionOptions: any = {
-      file: audioFile,
+      file: fileStream,
       model: models.whisperModel,
       response_format: 'verbose_json',
     }
@@ -82,10 +105,25 @@ export async function transcribeAudio(audioBuffer: Buffer, filename: string, lan
     if (language && language !== 'auto') {
       transcriptionOptions.language = language
     }
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'openai.ts:106',message:'Calling OpenAI API',data:{model:transcriptionOptions.model,language:transcriptionOptions.language,responseFormat:transcriptionOptions.response_format},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,E'})}).catch(()=>{});
+    // #endregion
 
     const response = await openai.audio.transcriptions.create(transcriptionOptions) as any
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'openai.ts:113',message:'OpenAI response received',data:{textLength:response.text?.length||0,language:response.language,duration:response.duration},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+
     console.log(`[OpenAI] Transcription successful. Text length: ${response.text?.length || 0}`)
+    
+    // Clean up temp file
+    try {
+      await fs.promises.unlink(tempFilePath)
+    } catch (e) {
+      // Ignore cleanup errors
+    }
 
     // verbose_json format returns language and duration, but TypeScript types don't include them
     return {
@@ -94,7 +132,17 @@ export async function transcribeAudio(audioBuffer: Buffer, filename: string, lan
       duration: response.duration || 0,
     }
   } catch (error: any) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'openai.ts:134',message:'Transcription error',data:{errorMessage:error.message,errorStatus:error.status,errorCode:error.code,errorType:error.type,fullError:JSON.stringify(error,Object.getOwnPropertyNames(error))},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B,D,E'})}).catch(()=>{});
+    // #endregion
+    
     console.error('[OpenAI] Transcription error:', error)
+    console.error('[OpenAI] Error details:', JSON.stringify({
+      message: error.message,
+      status: error.status,
+      code: error.code,
+      type: error.type,
+    }))
     
     // Provide helpful error messages
     if (error.message?.includes('API key')) {
@@ -107,7 +155,9 @@ export async function transcribeAudio(audioBuffer: Buffer, filename: string, lan
       throw new Error('OpenAI rate limit exceeded. Please try again later.')
     }
     if (error.status === 400) {
-      throw new Error('Invalid audio file format. Please ensure the recording is in a supported format.')
+      // Include more details in the error message
+      const details = error.message || error.error?.message || 'Unknown error'
+      throw new Error(`Invalid audio file: ${details}`)
     }
     
     throw error

@@ -49,6 +49,11 @@ export async function POST(
     // Generate key and save to local storage
     const key = generateRecordingKey(params.id)
     const buffer = Buffer.from(await file.arrayBuffer())
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'upload/route.ts:50',message:'Upload received - file details',data:{fileName:file.name,fileType:file.type,fileSize:file.size,bufferSize:buffer.length,firstBytes:buffer.slice(0,16).toString('hex'),duration},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
     await saveToLocalStorage(buffer, key)
 
     // Create or update recording record
