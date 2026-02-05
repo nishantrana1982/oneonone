@@ -82,13 +82,14 @@ export async function transcribeAudio(audioBuffer: Buffer, filename: string, lan
       transcriptionOptions.language = language
     }
 
-    const response = await openai.audio.transcriptions.create(transcriptionOptions)
+    const response = await openai.audio.transcriptions.create(transcriptionOptions) as any
 
     console.log(`[OpenAI] Transcription successful. Text length: ${response.text?.length || 0}`)
 
+    // verbose_json format returns language and duration, but TypeScript types don't include them
     return {
       text: response.text,
-      language: response.language || 'en',
+      language: response.language || language || 'en',
       duration: response.duration || 0,
     }
   } catch (error: any) {
