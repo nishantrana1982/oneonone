@@ -8,9 +8,9 @@ echo "🚀 Starting deployment..."
 # Navigate to app directory
 cd /var/www/oneonone || exit
 
-# Pull latest code
+# Pull latest code (exit if pull fails so we don't build old code)
 echo "📥 Pulling latest code..."
-git pull
+git pull origin main || { echo "❌ git pull failed. Stash or discard local changes (e.g. git checkout -- package-lock.json) and try again."; exit 1; }
 
 # Check if .env exists, if not create from template
 if [ ! -f .env ]; then
@@ -50,11 +50,11 @@ npx prisma generate
 echo "🗄️ Pushing database schema..."
 npx prisma db push
 
-# Build the app
+# Build the app (exit on failure)
 echo "🏗️ Building app (this may take a few minutes)..."
-NODE_OPTIONS="--max-old-space-size=3072" npm run build
+NODE_OPTIONS="--max-old-space-size=3072" npm run build || { echo "❌ Build failed."; exit 1; }
 
-# Seed database with test data
+# Seed database with test data (optional; skip on failure)
 echo "🌱 Seeding database..."
 npx prisma db seed || true
 
