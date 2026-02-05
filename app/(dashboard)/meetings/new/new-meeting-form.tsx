@@ -41,10 +41,14 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
   const onSubmit = async (data: FormData) => {
     setIsLoading(true)
     try {
-      const meetingDateTime = new Date(`${data.meetingDate}T${data.meetingTime}`)
+      // Fix: Use explicit Date constructor to ensure local time interpretation
+      // String parsing like new Date("2026-02-17T15:30") can inconsistently treat time as UTC
+      const [year, month, day] = data.meetingDate.split('-').map(Number)
+      const [hours, minutes] = data.meetingTime.split(':').map(Number)
+      const meetingDateTime = new Date(year, month - 1, day, hours, minutes)
 
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'new-meeting-form.tsx:onSubmit',message:'Form submit - time values',data:{rawDate:data.meetingDate,rawTime:data.meetingTime,combinedString:`${data.meetingDate}T${data.meetingTime}`,parsedDateTime:meetingDateTime.toString(),isoString:meetingDateTime.toISOString(),browserTimezone:Intl.DateTimeFormat().resolvedOptions().timeZone,browserOffset:meetingDateTime.getTimezoneOffset()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'new-meeting-form.tsx:onSubmit',message:'Form submit - time values (post-fix)',data:{rawDate:data.meetingDate,rawTime:data.meetingTime,year,month,day,hours,minutes,parsedDateTime:meetingDateTime.toString(),isoString:meetingDateTime.toISOString(),browserTimezone:Intl.DateTimeFormat().resolvedOptions().timeZone,browserOffset:meetingDateTime.getTimezoneOffset()},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
       // #endregion
 
       const response = await fetch('/api/meetings', {
