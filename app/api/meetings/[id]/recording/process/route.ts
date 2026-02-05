@@ -52,13 +52,10 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    // Update recording status to UPLOADED
+    // Update recording status to UPLOADED (audioUrl left null when using local storage)
     const recording = await prisma.meetingRecording.update({
       where: { meetingId: params.id },
-      data: {
-        status: 'UPLOADED',
-        audioUrl: `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`,
-      },
+      data: { status: 'UPLOADED' },
     })
 
     // Start processing synchronously (will complete in background via maxDuration)

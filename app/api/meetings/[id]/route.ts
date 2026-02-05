@@ -9,7 +9,7 @@ export async function PATCH(
   try {
     const user = await requireAuth()
     const body = await request.json()
-    const { meetingDate } = body
+    const { meetingDate, status } = body
 
     const meeting = await prisma.meeting.findUnique({
       where: { id: params.id },
@@ -29,11 +29,13 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
+    const updateData: { meetingDate?: Date; status?: 'SCHEDULED' | 'COMPLETED' | 'CANCELLED' } = {}
+    if (meetingDate) updateData.meetingDate = new Date(meetingDate)
+    if (status === 'COMPLETED' || status === 'SCHEDULED' || status === 'CANCELLED') updateData.status = status
+
     const updatedMeeting = await prisma.meeting.update({
       where: { id: params.id },
-      data: {
-        meetingDate: meetingDate ? new Date(meetingDate) : undefined,
-      },
+      data: updateData,
       include: {
         employee: { select: { name: true, email: true } },
         reporter: { select: { name: true, email: true } },

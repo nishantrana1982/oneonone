@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole, canAccessEmployeeData, getCurrentUser } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
-import { getSignedUploadUrl, generateRecordingKey, isS3Configured } from '@/lib/s3'
+import { generateRecordingKey } from '@/lib/s3'
 import { UserRole } from '@prisma/client'
 
 export async function POST(
@@ -47,34 +47,9 @@ export async function POST(
       )
     }
 
-    // Check if S3 is configured
-    const s3Configured = await isS3Configured()
+    // Use local upload so recording works without S3 CORS. Browser PUT to S3 often fails with "Network error".
     const key = generateRecordingKey(params.id)
-    
-    if (!s3Configured) {
-      // Return flag to use local upload instead
-      console.log('[Recording] S3 not configured, using local storage')
-      return NextResponse.json({ 
-        useLocalUpload: true, 
-        key,
-        message: 'S3 not configured, using local storage'
-      })
-    }
-
-    // Generate S3 presigned URL
-    let uploadUrl: string
-    try {
-      const result = await getSignedUploadUrl(key, contentType)
-      uploadUrl = result.uploadUrl
-    } catch (s3Error) {
-      console.error('S3 presign error:', s3Error)
-      // Fallback to local storage
-      return NextResponse.json({ 
-        useLocalUpload: true, 
-        key,
-        message: 'S3 error, using local storage'
-      })
-    }
+    console.log('[Recording] Using local storage upload (avoids S3 CORS/network issues)')
 
     // Create or update recording record
     await prisma.meetingRecording.upsert({
@@ -97,7 +72,7 @@ export async function POST(
       },
     })
 
-    return NextResponse.json({ uploadUrl, key, useLocalUpload: false })
+    return NextResponse.json({ useLocalUpload: true, key, message: 'Use local storage upload' })
   } catch (error) {
     console.error('Error generating presigned URL:', error)
     return NextResponse.json(

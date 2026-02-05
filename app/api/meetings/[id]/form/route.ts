@@ -62,14 +62,14 @@ export async function POST(
       return NextResponse.json(updatedMeeting)
     }
 
-    // Submit: update fields, set formSubmittedAt and COMPLETED, send email only on first submit
+    // Submit: update fields and set formSubmittedAt only. Reporter marks meeting completed after it happens.
     const wasAlreadySubmitted = !!meeting.formSubmittedAt
     const updatedMeeting = await prisma.meeting.update({
       where: { id: params.id },
       data: {
         ...data,
         formSubmittedAt: wasAlreadySubmitted ? meeting.formSubmittedAt : new Date(),
-        status: 'COMPLETED',
+        // Do not set status to COMPLETED; meeting owner marks it complete after the meeting
       },
       include: {
         employee: { select: { name: true } },

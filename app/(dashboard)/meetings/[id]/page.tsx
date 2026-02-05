@@ -8,6 +8,7 @@ import { UserRole } from '@prisma/client'
 import { formatMeetingDateLong } from '@/lib/utils'
 import { AddTodoForm } from './add-todo-form'
 import { MeetingRecorder } from './meeting-recorder'
+import { MarkCompletedButton } from './mark-completed-button'
 import { TranscriptViewer } from './transcript-viewer'
 import { MeetingNotes } from './meeting-notes'
 import { FileAttachments } from './file-attachments'
@@ -85,7 +86,7 @@ export default async function MeetingDetailPage({
       </Link>
 
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-dark-gray dark:text-white mb-2">
             One-on-One Meeting
@@ -95,13 +96,18 @@ export default async function MeetingDetailPage({
             {formatMeetingDateLong(meetingDate)}
           </p>
         </div>
-        <span className={`px-4 py-2 rounded-full text-sm font-medium ${
-          meeting.status === 'COMPLETED'
-            ? 'bg-green-500/10 text-green-600 dark:text-green-400'
-            : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
-        }`}>
-          {meeting.status === 'COMPLETED' ? 'Completed' : isPast ? 'Pending Form' : 'Scheduled'}
-        </span>
+        <div className="flex flex-wrap items-center gap-3">
+          {isReporter && meeting.status === 'SCHEDULED' && (
+            <MarkCompletedButton meetingId={meeting.id} />
+          )}
+          <span className={`px-4 py-2 rounded-full text-sm font-medium ${
+            meeting.status === 'COMPLETED'
+              ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+              : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+          }`}>
+            {meeting.status === 'COMPLETED' ? 'Completed' : isPast ? 'Form submitted' : 'Scheduled'}
+          </span>
+        </div>
       </div>
 
       {/* Form CTA – first thing employee sees: fill before meeting, or edit until meeting time */}
