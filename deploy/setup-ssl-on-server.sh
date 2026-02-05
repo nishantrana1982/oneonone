@@ -7,16 +7,21 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$APP_ROOT"
 
-NGINX_CONF="/etc/nginx/sites-available/default"
 CONF_SOURCE="$APP_ROOT/deploy/nginx-ssl.conf"
+# Copy to both: default and oneonone (server may have either in sites-enabled)
+NGINX_SITES="/etc/nginx/sites-available/default /etc/nginx/sites-available/oneonone"
 
 if [ ! -f "$CONF_SOURCE" ]; then
   echo "❌ Not found: $CONF_SOURCE (run from app root: /var/www/oneonone)"
   exit 1
 fi
 
-echo "📋 Copying Nginx SSL config..."
-sudo cp "$CONF_SOURCE" "$NGINX_CONF"
+echo "📋 Copying Nginx SSL config to default and oneonone..."
+for target in $NGINX_SITES; do
+  if [ -d "$(dirname "$target")" ]; then
+    sudo cp "$CONF_SOURCE" "$target" && echo "   -> $target" || true
+  fi
+done
 
 echo "🔍 Testing Nginx config..."
 sudo nginx -t

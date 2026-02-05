@@ -12,6 +12,8 @@ git pull
 bash deploy/setup-ssl-on-server.sh
 ```
 
+The script copies the SSL config to both `sites-available/default` and `sites-available/oneonone`, so it works whether Nginx has `default` or `oneonone` enabled in `sites-enabled`.
+
 Then open **port 443** in AWS Security Group (Inbound → HTTPS, 443, 0.0.0.0/0), set `NEXTAUTH_URL=https://oneonone.wliq.ai` in `.env`, and run `pm2 restart oneonone`.
 
 ---
