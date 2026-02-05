@@ -323,7 +323,7 @@ export function TranscriptViewer({ recording, employeeId, reporterId }: Transcri
                 Suggested Action Items
               </h4>
               <p className="text-sm text-medium-gray mb-4">
-                These action items were automatically identified from the transcript. Click "Add" to add them to your to-do list.
+                These action items were automatically identified from the transcript. Click &quot;Add&quot; to add them to your to-do list.
               </p>
               <div className="space-y-3">
                 {recording.autoTodos.map((todo, i) => (
