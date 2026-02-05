@@ -21,6 +21,8 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      // Allow same email to sign in again (e.g. after sign-out); only Google is used and domain is restricted
+      allowDangerousEmailAccountLinking: true,
       authorization: {
         params: {
           prompt: 'consent',
