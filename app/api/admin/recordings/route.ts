@@ -22,13 +22,13 @@ export async function GET() {
     const list = recordings.map((r) => ({
       id: r.id,
       meetingId: r.meetingId,
-      meetingDate: r.meeting?.meetingDate,
-      employeeName: r.meeting?.employee?.name,
-      reporterName: r.meeting?.reporter?.name,
+      meetingDate: r.meeting?.meetingDate ? r.meeting.meetingDate.toISOString() : null,
+      employeeName: r.meeting?.employee?.name ?? null,
+      reporterName: r.meeting?.reporter?.name ?? null,
       status: r.status,
       duration: r.duration,
       fileSize: r.fileSize,
-      recordedAt: r.recordedAt,
+      recordedAt: r.recordedAt ? r.recordedAt.toISOString() : null,
     }))
 
     return NextResponse.json(list)

@@ -5,11 +5,12 @@ import { UserManagement } from './user-management'
 import Link from 'next/link'
 import { Settings, Building2, Shield, HardDrive, Users, ChevronRight, Mic } from 'lucide-react'
 import { BulkImport } from '@/components/admin/bulk-import'
+import { isS3Configured } from '@/lib/s3'
 
 export default async function AdminPage() {
   await requireAdmin()
 
-  const [users, departments] = await Promise.all([
+  const [users, departments, recordingStats, s3Configured] = await Promise.all([
     prisma.user.findMany({
       include: {
         department: true,
@@ -20,7 +21,16 @@ export default async function AdminPage() {
     prisma.department.findMany({
       orderBy: { name: 'asc' },
     }),
+    prisma.meetingRecording.aggregate({
+      _sum: { fileSize: true },
+      _count: true,
+    }),
+    isS3Configured(),
   ])
+
+  const recordingsTotalMB = Math.round(((recordingStats._sum.fileSize ?? 0) / (1024 * 1024)) * 100) / 100
+  const recordingsCount = recordingStats._count
+  const storageLocation = s3Configured ? 'S3' : 'Local'
 
   // Get reporters and admins who can be managers
   const reporters = users.filter(u => 
@@ -40,7 +50,7 @@ export default async function AdminPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
         <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-5">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
@@ -85,6 +95,21 @@ export default async function AdminPage() {
             </div>
           </div>
         </div>
+        <Link
+          href="/admin/storage"
+          className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-5 hover:border-orange/30 transition-colors block"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-orange/10 flex items-center justify-center">
+              <Mic className="w-6 h-6 text-orange" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-2xl font-bold text-dark-gray dark:text-white">{recordingsTotalMB} MB</p>
+              <p className="text-sm text-medium-gray">Recording storage · {storageLocation}</p>
+              <p className="text-xs text-orange mt-1">View usage &amp; location →</p>
+            </div>
+          </div>
+        </Link>
       </div>
 
       {/* Quick Actions */}

@@ -13,6 +13,11 @@ type StorageStats = {
     totalBytes: number
     totalMB: number
   }
+  recordings?: {
+    count: number
+    totalBytes: number
+    totalMB: number
+  }
 }
 
 type RecordingRow = {
@@ -24,7 +29,7 @@ type RecordingRow = {
   status: string
   duration: number | null
   fileSize: number | null
-  recordedAt: string
+  recordedAt: string | null
 }
 
 export function StorageClient() {
@@ -104,7 +109,11 @@ export function StorageClient() {
         <div>
           <h1 className="text-2xl font-bold text-dark-gray dark:text-white">Recording Storage</h1>
           <p className="text-sm text-medium-gray">
-            Storage is currently on the <strong>local server</strong>. View usage and delete test recordings here.
+            {stats == null
+              ? 'Unable to load storage info.'
+              : stats.storageType === 's3'
+              ? 'Recordings are stored in S3. Usage below is from the database.'
+              : 'Recordings are stored on the local server. View usage and delete test recordings here.'}
           </p>
         </div>
       </div>
@@ -115,28 +124,35 @@ export function StorageClient() {
             <HardDrive className="w-5 h-5 text-orange" />
             Storage usage
           </h2>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
             <div>
               <p className="text-2xl font-bold text-dark-gray dark:text-white">
-                {stats.localStorage.totalMB} MB
+                {stats.recordings ? `${stats.recordings.totalMB} MB` : `${stats.localStorage.totalMB} MB`}
               </p>
-              <p className="text-sm text-medium-gray">Total size</p>
+              <p className="text-sm text-medium-gray">Total recordings size</p>
             </div>
             <div>
               <p className="text-2xl font-bold text-dark-gray dark:text-white">
-                {stats.localStorage.fileCount}
+                {stats.recordings?.count ?? stats.localStorage.fileCount}
               </p>
-              <p className="text-sm text-medium-gray">Recording files</p>
+              <p className="text-sm text-medium-gray">Recordings</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-dark-gray dark:text-white">
+                {stats.storageType === 's3' ? 'S3 bucket' : 'Local server'}
+              </p>
+              <p className="text-sm text-medium-gray">Where stored</p>
             </div>
             <div>
               <p className="text-sm font-mono text-medium-gray truncate" title={stats.localStorage.path}>
-                {stats.localStorage.path}
+                {stats.storageType === 's3' ? '–' : stats.localStorage.path}
               </p>
-              <p className="text-sm text-medium-gray">Storage path</p>
+              <p className="text-sm text-medium-gray">Location / path</p>
             </div>
           </div>
           <p className="mt-3 text-xs text-medium-gray">
             Storage type: <strong>{stats.storageType === 's3' ? 'S3' : 'Local server'}</strong>
+            {stats.storageType === 'local' && ` • Path: ${stats.localStorage.path}`}
           </p>
         </div>
       )}

@@ -236,11 +236,6 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
       if (useLocalUpload) {
         // Upload directly to server (local storage) with timeout so we don't hang forever
         console.log('Using local storage upload')
-        
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meeting-recorder.tsx:232',message:'Starting local upload',data:{blobSize:audioBlob.size,blobType:audioBlob.type,duration:recordingTime,language:selectedLanguage},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C,D'})}).catch(()=>{});
-        // #endregion
-        
         const formData = new FormData()
         formData.append('file', audioBlob, 'recording.webm')
         formData.append('duration', recordingTime.toString())
@@ -271,11 +266,6 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
         }
         
         const localData = await localUploadResponse.json()
-        
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meeting-recorder.tsx:270',message:'Upload complete, starting processing',data:{key:localData.key,recordingId:localData.recordingId,duration:recordingTime,language:selectedLanguage},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
-        
         setCurrentStatus('UPLOADED')
         
         // Start processing with language hint
@@ -341,11 +331,6 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
 
     } catch (err) {
       console.error('Error uploading recording:', err)
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meeting-recorder.tsx:340',message:'Upload/process error',data:{error:err instanceof Error ? err.message : String(err),stack:err instanceof Error ? err.stack : undefined},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C,D,E'})}).catch(()=>{});
-      // #endregion
-      
       setError(err instanceof Error ? err.message : 'Failed to upload recording')
       setCurrentStatus('FAILED')
       setCurrentError(err instanceof Error ? err.message : 'Failed to upload recording')
