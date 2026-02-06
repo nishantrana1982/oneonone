@@ -32,8 +32,9 @@ export async function GET(
     }
 
     const buffer = await readFromLocalStorage(meeting.recording.audioKey)
+    const body = new Uint8Array(buffer)
 
-    return new NextResponse(buffer, {
+    return new NextResponse(body, {
       headers: {
         'Content-Type': 'audio/webm',
         'Content-Length': String(buffer.length),
