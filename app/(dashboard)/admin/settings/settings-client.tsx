@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { 
   Key, 
   Cloud, 
@@ -655,6 +656,13 @@ export function SettingsClient() {
               {testingS3 ? <Loader2 className="w-4 h-4 animate-spin" /> : <TestTube className="w-4 h-4" />}
               Test S3 Connection
             </button>
+
+            <Link
+              href="/admin/storage"
+              className="flex items-center gap-2 px-5 py-2.5 text-orange hover:text-orange/80 font-medium rounded-xl transition-colors"
+            >
+              View recording storage &amp; usage →
+            </Link>
           </div>
         </div>
       </div>

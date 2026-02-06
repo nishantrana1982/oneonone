@@ -22,6 +22,7 @@ import {
   Building2,
   Shield,
   HardDrive,
+  Mic,
 } from 'lucide-react'
 import { useState } from 'react'
 import { UserRole } from '@prisma/client'
@@ -42,6 +43,7 @@ const adminNavigation = [
   { name: 'Departments', href: '/admin/departments', icon: Building2 },
   { name: 'Audit Logs', href: '/admin/audit-logs', icon: Shield },
   { name: 'Backup & Restore', href: '/admin/backup', icon: HardDrive },
+  { name: 'Recording Storage', href: '/admin/storage', icon: Mic },
   { name: 'Settings', href: '/admin/settings', icon: Settings },
 ]
 
