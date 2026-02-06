@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
 import { UserManagement } from './user-management'
 import Link from 'next/link'
-import { Settings, Building2, Shield, HardDrive, Users, ChevronRight } from 'lucide-react'
+import { Settings, Building2, Shield, HardDrive, Users, ChevronRight, Mic } from 'lucide-react'
 import { BulkImport } from '@/components/admin/bulk-import'
 
 export default async function AdminPage() {
@@ -129,6 +129,19 @@ export default async function AdminPage() {
             <div className="flex-1">
               <p className="font-medium text-dark-gray dark:text-white">Backup & Restore</p>
               <p className="text-sm text-medium-gray">Manage data backups</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-light-gray" />
+          </Link>
+          <Link
+            href="/admin/storage"
+            className="flex items-center gap-4 px-6 py-4 hover:bg-off-white/50 dark:hover:bg-charcoal/50 transition-colors"
+          >
+            <div className="w-10 h-10 rounded-xl bg-orange/10 flex items-center justify-center">
+              <Mic className="w-5 h-5 text-orange" />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium text-dark-gray dark:text-white">Recording Storage</p>
+              <p className="text-sm text-medium-gray">View usage and delete test recordings</p>
             </div>
             <ChevronRight className="w-5 h-5 text-light-gray" />
           </Link>

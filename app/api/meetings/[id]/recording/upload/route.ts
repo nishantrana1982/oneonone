@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole, canAccessEmployeeData } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
-import { saveToLocalStorage, generateRecordingKey } from '@/lib/s3'
+import { saveToLocalStorage, generateRecordingKey, isS3Configured, uploadToS3 } from '@/lib/s3'
 import { UserRole } from '@prisma/client'
 
 // Allow up to 5 minutes for large uploads
@@ -46,17 +46,17 @@ export async function POST(
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
-    // Generate key and save to local storage
     const key = generateRecordingKey(params.id)
     const buffer = Buffer.from(await file.arrayBuffer())
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'upload/route.ts:50',message:'Upload received - file details',data:{fileName:file.name,fileType:file.type,fileSize:file.size,bufferSize:buffer.length,firstBytes:buffer.slice(0,16).toString('hex'),duration},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-    
-    await saveToLocalStorage(buffer, key)
 
-    // Create or update recording record
+    // Store in S3 when configured (saves server disk); otherwise fallback to local
+    const useS3 = await isS3Configured()
+    if (useS3) {
+      await uploadToS3(buffer, key, 'audio/webm')
+    } else {
+      await saveToLocalStorage(buffer, key)
+    }
+
     const recording = await prisma.meetingRecording.upsert({
       where: { meetingId: params.id },
       create: {
@@ -77,10 +77,10 @@ export async function POST(
       },
     })
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       key,
       recordingId: recording.id,
-      message: 'File uploaded to local storage'
+      message: useS3 ? 'File uploaded to S3' : 'File uploaded to local storage',
     })
   } catch (error) {
     console.error('Error uploading file:', error)

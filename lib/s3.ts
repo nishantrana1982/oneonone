@@ -87,6 +87,28 @@ export async function deleteFromLocalStorage(key: string): Promise<void> {
   }
 }
 
+/** Path to recordings on disk (e.g. for admin display). */
+export function getLocalStorageDir(): string {
+  return LOCAL_STORAGE_DIR
+}
+
+/** Get storage used by local recordings: file count and total bytes. */
+export async function getLocalStorageStats(): Promise<{ fileCount: number; totalBytes: number }> {
+  try {
+    await ensureLocalStorageDir()
+    const names = await fs.readdir(LOCAL_STORAGE_DIR)
+    let totalBytes = 0
+    for (const name of names) {
+      const filePath = path.join(LOCAL_STORAGE_DIR, name)
+      const stat = await fs.stat(filePath)
+      if (stat.isFile()) totalBytes += stat.size
+    }
+    return { fileCount: names.length, totalBytes }
+  } catch (err) {
+    return { fileCount: 0, totalBytes: 0 }
+  }
+}
+
 export async function uploadToS3(
   buffer: Buffer,
   key: string,

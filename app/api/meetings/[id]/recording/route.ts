@@ -40,10 +40,20 @@ export async function GET(
       return NextResponse.json({ recording: null })
     }
 
-    // Generate signed URL for audio playback
-    let audioPlaybackUrl = null
+    // Generate playback URL: S3 signed URL if configured, else local stream URL
+    let audioPlaybackUrl: string | null = null
     if (meeting.recording.audioKey) {
-      audioPlaybackUrl = await getSignedDownloadUrl(meeting.recording.audioKey)
+      const s3Configured = await isS3Configured()
+      if (s3Configured) {
+        try {
+          audioPlaybackUrl = await getSignedDownloadUrl(meeting.recording.audioKey)
+        } catch {
+          // Fall back to local stream if S3 fails
+          audioPlaybackUrl = `/api/meetings/${params.id}/recording/stream`
+        }
+      } else {
+        audioPlaybackUrl = `/api/meetings/${params.id}/recording/stream`
+      }
     }
 
     return NextResponse.json({

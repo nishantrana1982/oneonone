@@ -52,16 +52,37 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    // Update recording status to UPLOADED (audioUrl left null when using local storage)
-    const recording = await prisma.meetingRecording.update({
+    // Get current recording (upload route already set audioKey and status)
+    const recording = await prisma.meetingRecording.findUnique({
+      where: { meetingId: params.id },
+    })
+
+    if (!recording) {
+      return NextResponse.json(
+        { error: 'No recording found. Please upload the recording first.' },
+        { status: 400 }
+      )
+    }
+
+    if (!recording.audioKey) {
+      return NextResponse.json(
+        { error: 'Recording has no audio file. Please upload again.' },
+        { status: 400 }
+      )
+    }
+
+    // Use the key stored in DB (set by upload route) so we never rely on client sending the wrong key
+    const audioKey = recording.audioKey
+
+    // Update status to UPLOADED if not already
+    await prisma.meetingRecording.update({
       where: { meetingId: params.id },
       data: { status: 'UPLOADED' },
     })
 
-    // Start processing synchronously (will complete in background via maxDuration)
-    // We use setImmediate to return the response first, then process
+    // Start processing in background
     setImmediate(() => {
-      processRecording(params.id, key, meeting.employee.name, meeting.reporter.name, user.id, language)
+      processRecording(params.id, audioKey, meeting.employee.name, meeting.reporter.name, user.id, language)
         .catch(err => console.error('Background processing error:', err))
     })
 
