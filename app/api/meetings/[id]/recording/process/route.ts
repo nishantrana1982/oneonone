@@ -6,8 +6,8 @@ import { transcribeAudio, analyzeTranscript } from '@/lib/openai'
 import { UserRole } from '@prisma/client'
 import { getSettings } from '@/lib/settings'
 
-// Set max duration for this route (5 minutes for processing)
-export const maxDuration = 300
+// Set max duration for this route (15 minutes for long audio transcription + analysis)
+export const maxDuration = 900
 
 export async function POST(
   request: NextRequest,

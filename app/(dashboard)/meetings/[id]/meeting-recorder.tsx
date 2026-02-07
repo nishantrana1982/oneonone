@@ -240,7 +240,7 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
         formData.append('file', audioBlob, 'recording.webm')
         formData.append('duration', recordingTime.toString())
 
-        const uploadTimeoutMs = 5 * 60 * 1000 // 5 minutes
+        const uploadTimeoutMs = 25 * 60 * 1000 // 25 minutes for long recordings
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), uploadTimeoutMs)
 

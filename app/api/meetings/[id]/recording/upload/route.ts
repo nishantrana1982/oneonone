@@ -4,8 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { saveToLocalStorage, generateRecordingKey, isS3Configured, uploadToS3 } from '@/lib/s3'
 import { UserRole } from '@prisma/client'
 
-// Allow up to 5 minutes for large uploads
-export const maxDuration = 300
+// Allow up to 25 minutes for large uploads (22+ min recordings)
+export const maxDuration = 1500
 
 // This route handles direct file uploads when S3 is not configured
 export async function POST(
