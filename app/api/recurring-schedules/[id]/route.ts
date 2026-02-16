@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
+import { UserRole } from '@prisma/client'
+
+function getScheduleId(params: { id?: string }): string | null {
+  const id = params?.id
+  if (typeof id === 'string' && id.length > 0) return id
+  return null
+}
 
 // Get a specific recurring schedule
 export async function GET(
@@ -13,16 +20,16 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const id = getScheduleId(params)
+    if (!id) {
+      return NextResponse.json({ error: 'Schedule ID is required' }, { status: 400 })
+    }
+
+    const isSuperAdmin = user.role === UserRole.SUPER_ADMIN
     const schedule = await prisma.recurringSchedule.findFirst({
-      where: {
-        id: params.id,
-        reporterId: user.id,
-      },
+      where: isSuperAdmin ? { id } : { id, reporterId: user.id },
       include: {
-        meetings: {
-          orderBy: { meetingDate: 'desc' },
-          take: 10,
-        },
+        meetings: { orderBy: { meetingDate: 'desc' }, take: 10 },
       },
     })
 
@@ -38,7 +45,10 @@ export async function GET(
     return NextResponse.json({ ...schedule, employee })
   } catch (error) {
     console.error('Error fetching recurring schedule:', error)
-    return NextResponse.json({ error: 'Failed to fetch schedule' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to fetch schedule' },
+      { status: 500 }
+    )
   }
 }
 
@@ -53,15 +63,17 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const id = getScheduleId(params)
+    if (!id) {
+      return NextResponse.json({ error: 'Schedule ID is required' }, { status: 400 })
+    }
+
     const body = await request.json()
     const { frequency, dayOfWeek, timeOfDay, isActive } = body
 
-    // Verify ownership
+    const isSuperAdmin = user.role === UserRole.SUPER_ADMIN
     const existing = await prisma.recurringSchedule.findFirst({
-      where: {
-        id: params.id,
-        reporterId: user.id,
-      },
+      where: isSuperAdmin ? { id } : { id, reporterId: user.id },
     })
 
     if (!existing) {
@@ -69,7 +81,7 @@ export async function PATCH(
     }
 
     const schedule = await prisma.recurringSchedule.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...(frequency !== undefined && { frequency }),
         ...(dayOfWeek !== undefined && { dayOfWeek }),
@@ -81,11 +93,14 @@ export async function PATCH(
     return NextResponse.json(schedule)
   } catch (error) {
     console.error('Error updating recurring schedule:', error)
-    return NextResponse.json({ error: 'Failed to update schedule' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to update schedule' },
+      { status: 500 }
+    )
   }
 }
 
-// Delete a recurring schedule
+// Delete a recurring schedule (soft delete: set isActive = false)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -93,30 +108,39 @@ export async function DELETE(
   try {
     const user = await getCurrentUser()
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized. Please sign in again.' }, { status: 401 })
     }
 
-    // Verify ownership
+    const id = getScheduleId(params)
+    if (!id) {
+      return NextResponse.json({ error: 'Schedule ID is required' }, { status: 400 })
+    }
+
+    const isSuperAdmin = user.role === UserRole.SUPER_ADMIN
+    const whereClause = isSuperAdmin ? { id } : { id, reporterId: user.id }
+
     const existing = await prisma.recurringSchedule.findFirst({
-      where: {
-        id: params.id,
-        reporterId: user.id,
-      },
+      where: whereClause,
     })
 
     if (!existing) {
-      return NextResponse.json({ error: 'Schedule not found' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Schedule not found. You may not have permission to delete it.' },
+        { status: 404 }
+      )
     }
 
-    // Soft delete by deactivating
     await prisma.recurringSchedule.update({
-      where: { id: params.id },
+      where: { id },
       data: { isActive: false },
     })
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, message: 'Schedule deleted' })
   } catch (error) {
     console.error('Error deleting recurring schedule:', error)
-    return NextResponse.json({ error: 'Failed to delete schedule' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to delete schedule. Please try again.' },
+      { status: 500 }
+    )
   }
 }

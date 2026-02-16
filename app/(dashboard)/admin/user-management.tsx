@@ -1,9 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, Plus, Edit2, UserPlus, Users, Building2 } from 'lucide-react'
+import { X, Edit2, UserPlus, Users, Building2, ChevronUp, ChevronDown } from 'lucide-react'
 import { UserRole } from '@prisma/client'
+
+type SortKey = 'name' | 'role' | 'department' | 'reportsTo' | 'status'
+type SortDir = 'asc' | 'desc'
 
 interface User {
   id: string
@@ -30,6 +33,8 @@ interface UserManagementProps {
 
 export function UserManagement({ users, departments, reporters }: UserManagementProps) {
   const router = useRouter()
+  const [sortKey, setSortKey] = useState<SortKey>('name')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -77,6 +82,50 @@ export function UserManagement({ users, departments, reporters }: UserManagement
     setEditingUser(null)
     resetForm()
   }
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortKey(key)
+      setSortDir('asc')
+    }
+  }
+
+  const sortedUsers = useMemo(() => {
+    const list = [...users]
+    list.sort((a, b) => {
+      let aVal: string | number, bVal: string | number
+      switch (sortKey) {
+        case 'name':
+          aVal = a.name.toLowerCase()
+          bVal = b.name.toLowerCase()
+          break
+        case 'role':
+          aVal = a.role
+          bVal = b.role
+          break
+        case 'department':
+          aVal = (a.department?.name ?? '').toLowerCase()
+          bVal = (b.department?.name ?? '').toLowerCase()
+          break
+        case 'reportsTo':
+          aVal = (a.reportsTo?.name ?? '').toLowerCase()
+          bVal = (b.reportsTo?.name ?? '').toLowerCase()
+          break
+        case 'status':
+          aVal = a.isActive ? 'active' : 'inactive'
+          bVal = b.isActive ? 'active' : 'inactive'
+          break
+        default:
+          return 0
+      }
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
+    return list
+  }, [users, sortKey, sortDir])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -178,17 +227,62 @@ export function UserManagement({ users, departments, reporters }: UserManagement
           <table className="w-full">
             <thead>
               <tr className="border-b border-off-white dark:border-medium-gray/20 bg-off-white/50 dark:bg-charcoal/50">
-                <th className="text-left py-3 px-6 text-sm font-medium text-medium-gray">Name</th>
+                <th className="text-left py-3 px-6 text-sm font-medium text-medium-gray">
+                  <button
+                    type="button"
+                    onClick={() => handleSort('name')}
+                    className="flex items-center gap-1 hover:text-dark-gray dark:hover:text-white transition-colors"
+                  >
+                    Name
+                    {sortKey === 'name' && (sortDir === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
+                  </button>
+                </th>
                 <th className="text-left py-3 px-6 text-sm font-medium text-medium-gray">Email</th>
-                <th className="text-left py-3 px-6 text-sm font-medium text-medium-gray">Role</th>
-                <th className="text-left py-3 px-6 text-sm font-medium text-medium-gray">Department</th>
-                <th className="text-left py-3 px-6 text-sm font-medium text-medium-gray">Reports To</th>
-                <th className="text-left py-3 px-6 text-sm font-medium text-medium-gray">Status</th>
+                <th className="text-left py-3 px-6 text-sm font-medium text-medium-gray">
+                  <button
+                    type="button"
+                    onClick={() => handleSort('role')}
+                    className="flex items-center gap-1 hover:text-dark-gray dark:hover:text-white transition-colors"
+                  >
+                    Role
+                    {sortKey === 'role' && (sortDir === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
+                  </button>
+                </th>
+                <th className="text-left py-3 px-6 text-sm font-medium text-medium-gray">
+                  <button
+                    type="button"
+                    onClick={() => handleSort('department')}
+                    className="flex items-center gap-1 hover:text-dark-gray dark:hover:text-white transition-colors"
+                  >
+                    Department
+                    {sortKey === 'department' && (sortDir === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
+                  </button>
+                </th>
+                <th className="text-left py-3 px-6 text-sm font-medium text-medium-gray">
+                  <button
+                    type="button"
+                    onClick={() => handleSort('reportsTo')}
+                    className="flex items-center gap-1 hover:text-dark-gray dark:hover:text-white transition-colors"
+                  >
+                    Reports To
+                    {sortKey === 'reportsTo' && (sortDir === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
+                  </button>
+                </th>
+                <th className="text-left py-3 px-6 text-sm font-medium text-medium-gray">
+                  <button
+                    type="button"
+                    onClick={() => handleSort('status')}
+                    className="flex items-center gap-1 hover:text-dark-gray dark:hover:text-white transition-colors"
+                  >
+                    Status
+                    {sortKey === 'status' && (sortDir === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
+                  </button>
+                </th>
                 <th className="text-left py-3 px-6 text-sm font-medium text-medium-gray">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
+              {sortedUsers.map((user) => (
                 <tr
                   key={user.id}
                   className="border-b border-off-white/50 dark:border-medium-gray/10 hover:bg-off-white/50 dark:hover:bg-charcoal/50 transition-colors"
