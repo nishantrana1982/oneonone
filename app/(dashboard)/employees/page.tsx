@@ -40,8 +40,7 @@ export default async function EmployeesPage() {
     const missed = p.meetingsAsEmployee.filter(
       (m) =>
         new Date(m.meetingDate) < now &&
-        m.status === 'SCHEDULED' &&
-        (m.status !== 'COMPLETED' || !m.checkInPersonal)
+        m.status !== 'COMPLETED'
     ).length
     const recordings = p.meetingsAsEmployee.filter(
       (m) => m.recording && m.recording.status === 'COMPLETED'
