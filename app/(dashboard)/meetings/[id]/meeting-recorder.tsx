@@ -215,6 +215,9 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
     setHasStartedUpload(true) // Track that we've started uploading this session
 
     try {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meeting-recorder.tsx:uploadRecording',message:'Before presign',data:{meetingId,blobSize:audioBlob.size,duration:recordingTime},timestamp:Date.now(),hypothesisId:'A,D'})}).catch(()=>{});
+      // #endregion
       // Get presigned URL or check if using local storage
       const presignResponse = await fetch(`/api/meetings/${meetingId}/recording/presign`, {
         method: 'POST',
@@ -232,6 +235,9 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
       }
       
       const { uploadUrl, key, useLocalUpload } = await presignResponse.json()
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meeting-recorder.tsx:presignDone',message:'Presign response',data:{useLocalUpload,hasKey:!!key},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
 
       if (useLocalUpload) {
         // Upload directly to server (local storage) with timeout so we don't hang forever
@@ -246,6 +252,9 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
 
         let localUploadResponse: Response
         try {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meeting-recorder.tsx:beforeUpload',message:'Before upload fetch',data:{blobSize:audioBlob.size},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
+          // #endregion
           localUploadResponse = await fetch(`/api/meetings/${meetingId}/recording/upload`, {
             method: 'POST',
             body: formData,
@@ -253,16 +262,22 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
           })
         } catch (uploadErr: unknown) {
           clearTimeout(timeoutId)
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meeting-recorder.tsx:uploadCatch',message:'Upload fetch threw',data:{name:uploadErr instanceof Error?uploadErr.name:'',message:uploadErr instanceof Error?uploadErr.message:''},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
+          // #endregion
           if (uploadErr instanceof Error && uploadErr.name === 'AbortError') {
             throw new Error('Upload timed out. The recording may be too large or the connection is slow. Try a shorter recording.')
           }
           throw uploadErr
         }
         clearTimeout(timeoutId)
-        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meeting-recorder.tsx:uploadResponse',message:'Upload response',data:{ok:localUploadResponse.ok,status:localUploadResponse.status},timestamp:Date.now(),hypothesisId:'A,D'})}).catch(()=>{});
+        // #endregion
         if (!localUploadResponse.ok) {
           const errorData = await localUploadResponse.json().catch(() => ({}))
-          throw new Error(errorData.error || 'Failed to upload file')
+          const msg = errorData.detail || errorData.error || 'Failed to upload file'
+          throw new Error(msg)
         }
         
         const localData = await localUploadResponse.json()
@@ -330,6 +345,9 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
       // Polling will be started by useEffect watching currentStatus
 
     } catch (err) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meeting-recorder.tsx:uploadError',message:'Upload error',data:{message:err instanceof Error?err.message:'',name:err instanceof Error?err.name:''},timestamp:Date.now(),hypothesisId:'A,D'})}).catch(()=>{});
+      // #endregion
       console.error('Error uploading recording:', err)
       setError(err instanceof Error ? err.message : 'Failed to upload recording')
       setCurrentStatus('FAILED')

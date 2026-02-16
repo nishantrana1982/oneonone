@@ -96,7 +96,7 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
       </button>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid gap-6 lg:grid-cols-[1fr,1fr]">
+        <div className="grid gap-6 lg:grid-cols-[1fr,1fr] items-start">
           {/* Left: Team Member with search + scrollable list */}
           <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-hidden flex flex-col max-h-[420px]">
             <div className="px-6 py-4 border-b border-off-white dark:border-medium-gray/20 flex items-center gap-3 shrink-0">
@@ -180,7 +180,7 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
                 <p className="text-sm text-medium-gray">Pick when to meet</p>
               </div>
             </div>
-            <div className="p-6 space-y-6 flex-1">
+            <div className="p-6 space-y-6">
               <div>
                 <DatePicker
                   label="Date"
