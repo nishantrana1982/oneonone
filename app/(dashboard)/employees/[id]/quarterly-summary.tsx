@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Download, TrendingUp, Smile, Meh, Frown, Calendar, CheckSquare, Target, Award, HelpCircle } from 'lucide-react'
+import { useToast } from '@/components/ui/toast'
 
 interface QuarterlySummaryProps {
   userId: string
@@ -9,6 +10,7 @@ interface QuarterlySummaryProps {
 }
 
 export function QuarterlySummary({ userId, userName }: QuarterlySummaryProps) {
+  const { toastError } = useToast()
   const [loading, setLoading] = useState(false)
   const [summary, setSummary] = useState<any>(null)
   const [isOpen, setIsOpen] = useState(false)
@@ -28,7 +30,7 @@ export function QuarterlySummary({ userId, userName }: QuarterlySummaryProps) {
       setIsOpen(true)
     } catch (error) {
       console.error('Error loading summary:', error)
-      alert('Failed to load quarterly summary')
+      toastError('Failed to load quarterly summary')
     } finally {
       setLoading(false)
     }

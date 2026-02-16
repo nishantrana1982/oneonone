@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
+import { useToast } from '@/components/ui/toast'
 
 interface MeetingFormClientProps {
   meetingId: string
@@ -20,6 +21,7 @@ export function MeetingFormClient({
   isSubmitted = false,
 }: MeetingFormClientProps) {
   const router = useRouter()
+  const { toastError } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [draftSaved, setDraftSaved] = useState(false)
 
@@ -47,7 +49,7 @@ export function MeetingFormClient({
       }
     } catch (error) {
       console.error('Error saving form:', error)
-      alert(error instanceof Error ? error.message : 'Failed to save. Please try again.')
+      toastError(error instanceof Error ? error.message : 'Failed to save. Please try again.')
     } finally {
       setIsLoading(false)
     }

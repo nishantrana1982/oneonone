@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { X, Edit2, UserPlus, Users, Building2, ChevronUp, ChevronDown } from 'lucide-react'
 import { UserRole } from '@prisma/client'
+import { useToast } from '@/components/ui/toast'
 
 type SortKey = 'name' | 'role' | 'department' | 'reportsTo' | 'status'
 type SortDir = 'asc' | 'desc'
@@ -33,6 +34,7 @@ interface UserManagementProps {
 
 export function UserManagement({ users, departments, reporters }: UserManagementProps) {
   const router = useRouter()
+  const { toastError } = useToast()
   const [sortKey, setSortKey] = useState<SortKey>('name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [isAddOpen, setIsAddOpen] = useState(false)
@@ -154,7 +156,7 @@ export function UserManagement({ users, departments, reporters }: UserManagement
       router.refresh()
     } catch (error) {
       console.error('Error saving user:', error)
-      alert(error instanceof Error ? error.message : 'Failed to save user')
+      toastError(error instanceof Error ? error.message : 'Failed to save user')
     } finally {
       setIsLoading(false)
     }

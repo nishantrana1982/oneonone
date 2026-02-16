@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Calendar, Repeat, ArrowLeft, Loader2, Check } from 'lucide-react'
 import { RecurringFrequency } from '@prisma/client'
 import { NewMeetingForm } from './new-meeting-form'
+import { useToast } from '@/components/ui/toast'
 
 const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
@@ -24,6 +25,7 @@ type ScheduleType = 'one-time' | 'recurring'
 
 export function ScheduleMeetingClient({ employees, currentUserId }: ScheduleMeetingClientProps) {
   const router = useRouter()
+  const { toastError } = useToast()
   const [scheduleType, setScheduleType] = useState<ScheduleType | null>(null)
   const [recurringLoading, setRecurringLoading] = useState(false)
   const [recurringForm, setRecurringForm] = useState({
@@ -54,10 +56,10 @@ export function ScheduleMeetingClient({ employees, currentUserId }: ScheduleMeet
         router.refresh()
       } else {
         const data = await res.json().catch(() => ({}))
-        alert(data.error || 'Failed to create recurring schedule')
+        toastError(data.error || 'Failed to create recurring schedule')
       }
     } catch {
-      alert('Failed to create recurring schedule')
+      toastError('Failed to create recurring schedule')
     } finally {
       setRecurringLoading(false)
     }

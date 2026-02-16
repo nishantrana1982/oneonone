@@ -17,6 +17,7 @@ import {
   Check
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { useToast } from '@/components/ui/toast'
 
 interface TranscriptViewerProps {
   recording: {
@@ -65,6 +66,7 @@ const languageNames: Record<string, string> = {
 
 export function TranscriptViewer({ recording, employeeId, reporterId }: TranscriptViewerProps) {
   const router = useRouter()
+  const { toastError } = useToast()
   const [showFullTranscript, setShowFullTranscript] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [activeTab, setActiveTab] = useState<'summary' | 'transcript' | 'analysis'>('summary')
@@ -107,11 +109,11 @@ export function TranscriptViewer({ recording, employeeId, reporterId }: Transcri
       if (response.ok) {
         router.refresh()
       } else {
-        alert('Failed to delete recording')
+        toastError('Failed to delete recording')
       }
     } catch (error) {
       console.error('Error deleting recording:', error)
-      alert('Failed to delete recording')
+      toastError('Failed to delete recording')
     } finally {
       setIsDeleting(false)
     }
@@ -119,7 +121,7 @@ export function TranscriptViewer({ recording, employeeId, reporterId }: Transcri
 
   const handleAddTodo = async (todo: { title: string; description: string; assignTo: string; priority: string }, index: number) => {
     if (!employeeId || !reporterId) {
-      alert('Unable to add todo: missing participant information')
+      toastError('Unable to add todo: missing participant information')
       return
     }
 
@@ -144,11 +146,11 @@ export function TranscriptViewer({ recording, employeeId, reporterId }: Transcri
         router.refresh()
       } else {
         const error = await response.json()
-        alert(error.error || 'Failed to add todo')
+        toastError(error.error || 'Failed to add todo')
       }
     } catch (error) {
       console.error('Error adding todo:', error)
-      alert('Failed to add todo')
+      toastError('Failed to add todo')
     } finally {
       setAddingTodo(null)
     }

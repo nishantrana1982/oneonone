@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CheckSquare, AlertTriangle, Circle, CheckCircle2, Clock, Calendar, ChevronDown } from 'lucide-react'
 import { UserRole, TodoStatus, TodoPriority } from '@prisma/client'
+import { useToast } from '@/components/ui/toast'
 
 interface Todo {
   id: string
@@ -37,6 +38,7 @@ const priorityConfig = {
 
 export function TodoList({ todos, currentUserId, userRole }: TodoListProps) {
   const router = useRouter()
+  const { toastError } = useToast()
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('active')
   const [updating, setUpdating] = useState<string | null>(null)
 
@@ -59,7 +61,7 @@ export function TodoList({ todos, currentUserId, userRole }: TodoListProps) {
       router.refresh()
     } catch (error) {
       console.error('Error updating todo:', error)
-      alert('Failed to update task. Please try again.')
+      toastError('Failed to update task. Please try again.')
     } finally {
       setUpdating(null)
     }

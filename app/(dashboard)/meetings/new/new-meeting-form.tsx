@@ -7,6 +7,7 @@ import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Calendar, Clock, User, ArrowLeft, Check, Search } from 'lucide-react'
 import { DatePicker } from '@/components/ui/date-picker'
+import { useToast } from '@/components/ui/toast'
 
 const formSchema = z.object({
   employeeId: z.string().min(1, 'Please select a team member'),
@@ -23,6 +24,7 @@ interface NewMeetingFormProps {
 
 export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps) {
   const router = useRouter()
+  const { toastError } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [employeeSearch, setEmployeeSearch] = useState('')
   const {
@@ -74,7 +76,7 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
       router.push(`/meetings/${meeting.id}`)
     } catch (error) {
       console.error('Error creating meeting:', error)
-      alert(error instanceof Error ? error.message : 'Failed to create meeting. Please try again.')
+      toastError(error instanceof Error ? error.message : 'Failed to create meeting. Please try again.')
     } finally {
       setIsLoading(false)
     }

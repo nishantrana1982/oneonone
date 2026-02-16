@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { formatMeetingDateShort } from '@/lib/utils'
 import { UserRole, RecurringFrequency } from '@prisma/client'
+import { useToast } from '@/components/ui/toast'
 
 interface Meeting {
   id: string
@@ -63,6 +64,7 @@ export function MeetingsClient({
   userRole,
 }: MeetingsClientProps) {
   const router = useRouter()
+  const { toastError } = useToast()
   const [activeTab, setActiveTab] = useState<'all' | 'recurring'>('all')
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [isToggling, setIsToggling] = useState<string | null>(null)
@@ -72,7 +74,7 @@ export function MeetingsClient({
   const showMessage = useCallback((type: 'success' | 'error', text: string) => {
     setMessage({ type, text })
     if (type === 'error') {
-      alert(text)
+      toastError(text)
     }
     setTimeout(() => setMessage(null), 5000)
   }, [])

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, X } from 'lucide-react'
 import { DatePicker } from '@/components/ui/date-picker'
+import { useToast } from '@/components/ui/toast'
 
 interface AddTodoFormProps {
   meetingId: string
@@ -15,6 +16,7 @@ interface AddTodoFormProps {
 
 export function AddTodoForm({ meetingId, employeeId, employeeName, reporterId, reporterName }: AddTodoFormProps) {
   const router = useRouter()
+  const { toastError } = useToast()
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
@@ -54,7 +56,7 @@ export function AddTodoForm({ meetingId, employeeId, employeeName, reporterId, r
       router.refresh()
     } catch (error) {
       console.error('Error creating todo:', error)
-      alert('Failed to create task. Please try again.')
+      toastError('Failed to create task. Please try again.')
     } finally {
       setIsLoading(false)
     }

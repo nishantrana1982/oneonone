@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { HardDrive, Trash2, Loader2, ArrowLeft, FileAudio } from 'lucide-react'
+import { useToast } from '@/components/ui/toast'
 
 type StorageStats = {
   storageType: 's3' | 'local'
@@ -34,6 +35,7 @@ type RecordingRow = {
 
 export function StorageClient() {
   const router = useRouter()
+  const { toastError } = useToast()
   const [stats, setStats] = useState<StorageStats | null>(null)
   const [recordings, setRecordings] = useState<RecordingRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -69,11 +71,11 @@ export function StorageClient() {
         router.refresh()
       } else {
         const data = await res.json().catch(() => ({}))
-        alert(data.error || 'Failed to delete')
+        toastError(data.error || 'Failed to delete')
       }
     } catch (e) {
       console.error(e)
-      alert('Failed to delete')
+      toastError('Failed to delete')
     } finally {
       setDeletingId(null)
     }

@@ -58,6 +58,38 @@ export async function PATCH(
       }
     }
 
+    // Delete Google Calendar event when meeting is cancelled
+    if (meeting.calendarEvent && status === 'CANCELLED') {
+      try {
+        const { deleteCalendarEvent } = await import('@/lib/google-calendar')
+        await deleteCalendarEvent(meeting.calendarEvent.googleEventId, meeting.reporterId)
+      } catch (error) {
+        console.error('Failed to delete calendar event on cancellation:', error)
+      }
+    }
+
+    // Create in-app notifications for status changes
+    try {
+      if (status === 'CANCELLED') {
+        const { notifyMeetingCancelled } = await import('@/lib/notifications')
+        await notifyMeetingCancelled(
+          meeting.employeeId,
+          user.name || 'Manager',
+          meeting.meetingDate,
+          params.id
+        )
+      } else if (status === 'COMPLETED') {
+        const { notifyMeetingCompleted } = await import('@/lib/notifications')
+        await notifyMeetingCompleted(
+          meeting.employeeId,
+          meeting.reporter.name,
+          params.id
+        )
+      }
+    } catch (error) {
+      console.error('Failed to create notification:', error)
+    }
+
     return NextResponse.json(updatedMeeting)
   } catch (error) {
     console.error('Error updating meeting:', error)

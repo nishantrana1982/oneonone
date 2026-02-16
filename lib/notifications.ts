@@ -87,6 +87,56 @@ export async function getUnreadCount(userId: string) {
   })
 }
 
+export async function getFilteredNotifications(
+  userId: string,
+  options: {
+    type?: string
+    isRead?: boolean
+    limit?: number
+    offset?: number
+  } = {}
+) {
+  const where: any = { userId }
+  if (options.type) where.type = options.type
+  if (options.isRead !== undefined) where.isRead = options.isRead
+
+  const [notifications, total] = await Promise.all([
+    prisma.notification.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: options.limit || 50,
+      skip: options.offset || 0,
+    }),
+    prisma.notification.count({ where }),
+  ])
+
+  return { notifications, total }
+}
+
+export async function deleteNotification(notificationId: string, userId: string) {
+  return prisma.notification.deleteMany({
+    where: {
+      id: notificationId,
+      userId,
+    },
+  })
+}
+
+export async function deleteAllReadNotifications(userId: string) {
+  return prisma.notification.deleteMany({
+    where: {
+      userId,
+      isRead: true,
+    },
+  })
+}
+
+export async function deleteAllNotifications(userId: string) {
+  return prisma.notification.deleteMany({
+    where: { userId },
+  })
+}
+
 // Helper functions for common notification types
 export async function notifyMeetingScheduled(
   employeeId: string,
@@ -157,5 +207,61 @@ export async function notifyRecordingReady(
     title: 'Recording Ready',
     message: 'Meeting recording has been processed and is ready to view',
     link: `/meetings/${meetingId}`,
+  })
+}
+
+export async function notifyMeetingCancelled(
+  userId: string,
+  cancelledByName: string,
+  meetingDate: Date,
+  meetingId: string
+) {
+  return createNotification({
+    userId,
+    type: 'MEETING_CANCELLED',
+    title: 'Meeting Cancelled',
+    message: `${cancelledByName} cancelled the one-on-one meeting scheduled for ${meetingDate.toLocaleDateString()}`,
+    link: `/meetings/${meetingId}`,
+  })
+}
+
+export async function notifyMeetingCompleted(
+  employeeId: string,
+  reporterName: string,
+  meetingId: string
+) {
+  return createNotification({
+    userId: employeeId,
+    type: 'MEETING_SCHEDULED',
+    title: 'Meeting Completed',
+    message: `${reporterName} has marked your one-on-one meeting as completed`,
+    link: `/meetings/${meetingId}`,
+  })
+}
+
+export async function notifyTodoDueSoon(
+  userId: string,
+  todoTitle: string,
+  dueDate: Date
+) {
+  return createNotification({
+    userId,
+    type: 'TODO_DUE_SOON',
+    title: 'Task Due Soon',
+    message: `Your task "${todoTitle}" is due on ${dueDate.toLocaleDateString()}`,
+    link: `/todos`,
+  })
+}
+
+export async function notifyTodoOverdue(
+  userId: string,
+  todoTitle: string
+) {
+  return createNotification({
+    userId,
+    type: 'TODO_OVERDUE',
+    title: 'Task Overdue',
+    message: `Your task "${todoTitle}" is past its due date`,
+    link: `/todos`,
   })
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdmin, getCurrentUser } from '@/lib/auth-helpers'
+import { requireAdmin, getCurrentUser, handleApiError } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
@@ -131,6 +131,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(counts)
   } catch (error) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return handleApiError(error)
   }
 }

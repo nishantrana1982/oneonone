@@ -14,7 +14,7 @@ function isSmtpConfigured(): boolean {
 function getFromEmail(): string {
   if (process.env.EMAIL_FROM) return process.env.EMAIL_FROM
   if (process.env.AWS_SES_FROM_EMAIL) return process.env.AWS_SES_FROM_EMAIL
-  return 'noreply@example.com'
+  throw new Error('EMAIL_FROM or AWS_SES_FROM_EMAIL must be set in environment variables')
 }
 
 // Lazy SMTP transporter (only when SMTP is configured)
@@ -65,6 +65,17 @@ interface EmailOptions {
   text?: string
 }
 
+export class EmailNotConfiguredError extends Error {
+  constructor() {
+    super('Email not configured: neither SMTP nor AWS SES is set up. Configure SMTP_* or AWS_SES_* in .env')
+    this.name = 'EmailNotConfiguredError'
+  }
+}
+
+export function isEmailConfigured(): boolean {
+  return isSmtpConfigured() || isSesConfigured()
+}
+
 export async function sendEmail({ to, subject, html, text }: EmailOptions): Promise<string | null> {
   const recipients = Array.isArray(to) ? to : [to]
   const from = getFromEmail()
@@ -80,6 +91,7 @@ export async function sendEmail({ to, subject, html, text }: EmailOptions): Prom
         html,
         text: text || undefined,
       })
+      console.log(`Email sent via SMTP to ${recipients.join(', ')} [${info.messageId}]`)
       return info.messageId || null
     } catch (error) {
       console.error('SMTP send error:', error)
@@ -103,6 +115,7 @@ export async function sendEmail({ to, subject, html, text }: EmailOptions): Prom
         },
       })
       const response = await client.send(command)
+      console.log(`Email sent via SES to ${recipients.join(', ')} [${response.MessageId}]`)
       return response.MessageId || null
     } catch (error) {
       console.error('SES send error:', error)
@@ -110,11 +123,8 @@ export async function sendEmail({ to, subject, html, text }: EmailOptions): Prom
     }
   }
 
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'email.ts:sendEmail',message:'Email NOT configured',data:{smtpConfigured:isSmtpConfigured(),sesConfigured:isSesConfigured()},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
-  // #endregion
-  console.warn('Email not sent: neither SMTP nor AWS SES is configured. Set SMTP_* or AWS SES in .env')
-  return null
+  // Neither provider configured — throw so callers know it failed
+  throw new EmailNotConfiguredError()
 }
 
 export async function sendMeetingScheduledEmail(

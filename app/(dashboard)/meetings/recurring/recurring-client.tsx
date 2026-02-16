@@ -17,6 +17,7 @@ import {
   Check
 } from 'lucide-react'
 import { RecurringFrequency } from '@prisma/client'
+import { useToast } from '@/components/ui/toast'
 
 interface Employee {
   id: string
@@ -51,6 +52,7 @@ const frequencyLabels: Record<RecurringFrequency, string> = {
 
 export function RecurringSchedulesClient({ employees, initialSchedules }: Props) {
   const router = useRouter()
+  const { toastError } = useToast()
   const [schedules, setSchedules] = useState<Schedule[]>(initialSchedules)
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -94,10 +96,10 @@ export function RecurringSchedulesClient({ employees, initialSchedules }: Props)
         router.refresh()
       } else {
         const error = await response.json()
-        alert(error.error || 'Failed to create schedule')
+        toastError(error.error || 'Failed to create schedule')
       }
     } catch (error) {
-      alert('Failed to create schedule')
+      toastError('Failed to create schedule')
     } finally {
       setLoading(false)
     }

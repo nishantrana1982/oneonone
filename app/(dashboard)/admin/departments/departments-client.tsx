@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Building2, Users, Pencil, Trash2, X, Loader2 } from 'lucide-react'
+import { useToast } from '@/components/ui/toast'
 
 interface Department {
   id: string
@@ -18,6 +19,7 @@ interface DepartmentsClientProps {
 
 export function DepartmentsClient({ departments: initialDepartments }: DepartmentsClientProps) {
   const router = useRouter()
+  const { toastError } = useToast()
   const [departments, setDepartments] = useState(initialDepartments)
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -47,7 +49,7 @@ export function DepartmentsClient({ departments: initialDepartments }: Departmen
       setIsAddOpen(false)
       router.refresh()
     } catch (error: any) {
-      alert(error.message)
+      toastError(error.message)
     } finally {
       setLoading(false)
     }
@@ -75,7 +77,7 @@ export function DepartmentsClient({ departments: initialDepartments }: Departmen
       setEditName('')
       router.refresh()
     } catch (error: any) {
-      alert(error.message)
+      toastError(error.message)
     } finally {
       setLoading(false)
     }
@@ -97,7 +99,7 @@ export function DepartmentsClient({ departments: initialDepartments }: Departmen
       setDeleteConfirm(null)
       router.refresh()
     } catch (error: any) {
-      alert(error.message)
+      toastError(error.message)
     } finally {
       setLoading(false)
     }

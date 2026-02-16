@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Download, TrendingUp, AlertTriangle, Smile, Meh, Frown, Calendar, Users, CheckSquare, FileText, Building2, Loader2, Sparkles, BarChart3 } from 'lucide-react'
 import { DatePicker } from '@/components/ui/date-picker'
+import { useToast } from '@/components/ui/toast'
 
 interface Department {
   id: string
@@ -14,6 +15,7 @@ interface ReportsClientProps {
 }
 
 export function ReportsClient({ departments }: ReportsClientProps) {
+  const { toastError } = useToast()
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all')
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
@@ -40,7 +42,7 @@ export function ReportsClient({ departments }: ReportsClientProps) {
       setReportData(data)
     } catch (error) {
       console.error('Error generating report:', error)
-      alert('Failed to generate report. Please try again.')
+      toastError('Failed to generate report. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -62,7 +64,7 @@ export function ReportsClient({ departments }: ReportsClientProps) {
       document.body.removeChild(a)
     } catch (error) {
       console.error('Error exporting:', error)
-      alert('Failed to export report.')
+      toastError('Failed to export report.')
     }
   }
 

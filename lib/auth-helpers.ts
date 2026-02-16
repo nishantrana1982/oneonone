@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from './auth'
 import { UserRole } from '@prisma/client'
 import { redirect } from 'next/navigation'
+import { NextResponse } from 'next/server'
 
 // Custom error classes for API routes
 export class UnauthorizedError extends Error {
@@ -47,6 +48,18 @@ export async function requireRole(allowedRoles: UserRole[]) {
 // For page routes - redirects on failure
 export async function requireAdmin() {
   return requireRole([UserRole.SUPER_ADMIN])
+}
+
+// Standardized API error response helper
+export function handleApiError(error: unknown) {
+  if (error instanceof UnauthorizedError) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  if (error instanceof ForbiddenError) {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  }
+  console.error('API error:', error)
+  return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
 }
 
 export function canAccessEmployeeData(

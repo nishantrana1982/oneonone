@@ -172,6 +172,23 @@ async function processRecording(
       },
     })
 
+    // Notify both employee and reporter that recording is ready
+    try {
+      const meeting = await prisma.meeting.findUnique({
+        where: { id: meetingId },
+        select: { employeeId: true, reporterId: true },
+      })
+      if (meeting) {
+        const { notifyRecordingReady } = await import('@/lib/notifications')
+        await notifyRecordingReady(
+          [meeting.employeeId, meeting.reporterId],
+          meetingId
+        )
+      }
+    } catch (notifError) {
+      console.error('[Recording] Failed to create notification:', notifError)
+    }
+
     console.log(`[Recording] Processing complete for meeting=${meetingId}`)
   } catch (error) {
     console.error('[Recording] Processing error:', error)

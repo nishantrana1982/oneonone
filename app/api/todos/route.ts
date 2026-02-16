@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/auth-helpers'
+import { requireAuth, handleApiError } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { TodoPriority, TodoStatus } from '@prisma/client'
 
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(todos)
   } catch (error) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return handleApiError(error)
   }
 }
 
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Send email notification if assigned to someone else
+    // Send email + in-app notification if assigned to someone else
     if (todo.assignedToId !== user.id && todo.assignedTo?.email) {
       try {
         const { sendTodoAssignedEmail } = await import('@/lib/email')
@@ -75,7 +75,18 @@ export async function POST(request: NextRequest) {
         )
       } catch (error) {
         console.error('Failed to send email notification:', error)
-        // Continue even if email fails
+      }
+
+      try {
+        const { notifyTodoAssigned } = await import('@/lib/notifications')
+        await notifyTodoAssigned(
+          todo.assignedToId,
+          todo.createdBy!.name,
+          todo.title,
+          todo.id
+        )
+      } catch (error) {
+        console.error('Failed to create notification:', error)
       }
     }
 

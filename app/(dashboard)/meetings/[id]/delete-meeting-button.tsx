@@ -3,9 +3,11 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Trash2 } from 'lucide-react'
+import { useToast } from '@/components/ui/toast'
 
 export function DeleteMeetingButton({ meetingId }: { meetingId: string }) {
   const router = useRouter()
+  const { toastError } = useToast()
   const [loading, setLoading] = useState(false)
 
   const handleDelete = async () => {
@@ -26,7 +28,7 @@ export function DeleteMeetingButton({ meetingId }: { meetingId: string }) {
       router.refresh()
     } catch (e) {
       console.error(e)
-      alert(e instanceof Error ? e.message : 'Failed to delete meeting. Please try again.')
+      toastError(e instanceof Error ? e.message : 'Failed to delete meeting. Please try again.')
     } finally {
       setLoading(false)
     }

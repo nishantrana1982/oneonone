@@ -3,9 +3,11 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CheckCircle } from 'lucide-react'
+import { useToast } from '@/components/ui/toast'
 
 export function MarkCompletedButton({ meetingId }: { meetingId: string }) {
   const router = useRouter()
+  const { toastError } = useToast()
   const [loading, setLoading] = useState(false)
 
   const handleMarkCompleted = async () => {
@@ -20,7 +22,7 @@ export function MarkCompletedButton({ meetingId }: { meetingId: string }) {
       router.refresh()
     } catch (e) {
       console.error(e)
-      alert('Failed to mark meeting as completed. Please try again.')
+      toastError('Failed to mark meeting as completed. Please try again.')
     } finally {
       setLoading(false)
     }

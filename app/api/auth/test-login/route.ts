@@ -4,6 +4,14 @@ import { UserRole } from '@prisma/client'
 import { randomBytes } from 'crypto'
 
 export async function POST(request: NextRequest) {
+  // Block in production unless explicitly enabled
+  if (
+    process.env.NODE_ENV === 'production' &&
+    process.env.ENABLE_TEST_LOGIN !== 'true'
+  ) {
+    return NextResponse.json({ error: 'Not available' }, { status: 404 })
+  }
+
   try {
     const { role } = await request.json()
 

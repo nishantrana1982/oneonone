@@ -7,9 +7,14 @@ import { sendEmail } from '@/lib/email'
 // This endpoint should be called by a cron job (e.g., every hour)
 // Set up a cron job to call: POST /api/cron/meetings with header: x-cron-secret: YOUR_SECRET
 export async function POST(request: NextRequest) {
-  // Verify cron secret (optional - add CRON_SECRET to env)
+  // Verify cron secret — required in production
   const cronSecret = request.headers.get('x-cron-secret')
-  if (process.env.CRON_SECRET && cronSecret !== process.env.CRON_SECRET) {
+  if (!process.env.CRON_SECRET) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('CRON_SECRET env var is not set — cron endpoint is disabled in production')
+      return NextResponse.json({ error: 'Cron not configured' }, { status: 503 })
+    }
+  } else if (cronSecret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

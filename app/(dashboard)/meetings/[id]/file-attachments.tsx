@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { Paperclip, Upload, File, Trash2, Download, Loader2, X, FileText, Image, FileArchive } from 'lucide-react'
+import { useToast } from '@/components/ui/toast'
 
 interface Attachment {
   id: string
@@ -38,6 +39,7 @@ function formatFileSize(bytes: number) {
 }
 
 export function FileAttachments({ meetingId, initialAttachments, canUpload }: FileAttachmentsProps) {
+  const { toastError } = useToast()
   const [attachments, setAttachments] = useState<Attachment[]>(initialAttachments)
   const [uploading, setUploading] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -48,7 +50,7 @@ export function FileAttachments({ meetingId, initialAttachments, canUpload }: Fi
     if (!file) return
 
     if (file.size > 10 * 1024 * 1024) {
-      alert('File size must be less than 10MB')
+      toastError('File size must be less than 10MB')
       return
     }
 
@@ -113,7 +115,7 @@ export function FileAttachments({ meetingId, initialAttachments, canUpload }: Fi
       setAttachments([newAttachment, ...attachments])
     } catch (error: any) {
       console.error('Upload error:', error)
-      alert(error.message || 'Failed to upload file')
+      toastError(error.message || 'Failed to upload file')
     } finally {
       setUploading(false)
       if (fileInputRef.current) {
@@ -136,10 +138,10 @@ export function FileAttachments({ meetingId, initialAttachments, canUpload }: Fi
       if (response.ok) {
         setAttachments(attachments.filter((a) => a.id !== attachmentId))
       } else {
-        alert('Failed to delete file')
+        toastError('Failed to delete file')
       }
     } catch (error) {
-      alert('Failed to delete file')
+      toastError('Failed to delete file')
     } finally {
       setDeleting(null)
     }

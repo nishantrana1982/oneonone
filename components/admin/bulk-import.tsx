@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Upload, FileSpreadsheet, Loader2, CheckCircle, XCircle, Download, X } from 'lucide-react'
+import { useToast } from '@/components/ui/toast'
 
 interface ImportResult {
   success: number
@@ -12,6 +13,7 @@ interface ImportResult {
 
 export function BulkImport() {
   const router = useRouter()
+  const { toastError } = useToast()
   const [isOpen, setIsOpen] = useState(false)
   const [importing, setImporting] = useState(false)
   const [result, setResult] = useState<ImportResult | null>(null)
@@ -27,7 +29,7 @@ export function BulkImport() {
       const lines = text.split('\n').filter(line => line.trim())
       
       if (lines.length < 2) {
-        alert('CSV file must have at least a header row and one data row')
+        toastError('CSV file must have at least a header row and one data row')
         return
       }
 
@@ -43,7 +45,7 @@ export function BulkImport() {
 
       setCsvData(users)
     } catch (error) {
-      alert('Failed to parse CSV file')
+      toastError('Failed to parse CSV file')
     }
 
     if (fileInputRef.current) {

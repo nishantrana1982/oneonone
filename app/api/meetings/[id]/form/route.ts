@@ -78,6 +78,7 @@ export async function POST(
     })
 
     if (!wasAlreadySubmitted) {
+      // Send email notification
       try {
         const { sendFormSubmittedEmail } = await import('@/lib/email')
         await sendFormSubmittedEmail(
@@ -89,6 +90,18 @@ export async function POST(
         )
       } catch (error) {
         console.error('Failed to send email notification:', error)
+      }
+
+      // Create in-app notification for the reporter
+      try {
+        const { notifyFormSubmitted } = await import('@/lib/notifications')
+        await notifyFormSubmitted(
+          meeting.reporterId,
+          updatedMeeting.employee.name,
+          updatedMeeting.id
+        )
+      } catch (error) {
+        console.error('Failed to create notification:', error)
       }
     }
 
