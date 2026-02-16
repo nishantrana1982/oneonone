@@ -110,6 +110,9 @@ export async function sendEmail({ to, subject, html, text }: EmailOptions): Prom
     }
   }
 
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'email.ts:sendEmail',message:'Email NOT configured',data:{smtpConfigured:isSmtpConfigured(),sesConfigured:isSesConfigured()},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
+  // #endregion
   console.warn('Email not sent: neither SMTP nor AWS SES is configured. Set SMTP_* or AWS SES in .env')
   return null
 }

@@ -64,6 +64,10 @@ export async function POST(request: NextRequest) {
         ? employee.reportsToId
         : user.id
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meetings/route.ts:67',message:'Creating meeting',data:{employeeId,reporterId,meetingDate,userRole:user.role},timestamp:Date.now(),hypothesisId:'A,E'})}).catch(()=>{});
+    // #endregion
+
     const meeting = await prisma.meeting.create({
       data: {
         employeeId,
@@ -77,12 +81,20 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meetings/route.ts:83',message:'Meeting created, attempting calendar',data:{meetingId:meeting.id,employeeEmail:meeting.employee.email,reporterEmail:meeting.reporter.email,reporterId},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+
     // Create Google Calendar event
     try {
       const { createCalendarEvent, isCalendarEnabled } = await import('@/lib/google-calendar')
       
       // Check if calendar is enabled for the reporter
       const calendarEnabled = await isCalendarEnabled(reporterId)
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meetings/route.ts:93',message:'Calendar enabled check',data:{calendarEnabled,reporterId},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       
       if (calendarEnabled) {
         const calendarResult = await createCalendarEvent(
@@ -94,11 +106,17 @@ export async function POST(request: NextRequest) {
           meeting.employee.name,
           meeting.reporter.name
         )
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meetings/route.ts:106',message:'Calendar event created OK',data:{calendarResult},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
         console.log('Calendar event created:', calendarResult)
       } else {
         console.log('Calendar not enabled for reporter - skipping calendar event')
       }
-    } catch (error) {
+    } catch (error: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meetings/route.ts:115',message:'Calendar event FAILED',data:{error:error.message,code:error.code,status:error.status},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       console.error('Failed to create calendar event:', error)
       // Continue even if calendar creation fails
     }
@@ -114,7 +132,13 @@ export async function POST(request: NextRequest) {
         new Date(meetingDate),
         meeting.id
       )
-    } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meetings/route.ts:133',message:'Email sent OK',timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
+    } catch (error: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meetings/route.ts:139',message:'Email FAILED',data:{error:error.message},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
       console.error('Failed to send email notification:', error)
       // Continue even if email fails
     }

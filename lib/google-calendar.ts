@@ -204,6 +204,10 @@ export async function isCalendarEnabled(userId: string): Promise<boolean> {
       },
     })
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'google-calendar.ts:isCalendarEnabled',message:'Token check',data:{userId,hasAccount:!!account,hasAccessToken:!!account?.access_token,hasRefreshToken:!!account?.refresh_token,expiresAt:account?.expires_at},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+
     return !!(account?.access_token && account?.refresh_token)
   } catch (e) {
     console.error('Error checking calendar status:', e)
