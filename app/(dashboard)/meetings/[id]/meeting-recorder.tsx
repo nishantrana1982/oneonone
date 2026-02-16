@@ -170,9 +170,13 @@ export function MeetingRecorder({
     if (isUploadingChunkRef.current) return false
     if (!sessionKeyRef.current) return false
 
-    const allChunks = chunksRef.current
-    const newChunks = allChunks.slice(lastUploadedIndexRef.current)
-    if (newChunks.length === 0) return true // nothing to upload
+    // Snapshot the current length BEFORE any async work so new chunks
+    // that arrive during the upload are not accidentally marked as sent.
+    const snapshotEnd = chunksRef.current.length
+    const startIdx = lastUploadedIndexRef.current
+    if (snapshotEnd <= startIdx) return true // nothing to upload
+
+    const newChunks = chunksRef.current.slice(startIdx, snapshotEnd)
 
     isUploadingChunkRef.current = true
     setIsUploadingChunk(true)
@@ -194,7 +198,7 @@ export function MeetingRecorder({
         throw new Error(body.detail || body.error || `Chunk upload failed (${res.status})`)
       }
 
-      lastUploadedIndexRef.current = allChunks.length
+      lastUploadedIndexRef.current = snapshotEnd // use snapshot, not live length
       chunkSequenceRef.current++
       setChunksUploaded((n) => n + 1)
       return true
