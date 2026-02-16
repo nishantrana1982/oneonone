@@ -1,28 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole, canAccessEmployeeData } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
-import { generateRecordingKey, isS3Configured, uploadToS3 } from '@/lib/s3'
+import { chunkKey, uploadToS3 } from '@/lib/s3'
 import { UserRole } from '@prisma/client'
 
-export const maxDuration = 1500
+export const maxDuration = 300
 
-function sanitizeError(msg: string): string {
-  if (!msg || typeof msg !== 'string') return 'Unknown error'
-  return msg
-    .replace(/\b(AKIA|A3T|ABIA)[A-Z0-9]{14,}/gi, '[REDACTED]')
-    .replace(/\b[0-9a-fA-F]{40,}\b/g, '[REDACTED]')
-    .slice(0, 300)
-}
-
+// POST — Upload a single audio chunk during recording
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    // Auth
     const user = await requireRole([UserRole.REPORTER, UserRole.SUPER_ADMIN])
 
-    // Meeting
     const meeting = await prisma.meeting.findUnique({
       where: { id: params.id },
       include: { employee: true },
@@ -31,11 +22,21 @@ export async function POST(
       return NextResponse.json({ error: 'Meeting not found' }, { status: 404 })
     }
 
-    // Access check
     if (
       !canAccessEmployeeData(user.role, user.id, meeting.employeeId, meeting.employee.reportsToId)
     ) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    // Recording must already exist (started via /presign)
+    const recording = await prisma.meetingRecording.findUnique({
+      where: { meetingId: params.id },
+    })
+    if (!recording || !recording.audioKey) {
+      return NextResponse.json(
+        { error: 'No active recording session. Call start first.' },
+        { status: 400 }
+      )
     }
 
     // Parse form data
@@ -46,114 +47,45 @@ export async function POST(
       const msg = err instanceof Error ? err.message : ''
       const tooLarge = /body|size|limit|413/i.test(msg)
       return NextResponse.json(
-        {
-          error: tooLarge ? 'Recording too large' : 'Invalid request',
-          detail: tooLarge
-            ? 'The recording file is too large. Try a shorter recording or increase the server upload limit.'
-            : 'Could not read upload data.',
-        },
+        { error: tooLarge ? 'Chunk too large' : 'Invalid request' },
         { status: tooLarge ? 413 : 400 }
       )
     }
 
     const file = formData.get('file') as File | null
-    const duration = formData.get('duration') as string | null
+    const sequenceStr = formData.get('sequence') as string | null
 
     if (!file || file.size === 0) {
-      return NextResponse.json(
-        { error: 'No file provided', detail: 'The recording file was empty or missing.' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'No chunk data provided' }, { status: 400 })
     }
 
-    console.log(`[Recording] Upload received: ${(file.size / 1024 / 1024).toFixed(2)} MB, meeting=${params.id}`)
+    const sequence = parseInt(sequenceStr || '0', 10)
 
-    // Read file bytes
-    let buffer: Buffer
-    try {
-      buffer = Buffer.from(await file.arrayBuffer())
-    } catch (err: unknown) {
-      return NextResponse.json(
-        { error: 'Failed to read recording', detail: 'Could not read the uploaded file bytes.' },
-        { status: 400 }
-      )
-    }
+    // Read bytes
+    const buffer = Buffer.from(await file.arrayBuffer())
 
-    // S3 check — S3 must be configured
-    let s3Ready: boolean
-    try {
-      s3Ready = await isS3Configured()
-    } catch {
-      return NextResponse.json(
-        {
-          error: 'Storage configuration error',
-          detail: 'Could not read S3 settings. Check Admin → Settings and server logs.',
-        },
-        { status: 503 }
-      )
-    }
+    // Upload chunk to S3: {sessionKey}/chunk_0000.webm
+    const key = chunkKey(recording.audioKey, sequence)
+    await uploadToS3(buffer, key, 'audio/webm')
 
-    if (!s3Ready) {
-      return NextResponse.json(
-        {
-          error: 'S3 is not configured',
-          detail: 'Configure AWS S3 in Admin → Settings → Recording Storage before uploading recordings.',
-        },
-        { status: 503 }
-      )
-    }
-
-    // Upload to S3
-    const key = generateRecordingKey(params.id)
-    console.log(`[Recording] Uploading to S3 key=${key} size=${buffer.length}`)
-
-    try {
-      await uploadToS3(buffer, key, file.type || 'audio/webm')
-    } catch (s3Err: unknown) {
-      const detail = s3Err instanceof Error ? s3Err.message : 'Unknown S3 error'
-      console.error('[Recording] S3 upload failed:', detail)
-      return NextResponse.json(
-        {
-          error: 'S3 upload failed',
-          detail: sanitizeError(detail),
-        },
-        { status: 502 }
-      )
-    }
-
-    console.log(`[Recording] S3 upload success, saving DB record`)
-
-    // Save to database
-    const recording = await prisma.meetingRecording.upsert({
+    // Accumulate file size in DB
+    await prisma.meetingRecording.update({
       where: { meetingId: params.id },
-      create: {
-        meetingId: params.id,
-        audioKey: key,
-        duration: parseInt(duration || '0') || 0,
-        fileSize: buffer.length,
-        status: 'UPLOADED',
-        recordedAt: new Date(),
-      },
-      update: {
-        audioKey: key,
-        duration: parseInt(duration || '0') || 0,
-        fileSize: buffer.length,
-        status: 'UPLOADED',
-        recordedAt: new Date(),
-        errorMessage: null,
+      data: {
+        fileSize: (recording.fileSize || 0) + buffer.length,
       },
     })
 
-    return NextResponse.json({
-      key,
-      recordingId: recording.id,
-      message: 'File uploaded to S3 successfully',
-    })
+    console.log(
+      `[Recording] Chunk ${sequence} uploaded: ${(buffer.length / 1024).toFixed(1)} KB, key=${key}`
+    )
+
+    return NextResponse.json({ success: true, chunkKey: key, sequence })
   } catch (error) {
-    console.error('[Recording] Upload route error:', error)
+    console.error('[Recording] Chunk upload error:', error)
     const detail = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json(
-      { error: 'Failed to upload recording', detail: sanitizeError(detail) },
+      { error: 'Failed to upload chunk', detail: detail.slice(0, 300) },
       { status: 500 }
     )
   }

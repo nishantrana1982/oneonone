@@ -12,7 +12,12 @@ import {
   Pause,
   RefreshCw,
   Globe,
+  CloudUpload,
 } from 'lucide-react'
+
+// ---------------------------------------------------------------------------
+// Types & Constants
+// ---------------------------------------------------------------------------
 
 interface MeetingRecorderProps {
   meetingId: string
@@ -44,6 +49,13 @@ const LANGUAGE_OPTIONS = [
   { code: 'ur', label: 'Urdu (اردو)' },
 ]
 
+const MAX_DURATION = 25 * 60 // 25 minutes
+const CHUNK_UPLOAD_INTERVAL = 30_000 // Upload chunks every 30 seconds
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 export function MeetingRecorder({
   meetingId,
   hasExistingRecording,
@@ -59,7 +71,12 @@ export function MeetingRecorder({
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [selectedLanguage, setSelectedLanguage] = useState('auto')
 
-  // Upload/processing state
+  // Chunk upload state
+  const [chunksUploaded, setChunksUploaded] = useState(0)
+  const [isUploadingChunk, setIsUploadingChunk] = useState(false)
+  const [chunkError, setChunkError] = useState<string | null>(null)
+
+  // Finalize / processing state
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [currentStatus, setCurrentStatus] = useState(initialStatus)
@@ -72,26 +89,31 @@ export function MeetingRecorder({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const chunkUploadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const MAX_DURATION = 25 * 60
+  // Chunk tracking refs (avoid stale closures)
+  const sessionKeyRef = useRef<string | null>(null)
+  const chunkSequenceRef = useRef(0)
+  const lastUploadedIndexRef = useRef(0)
+  const isUploadingChunkRef = useRef(false)
 
   // --- helpers ---
-  const formatTime = (s: number) =>
+  const fmt = (s: number) =>
     `${Math.floor(s / 60)
       .toString()
       .padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`
 
-  const getProgress = useCallback(() => {
-    return (
+  const getProgress = useCallback(
+    () =>
       PROCESSING_STAGES.find((s) => s.status === currentStatus) ?? {
         status: currentStatus,
         label: 'Processing...',
         progress: 0,
-      }
-    )
-  }, [currentStatus])
+      },
+    [currentStatus]
+  )
 
-  // --- polling ---
+  // --- polling for processing status ---
   const pollStatus = useCallback(async () => {
     try {
       const res = await fetch(`/api/meetings/${meetingId}/recording`)
@@ -109,7 +131,7 @@ export function MeetingRecorder({
         if (rec.status === 'COMPLETED') router.refresh()
       }
     } catch {
-      // ignore polling errors
+      // ignore
     }
   }, [meetingId, router])
 
@@ -133,25 +155,90 @@ export function MeetingRecorder({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
       if (pollingRef.current) clearInterval(pollingRef.current)
+      if (chunkUploadIntervalRef.current) clearInterval(chunkUploadIntervalRef.current)
       if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop())
     }
   }, [])
 
-  // auto-stop at max
+  // auto-stop at max duration
   useEffect(() => {
     if (recordingTime >= MAX_DURATION && isRecording) stopRecording()
   }, [recordingTime, isRecording])
+
+  // --- chunk upload logic ---
+  const uploadPendingChunks = useCallback(async (): Promise<boolean> => {
+    if (isUploadingChunkRef.current) return false
+    if (!sessionKeyRef.current) return false
+
+    const allChunks = chunksRef.current
+    const newChunks = allChunks.slice(lastUploadedIndexRef.current)
+    if (newChunks.length === 0) return true // nothing to upload
+
+    isUploadingChunkRef.current = true
+    setIsUploadingChunk(true)
+    setChunkError(null)
+
+    try {
+      const blob = new Blob(newChunks, { type: 'audio/webm' })
+      const form = new FormData()
+      form.append('file', blob, `chunk_${chunkSequenceRef.current}.webm`)
+      form.append('sequence', chunkSequenceRef.current.toString())
+
+      const res = await fetch(`/api/meetings/${meetingId}/recording/upload`, {
+        method: 'POST',
+        body: form,
+      })
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.detail || body.error || `Chunk upload failed (${res.status})`)
+      }
+
+      lastUploadedIndexRef.current = allChunks.length
+      chunkSequenceRef.current++
+      setChunksUploaded((n) => n + 1)
+      return true
+    } catch (err) {
+      console.error('[Recorder] Chunk upload error:', err)
+      setChunkError(err instanceof Error ? err.message : 'Chunk upload failed')
+      return false
+    } finally {
+      isUploadingChunkRef.current = false
+      setIsUploadingChunk(false)
+    }
+  }, [meetingId])
 
   // --- recording controls ---
   const startRecording = async () => {
     try {
       setSubmitError(null)
+      setChunkError(null)
+
+      // 1. Get microphone
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 44100 },
       })
       streamRef.current = stream
-      chunksRef.current = []
 
+      // 2. Start server session (creates DB record, returns S3 prefix)
+      const sessionRes = await fetch(`/api/meetings/${meetingId}/recording/presign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentType: 'audio/webm' }),
+      })
+      if (!sessionRes.ok) {
+        const body = await sessionRes.json().catch(() => ({}))
+        stream.getTracks().forEach((t) => t.stop())
+        throw new Error(body.detail || body.error || 'Failed to start recording session')
+      }
+      const { sessionKey } = await sessionRes.json()
+      sessionKeyRef.current = sessionKey
+      chunkSequenceRef.current = 0
+      lastUploadedIndexRef.current = 0
+      setChunksUploaded(0)
+
+      // 3. Start MediaRecorder
+      chunksRef.current = []
       const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' })
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data)
@@ -160,13 +247,21 @@ export function MeetingRecorder({
         setAudioBlob(new Blob(chunksRef.current, { type: 'audio/webm' }))
       }
       mediaRecorderRef.current = recorder
-      recorder.start(1000)
+      recorder.start(5000) // fire ondataavailable every 5 seconds
 
       setIsRecording(true)
       setRecordingTime(0)
       timerRef.current = setInterval(() => setRecordingTime((t) => t + 1), 1000)
-    } catch {
-      setSubmitError('Could not access microphone. Please grant permission and try again.')
+
+      // 4. Start periodic chunk upload (every 30 s)
+      chunkUploadIntervalRef.current = setInterval(() => {
+        uploadPendingChunks()
+      }, CHUNK_UPLOAD_INTERVAL)
+    } catch (err) {
+      console.error('[Recorder] Start error:', err)
+      setSubmitError(
+        err instanceof Error ? err.message : 'Could not start recording. Check microphone access.'
+      )
     }
   }
 
@@ -182,84 +277,77 @@ export function MeetingRecorder({
     setIsPaused(!isPaused)
   }
 
-  const stopRecording = () => {
+  const stopRecording = async () => {
     if (!mediaRecorderRef.current || !isRecording) return
+
+    // Stop recorder & mic
     mediaRecorderRef.current.stop()
     if (timerRef.current) clearInterval(timerRef.current)
     if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop())
+    if (chunkUploadIntervalRef.current) clearInterval(chunkUploadIntervalRef.current)
     setIsRecording(false)
     setIsPaused(false)
+
+    // Upload any remaining chunks
+    // Small delay to let final ondataavailable fire
+    await new Promise((r) => setTimeout(r, 500))
+    await uploadPendingChunks()
   }
 
-  const discardRecording = () => {
+  const discardRecording = async () => {
     setAudioBlob(null)
     setRecordingTime(0)
     chunksRef.current = []
+    sessionKeyRef.current = null
+    chunkSequenceRef.current = 0
+    lastUploadedIndexRef.current = 0
+    setChunksUploaded(0)
+    setChunkError(null)
+
+    // Delete the session from server (cleans up S3 chunks)
+    try {
+      await fetch(`/api/meetings/${meetingId}/recording`, { method: 'DELETE' })
+    } catch {
+      // ignore
+    }
   }
 
-  // --- upload (single path: FormData → server → S3) ---
+  // --- finalize: tell server to combine chunks + transcribe ---
   const submitRecording = async () => {
-    if (!audioBlob) return
     setIsSubmitting(true)
     setSubmitError(null)
     setCurrentStatus('UPLOADING')
     setDidStartUpload(true)
 
     try {
-      // Step 1: Upload file to server (server forwards to S3)
-      const form = new FormData()
-      form.append('file', audioBlob, 'recording.webm')
-      form.append('duration', recordingTime.toString())
-
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 25 * 60 * 1000)
-
-      let uploadRes: Response
-      try {
-        uploadRes = await fetch(`/api/meetings/${meetingId}/recording/upload`, {
-          method: 'POST',
-          body: form,
-          signal: controller.signal,
-        })
-      } catch (fetchErr: unknown) {
-        clearTimeout(timeout)
-        if (fetchErr instanceof Error && fetchErr.name === 'AbortError') {
-          throw new Error('Upload timed out. Try a shorter recording or check your connection.')
-        }
-        throw new Error('Network error during upload. Please check your connection and try again.')
-      }
-      clearTimeout(timeout)
-
-      if (!uploadRes.ok) {
-        const body = await uploadRes.json().catch(() => ({}))
-        throw new Error(body.detail || body.error || `Upload failed (${uploadRes.status})`)
+      // Upload any remaining chunks first
+      const ok = await uploadPendingChunks()
+      if (!ok && chunkSequenceRef.current === 0) {
+        throw new Error('No audio chunks were uploaded. Please try recording again.')
       }
 
-      const uploadData = await uploadRes.json()
-      setCurrentStatus('UPLOADED')
-
-      // Step 2: Kick off processing (transcription + analysis)
-      const processRes = await fetch(`/api/meetings/${meetingId}/recording/process`, {
+      // Call finalize
+      const res = await fetch(`/api/meetings/${meetingId}/recording/process`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          key: uploadData.key,
+          totalChunks: chunkSequenceRef.current,
           duration: recordingTime,
           language: selectedLanguage !== 'auto' ? selectedLanguage : undefined,
         }),
       })
 
-      if (!processRes.ok) {
-        const body = await processRes.json().catch(() => ({}))
-        throw new Error(body.error || 'Failed to start transcription')
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || 'Failed to start processing')
       }
 
-      // Success → clear blob, start polling
+      // Clear client state, start polling
       setAudioBlob(null)
       setRecordingTime(0)
       setCurrentStatus('TRANSCRIBING')
     } catch (err) {
-      console.error('Recording upload error:', err)
+      console.error('[Recorder] Submit error:', err)
       const msg = err instanceof Error ? err.message : 'Upload failed'
       setSubmitError(msg)
       setCurrentStatus('FAILED')
@@ -269,7 +357,7 @@ export function MeetingRecorder({
     }
   }
 
-  // --- retry after failure ---
+  // --- retry ---
   const handleRetry = async () => {
     try {
       await fetch(`/api/meetings/${meetingId}/recording`, { method: 'DELETE' })
@@ -280,10 +368,16 @@ export function MeetingRecorder({
     setCurrentError(null)
     setSubmitError(null)
     setDidStartUpload(false)
+    sessionKeyRef.current = null
+    chunkSequenceRef.current = 0
+    lastUploadedIndexRef.current = 0
+    setChunksUploaded(0)
     router.refresh()
   }
 
-  // --- render: processing ---
+  // ---------------------------------------------------------------------------
+  // Render: processing
+  // ---------------------------------------------------------------------------
   const isProcessing = ['UPLOADING', 'UPLOADED', 'TRANSCRIBING', 'ANALYZING'].includes(
     currentStatus ?? ''
   )
@@ -311,8 +405,7 @@ export function MeetingRecorder({
         <div className="flex justify-between text-xs">
           {PROCESSING_STAGES.slice(0, 4).map((stage, i) => {
             const active = currentStatus === stage.status
-            const past =
-              PROCESSING_STAGES.findIndex((s) => s.status === currentStatus) > i
+            const past = PROCESSING_STAGES.findIndex((s) => s.status === currentStatus) > i
             return (
               <div
                 key={stage.status}
@@ -348,7 +441,9 @@ export function MeetingRecorder({
     )
   }
 
-  // --- render: completed ---
+  // ---------------------------------------------------------------------------
+  // Render: completed
+  // ---------------------------------------------------------------------------
   if ((hasExistingRecording || didStartUpload) && currentStatus === 'COMPLETED') {
     return (
       <div className="rounded-2xl bg-green-500/5 border border-green-500/20 p-6">
@@ -365,7 +460,9 @@ export function MeetingRecorder({
     )
   }
 
-  // --- render: failed ---
+  // ---------------------------------------------------------------------------
+  // Render: failed
+  // ---------------------------------------------------------------------------
   if ((hasExistingRecording || didStartUpload) && currentStatus === 'FAILED') {
     return (
       <div className="rounded-2xl bg-red-500/5 border border-red-500/20 p-6">
@@ -381,12 +478,12 @@ export function MeetingRecorder({
               </p>
               {currentError?.includes('API key') && (
                 <p className="text-xs text-red-400 mt-1">
-                  Please configure the OpenAI API key in Admin → Settings
+                  Configure the OpenAI API key in Admin → Settings
                 </p>
               )}
               {currentError?.includes('S3') && (
                 <p className="text-xs text-red-400 mt-1">
-                  Please configure AWS S3 in Admin → Settings → Recording Storage
+                  Configure AWS S3 in Admin → Settings → Recording Storage
                 </p>
               )}
             </div>
@@ -403,7 +500,9 @@ export function MeetingRecorder({
     )
   }
 
-  // --- render: default (record / preview / submit) ---
+  // ---------------------------------------------------------------------------
+  // Render: default (record / preview / submit)
+  // ---------------------------------------------------------------------------
   return (
     <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-6">
       <div className="flex items-center justify-between mb-4">
@@ -422,7 +521,7 @@ export function MeetingRecorder({
         </div>
       )}
 
-      {/* Recording in progress */}
+      {/* ---- Recording in progress ---- */}
       {isRecording && (
         <div className="space-y-4">
           <div className="flex items-center justify-center gap-6">
@@ -433,19 +532,53 @@ export function MeetingRecorder({
                 }`}
               />
               <p className="text-3xl font-mono font-bold text-dark-gray dark:text-white">
-                {formatTime(recordingTime)}
+                {fmt(recordingTime)}
               </p>
               <p className="text-xs text-medium-gray mt-1">
-                {formatTime(MAX_DURATION - recordingTime)} remaining
+                {fmt(MAX_DURATION - recordingTime)} remaining
               </p>
             </div>
           </div>
+
+          {/* Progress bar */}
           <div className="w-full h-2 bg-off-white dark:bg-charcoal rounded-full overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-red-500 to-orange transition-all duration-1000"
               style={{ width: `${(recordingTime / MAX_DURATION) * 100}%` }}
             />
           </div>
+
+          {/* Chunk backup indicator */}
+          <div className="flex items-center justify-center gap-2 text-xs text-medium-gray">
+            {isUploadingChunk ? (
+              <>
+                <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
+                <span className="text-blue-500">Backing up to server...</span>
+              </>
+            ) : chunksUploaded > 0 ? (
+              <>
+                <CloudUpload className="w-3 h-3 text-green-500" />
+                <span className="text-green-500">
+                  {chunksUploaded} backup{chunksUploaded !== 1 ? 's' : ''} saved to S3
+                </span>
+              </>
+            ) : (
+              <>
+                <CloudUpload className="w-3 h-3" />
+                <span>Audio will back up to S3 every 30s</span>
+              </>
+            )}
+          </div>
+
+          {chunkError && (
+            <div className="text-center">
+              <p className="text-xs text-yellow-600">
+                Backup warning: {chunkError} (will retry)
+              </p>
+            </div>
+          )}
+
+          {/* Controls */}
           <div className="flex items-center justify-center gap-3">
             <button
               onClick={pauseRecording}
@@ -465,7 +598,7 @@ export function MeetingRecorder({
         </div>
       )}
 
-      {/* Preview recorded audio */}
+      {/* ---- Preview recorded audio ---- */}
       {!isRecording && audioBlob && (
         <div className="space-y-4">
           <div className="flex items-center justify-center">
@@ -475,12 +608,20 @@ export function MeetingRecorder({
                 Recording Complete
               </p>
               <p className="text-sm text-medium-gray">
-                Duration: {formatTime(recordingTime)} &middot;{' '}
+                Duration: {fmt(recordingTime)} &middot;{' '}
                 {(audioBlob.size / 1024 / 1024).toFixed(1)} MB
+                {chunksUploaded > 0 && (
+                  <span className="text-green-500">
+                    {' '}
+                    &middot; {chunksUploaded} chunk{chunksUploaded !== 1 ? 's' : ''} already on S3
+                  </span>
+                )}
               </p>
             </div>
           </div>
+
           <audio controls src={URL.createObjectURL(audioBlob)} className="w-full" />
+
           <div className="flex items-center justify-center gap-3">
             <button
               onClick={discardRecording}
@@ -497,7 +638,7 @@ export function MeetingRecorder({
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Uploading to S3...
+                  Finalizing...
                 </>
               ) : (
                 <>
@@ -510,7 +651,7 @@ export function MeetingRecorder({
         </div>
       )}
 
-      {/* Start recording */}
+      {/* ---- Start recording ---- */}
       {!isRecording && !audioBlob && (
         <div className="text-center space-y-4">
           <div className="flex items-center justify-center gap-2">

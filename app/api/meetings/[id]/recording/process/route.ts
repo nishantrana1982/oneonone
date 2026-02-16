@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole, canAccessEmployeeData } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
-import { getSignedDownloadUrl, isS3Configured } from '@/lib/s3'
+import {
+  chunkKey,
+  finalRecordingKey,
+  downloadFromS3,
+  uploadToS3,
+  deleteFromS3,
+} from '@/lib/s3'
 import { transcribeAudio, analyzeTranscript } from '@/lib/openai'
 import { UserRole } from '@prisma/client'
 import { getSettings } from '@/lib/settings'
 
 export const maxDuration = 900
 
+// POST — Finalize recording: combine chunks, transcribe, analyze
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -15,18 +22,21 @@ export async function POST(
   try {
     const user = await requireRole([UserRole.REPORTER, UserRole.SUPER_ADMIN])
     const body = await request.json()
-    const { duration, language } = body
+    const { totalChunks, duration, language } = body
+
+    if (!totalChunks || totalChunks < 1) {
+      return NextResponse.json({ error: 'No chunks to process' }, { status: 400 })
+    }
 
     // Check OpenAI key
     const settings = await getSettings()
     if (!settings.openaiApiKey) {
       return NextResponse.json(
-        { error: 'OpenAI API key not configured. Please set it in Admin → Settings.' },
+        { error: 'OpenAI API key not configured. Set it in Admin → Settings.' },
         { status: 400 }
       )
     }
 
-    // Get meeting
     const meeting = await prisma.meeting.findUnique({
       where: { id: params.id },
       include: { employee: true, reporter: true },
@@ -35,28 +45,33 @@ export async function POST(
       return NextResponse.json({ error: 'Meeting not found' }, { status: 404 })
     }
 
-    // Access check
     if (
       !canAccessEmployeeData(user.role, user.id, meeting.employeeId, meeting.employee.reportsToId)
     ) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    // Get recording (must already be UPLOADED by the upload route)
     const recording = await prisma.meetingRecording.findUnique({
       where: { meetingId: params.id },
     })
     if (!recording || !recording.audioKey) {
       return NextResponse.json(
-        { error: 'No uploaded recording found. Please upload the recording first.' },
+        { error: 'No recording session found. Start a recording first.' },
         { status: 400 }
       )
     }
+
+    // Update duration
+    await prisma.meetingRecording.update({
+      where: { meetingId: params.id },
+      data: { duration: duration || 0, status: 'UPLOADED' },
+    })
 
     // Kick off background processing
     processRecording(
       params.id,
       recording.audioKey,
+      totalChunks,
       meeting.employee.name,
       meeting.reporter.name,
       language
@@ -71,43 +86,62 @@ export async function POST(
 
 async function processRecording(
   meetingId: string,
-  audioKey: string,
+  sessionKey: string,
+  totalChunks: number,
   employeeName: string,
   reporterName: string,
   language?: string
 ) {
   try {
-    console.log(`[Recording] Processing meeting=${meetingId}, key=${audioKey}, lang=${language || 'auto'}`)
+    console.log(
+      `[Recording] Finalizing meeting=${meetingId}, session=${sessionKey}, chunks=${totalChunks}, lang=${language || 'auto'}`
+    )
 
-    // Update status
+    // Step 1: Download all chunks from S3 and combine
     await prisma.meetingRecording.update({
       where: { meetingId },
       data: { status: 'TRANSCRIBING' },
     })
 
-    // Download audio from S3
-    const s3Ok = await isS3Configured()
-    if (!s3Ok) throw new Error('S3 is not configured. Cannot download audio for transcription.')
-
-    const downloadUrl = await getSignedDownloadUrl(audioKey)
-    console.log(`[Recording] Downloading audio from S3...`)
-
-    const audioResponse = await fetch(downloadUrl, { headers: { Accept: 'audio/*' } })
-    if (!audioResponse.ok) {
-      throw new Error(`Failed to download audio from S3: HTTP ${audioResponse.status}`)
+    const buffers: Buffer[] = []
+    for (let i = 0; i < totalChunks; i++) {
+      const key = chunkKey(sessionKey, i)
+      console.log(`[Recording] Downloading chunk ${i}/${totalChunks}: ${key}`)
+      const buf = await downloadFromS3(key)
+      buffers.push(buf)
     }
 
-    const audioBuffer = Buffer.from(await audioResponse.arrayBuffer())
-    console.log(`[Recording] Downloaded ${(audioBuffer.length / 1024 / 1024).toFixed(2)} MB`)
+    const combined = Buffer.concat(buffers)
+    console.log(
+      `[Recording] Combined ${totalChunks} chunks → ${(combined.length / 1024 / 1024).toFixed(2)} MB`
+    )
 
-    if (audioBuffer.length < 1000) {
-      throw new Error('Audio file is too small or empty')
+    if (combined.length < 1000) {
+      throw new Error('Combined audio is too small or empty')
     }
 
-    // Transcribe with Whisper
+    // Step 2: Upload final combined file to S3
+    const finalKey = finalRecordingKey(sessionKey)
+    await uploadToS3(combined, finalKey, 'audio/webm')
+    console.log(`[Recording] Final file uploaded: ${finalKey}`)
+
+    // Update audioKey to point to the final file
+    await prisma.meetingRecording.update({
+      where: { meetingId },
+      data: { audioKey: finalKey, fileSize: combined.length },
+    })
+
+    // Step 3: Clean up individual chunks (non-blocking)
+    cleanupChunks(sessionKey, totalChunks).catch((err) =>
+      console.warn('[Recording] Chunk cleanup failed:', err)
+    )
+
+    // Step 4: Transcribe with Whisper
     console.log(`[Recording] Starting Whisper transcription...`)
-    const transcription = await transcribeAudio(audioBuffer, 'recording.webm', language)
-    console.log(`[Recording] Transcription done. Lang=${transcription.language}, dur=${transcription.duration}s`)
+    const transcription = await transcribeAudio(combined, 'recording.webm', language)
+    console.log(
+      `[Recording] Transcription done. Lang=${transcription.language}, dur=${transcription.duration}s`
+    )
 
     await prisma.meetingRecording.update({
       where: { meetingId },
@@ -119,7 +153,7 @@ async function processRecording(
       },
     })
 
-    // Analyze
+    // Step 5: Analyze with GPT
     console.log(`[Recording] Starting GPT analysis...`)
     const analysis = await analyzeTranscript(transcription.text, employeeName, reporterName)
     console.log(`[Recording] Analysis complete. Quality=${analysis.qualityScore}`)
@@ -147,4 +181,15 @@ async function processRecording(
       data: { status: 'FAILED', errorMessage },
     })
   }
+}
+
+async function cleanupChunks(sessionKey: string, totalChunks: number) {
+  for (let i = 0; i < totalChunks; i++) {
+    try {
+      await deleteFromS3(chunkKey(sessionKey, i))
+    } catch {
+      // ignore individual chunk delete failures
+    }
+  }
+  console.log(`[Recording] Cleaned up ${totalChunks} chunks`)
 }

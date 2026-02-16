@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole, canAccessEmployeeData } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
-import { getSignedDownloadUrl, deleteFromS3, isS3Configured } from '@/lib/s3'
+import { getSignedDownloadUrl, deleteS3Prefix, isS3Configured } from '@/lib/s3'
 import { UserRole } from '@prisma/client'
 
 // GET — fetch recording status and playback URL
@@ -31,16 +31,16 @@ export async function GET(
       return NextResponse.json({ recording: null })
     }
 
-    // Build playback URL
+    // Build playback URL for completed recordings (audioKey points to final.webm)
     let audioPlaybackUrl: string | null = null
-    if (meeting.recording.audioKey) {
+    if (meeting.recording.audioKey && meeting.recording.status === 'COMPLETED') {
       try {
         const s3Ok = await isS3Configured()
         if (s3Ok) {
           audioPlaybackUrl = await getSignedDownloadUrl(meeting.recording.audioKey)
         }
       } catch {
-        // S3 unavailable — no playback URL
+        // S3 unavailable
       }
     }
 
@@ -53,7 +53,7 @@ export async function GET(
   }
 }
 
-// DELETE — delete recording from S3 + database
+// DELETE — delete recording: remove all S3 objects (chunks + final) and DB record
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -80,19 +80,23 @@ export async function DELETE(
       return NextResponse.json({ error: 'No recording found' }, { status: 404 })
     }
 
-    // Delete from S3
+    // Delete everything in the S3 session prefix (chunks + final file)
     if (meeting.recording.audioKey) {
       try {
         const s3Ok = await isS3Configured()
         if (s3Ok) {
-          await deleteFromS3(meeting.recording.audioKey)
+          // audioKey is either the session prefix or session/final.webm
+          // Extract the prefix (everything up to the session folder)
+          const prefix = meeting.recording.audioKey.replace(/\/final\.webm$/, '')
+          const deleted = await deleteS3Prefix(prefix)
+          console.log(`[Recording] Deleted ${deleted} S3 objects under ${prefix}`)
         }
       } catch (err) {
         console.warn('[Recording] Failed to delete from S3:', err)
       }
     }
 
-    // Delete from database
+    // Delete DB record
     await prisma.meetingRecording.delete({
       where: { id: meeting.recording.id },
     })
