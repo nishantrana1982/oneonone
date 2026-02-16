@@ -83,9 +83,9 @@ export async function DELETE(
       return NextResponse.json({ error: 'Meeting not found' }, { status: 404 })
     }
 
-    // Only reporter or admin can delete
-    if (meeting.reporterId !== user.id && user.role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    // Only SUPER_ADMIN can delete meetings
+    if (user.role !== 'SUPER_ADMIN') {
+      return NextResponse.json({ error: 'Only Super Admin can delete meetings' }, { status: 403 })
     }
 
     // Delete Google Calendar event if it exists

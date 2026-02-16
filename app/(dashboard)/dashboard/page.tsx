@@ -106,64 +106,64 @@ export default async function DashboardPage() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-dark-gray dark:text-white mb-2">
+        <h1 className="text-2xl sm:text-3xl font-bold text-dark-gray dark:text-white mb-1">
           {greeting()}, {user.name?.split(' ')[0]}
         </h1>
-        <p className="text-medium-gray">Here&apos;s what&apos;s happening with your one-on-ones</p>
+        <p className="text-sm sm:text-base text-medium-gray">Here&apos;s what&apos;s happening with your one-on-ones</p>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <Link href="/meetings">
-          <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-5 hover:border-blue-500/30 transition-colors">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
-                <Clock className="w-6 h-6 text-blue-500" />
+          <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-4 sm:p-5 hover:border-blue-500/30 transition-colors active:scale-[0.98]">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-dark-gray dark:text-white">{stats.upcomingMeetings}</p>
-                <p className="text-sm text-medium-gray">Upcoming</p>
+                <p className="text-xl sm:text-2xl font-bold text-dark-gray dark:text-white">{stats.upcomingMeetings}</p>
+                <p className="text-xs sm:text-sm text-medium-gray">Upcoming</p>
               </div>
             </div>
           </div>
         </Link>
 
         <Link href="/todos">
-          <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-5 hover:border-amber-500/30 transition-colors">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                <CheckSquare className="w-6 h-6 text-amber-500" />
+          <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-4 sm:p-5 hover:border-amber-500/30 transition-colors active:scale-[0.98]">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                <CheckSquare className="w-5 h-5 sm:w-6 sm:h-6 text-amber-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-dark-gray dark:text-white">{stats.pendingTodos}</p>
-                <p className="text-sm text-medium-gray">Pending Tasks</p>
+                <p className="text-xl sm:text-2xl font-bold text-dark-gray dark:text-white">{stats.pendingTodos}</p>
+                <p className="text-xs sm:text-sm text-medium-gray">Pending Tasks</p>
               </div>
             </div>
           </div>
         </Link>
 
-        <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-5">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
-              <TrendingUp className="w-6 h-6 text-green-500" />
+        <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-4 sm:p-5">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-green-500/10 flex items-center justify-center flex-shrink-0">
+              <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-green-500" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-dark-gray dark:text-white">{stats.completedMeetings}</p>
-              <p className="text-sm text-medium-gray">Completed</p>
+              <p className="text-xl sm:text-2xl font-bold text-dark-gray dark:text-white">{stats.completedMeetings}</p>
+              <p className="text-xs sm:text-sm text-medium-gray">Completed</p>
             </div>
           </div>
         </div>
 
         {(user.role === UserRole.REPORTER || user.role === UserRole.SUPER_ADMIN) && (
           <Link href="/employees">
-            <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-5 hover:border-medium-gray/50 transition-colors">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-off-white dark:bg-dark-gray flex items-center justify-center">
-                  <Users className="w-6 h-6 text-dark-gray dark:text-white" />
+            <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-4 sm:p-5 hover:border-medium-gray/50 transition-colors active:scale-[0.98]">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-off-white dark:bg-dark-gray flex items-center justify-center flex-shrink-0">
+                  <Users className="w-5 h-5 sm:w-6 sm:h-6 text-dark-gray dark:text-white" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-dark-gray dark:text-white">{stats.directReports}</p>
-                  <p className="text-sm text-medium-gray">Team Members</p>
+                  <p className="text-xl sm:text-2xl font-bold text-dark-gray dark:text-white">{stats.directReports}</p>
+                  <p className="text-xs sm:text-sm text-medium-gray">Team Members</p>
                 </div>
               </div>
             </div>

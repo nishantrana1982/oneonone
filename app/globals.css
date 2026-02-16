@@ -29,6 +29,11 @@
   .text-balance {
     text-wrap: balance;
   }
+
+  /* Safe area padding for iPhones with home indicator / notch */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }
 
 /* Siri Glow Animation */

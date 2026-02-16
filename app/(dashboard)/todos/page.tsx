@@ -35,12 +35,12 @@ export default async function TodosPage() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-dark-gray dark:text-white mb-2">To-Dos</h1>
-        <p className="text-medium-gray">Track your tasks and action items</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-dark-gray dark:text-white mb-1">To-Dos</h1>
+        <p className="text-sm sm:text-base text-medium-gray">Track your tasks and action items</p>
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
         <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gray-500/10 flex items-center justify-center">

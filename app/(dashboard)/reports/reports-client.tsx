@@ -106,8 +106,8 @@ export function ReportsClient({ departments }: ReportsClientProps) {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-dark-gray dark:text-white mb-2">Reports</h1>
-          <p className="text-medium-gray">Generate insights and summaries from your one-on-ones</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-dark-gray dark:text-white mb-1">Reports</h1>
+          <p className="text-sm sm:text-base text-medium-gray">Generate insights and summaries from your one-on-ones</p>
         </div>
         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange to-orange/70 flex items-center justify-center shadow-lg shadow-orange/25">
           <BarChart3 className="w-6 h-6 text-white" />

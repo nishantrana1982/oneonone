@@ -171,24 +171,24 @@ export function MeetingsClient({
       {schedules.map((schedule) => (
         <div
           key={schedule.id}
-          className="flex items-center gap-4 px-6 py-4"
+          className="flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4"
         >
           <div
-            className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+            className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
               schedule.isActive ? 'bg-green-500/10' : 'bg-gray-500/10'
             }`}
           >
             <Repeat
-              className={`w-6 h-6 ${
+              className={`w-5 h-5 sm:w-6 sm:h-6 ${
                 schedule.isActive ? 'text-green-500' : 'text-gray-400'
               }`}
             />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-dark-gray dark:text-white">
+            <p className="font-medium text-dark-gray dark:text-white text-sm sm:text-base truncate">
               {schedule.employee.name}
             </p>
-            <p className="text-sm text-medium-gray">
+            <p className="text-xs sm:text-sm text-medium-gray truncate">
               {schedule.frequency === 'BIWEEKLY'
                 ? 'Bi-weekly'
                 : schedule.frequency.toLowerCase()}{' '}
@@ -197,7 +197,7 @@ export function MeetingsClient({
             </p>
           </div>
           <span
-            className={`px-3 py-1 text-xs font-medium rounded-full ${
+            className={`hidden sm:inline px-3 py-1 text-xs font-medium rounded-full ${
               schedule.isActive
                 ? 'bg-green-500/10 text-green-600 dark:text-green-400'
                 : 'bg-gray-500/10 text-gray-600 dark:text-gray-400'
@@ -205,7 +205,7 @@ export function MeetingsClient({
           >
             {schedule.isActive ? 'Active' : 'Paused'}
           </span>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
             <button
               type="button"
               onClick={() =>
@@ -266,49 +266,50 @@ export function MeetingsClient({
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-dark-gray dark:text-white mb-2">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-dark-gray dark:text-white mb-1">
             Meetings
           </h1>
-          <p className="text-medium-gray">Manage your one-on-one sessions</p>
+          <p className="text-sm sm:text-base text-medium-gray">Manage your one-on-one sessions</p>
         </div>
         {canSchedule && (
           <Link
             href="/meetings/new"
-            className="flex items-center gap-2 px-5 py-3 bg-dark-gray dark:bg-white text-white dark:text-dark-gray rounded-xl font-medium hover:bg-charcoal dark:hover:bg-off-white transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 sm:px-5 sm:py-3 bg-dark-gray dark:bg-white text-white dark:text-dark-gray rounded-xl font-medium hover:bg-charcoal dark:hover:bg-off-white transition-colors text-sm sm:text-base flex-shrink-0 active:scale-[0.97]"
           >
-            <Plus className="w-5 h-5" />
-            Schedule Meeting
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="hidden sm:inline">Schedule Meeting</span>
+            <span className="sm:hidden">Schedule</span>
           </Link>
         )}
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-5">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
-              <Clock className="w-6 h-6 text-blue-500" />
+      <div className="grid grid-cols-3 gap-3 sm:gap-4">
+        <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-3 sm:p-5">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+              <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-blue-500" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-dark-gray dark:text-white">
+              <p className="text-lg sm:text-2xl font-bold text-dark-gray dark:text-white">
                 {upcomingMeetings.length}
               </p>
-              <p className="text-sm text-medium-gray">Upcoming</p>
+              <p className="text-xs sm:text-sm text-medium-gray">Upcoming</p>
             </div>
           </div>
         </div>
-        <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-5">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
-              <CheckCircle2 className="w-6 h-6 text-green-500" />
+        <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-3 sm:p-5">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-green-500/10 flex items-center justify-center flex-shrink-0">
+              <CheckCircle2 className="w-4 h-4 sm:w-6 sm:h-6 text-green-500" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-dark-gray dark:text-white">
+              <p className="text-lg sm:text-2xl font-bold text-dark-gray dark:text-white">
                 {completedMeetings.length}
               </p>
-              <p className="text-sm text-medium-gray">Completed</p>
+              <p className="text-xs sm:text-sm text-medium-gray">Completed</p>
             </div>
           </div>
         </div>
@@ -441,10 +442,10 @@ export function MeetingsClient({
                     <Link
                       key={meeting.id}
                       href={`/meetings/${meeting.id}`}
-                      className="flex items-center gap-4 px-6 py-4 hover:bg-off-white/50 dark:hover:bg-charcoal/50 transition-colors"
+                      className="flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4 hover:bg-off-white/50 dark:hover:bg-charcoal/50 active:bg-off-white dark:active:bg-charcoal transition-colors"
                     >
                       <div
-                        className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                        className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
                           meeting.status === 'COMPLETED'
                             ? 'bg-green-500/10'
                             : needsForm
@@ -453,7 +454,7 @@ export function MeetingsClient({
                         }`}
                       >
                         <Calendar
-                          className={`w-6 h-6 ${
+                          className={`w-5 h-5 sm:w-6 sm:h-6 ${
                             meeting.status === 'COMPLETED'
                               ? 'text-green-500'
                               : needsForm
@@ -464,21 +465,21 @@ export function MeetingsClient({
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="font-medium text-dark-gray dark:text-white">
+                          <p className="font-medium text-dark-gray dark:text-white text-sm sm:text-base truncate">
                             {otherPerson?.name ?? 'Unknown'}
                           </p>
                           {needsForm && isEmployee && (
-                            <span className="px-2 py-0.5 text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-full">
+                            <span className="px-2 py-0.5 text-[10px] sm:text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-full flex-shrink-0">
                               Form needed
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-medium-gray">
+                        <p className="text-xs sm:text-sm text-medium-gray">
                           {formatMeetingDateShort(meetingDate)}
                         </p>
                       </div>
                       <span
-                        className={`px-3 py-1 text-xs font-medium rounded-full ${
+                        className={`px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-medium rounded-full flex-shrink-0 ${
                           meeting.status === 'COMPLETED'
                             ? 'bg-green-500/10 text-green-600 dark:text-green-400'
                             : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
@@ -490,7 +491,7 @@ export function MeetingsClient({
                             ? 'Pending'
                             : 'Scheduled'}
                       </span>
-                      <ChevronRight className="w-5 h-5 text-light-gray" />
+                      <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-light-gray hidden sm:block" />
                     </Link>
                   )
                 })}

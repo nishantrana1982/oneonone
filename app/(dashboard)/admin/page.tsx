@@ -45,12 +45,12 @@ export default async function AdminPage() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-dark-gray dark:text-white mb-2">Admin</h1>
-        <p className="text-medium-gray">Manage users, departments, and system settings</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-dark-gray dark:text-white mb-1">Admin</h1>
+        <p className="text-sm sm:text-base text-medium-gray">Manage users, departments, and system settings</p>
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-5">
         <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-5">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center">

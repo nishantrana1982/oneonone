@@ -87,24 +87,24 @@ export default async function MeetingDetailPage({
       </Link>
 
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="space-y-3">
         <div>
-          <h1 className="text-3xl font-bold text-dark-gray dark:text-white mb-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-dark-gray dark:text-white mb-1">
             One-on-One Meeting
           </h1>
-          <p className="text-medium-gray flex items-center gap-2">
-            <Calendar className="w-4 h-4" />
+          <p className="text-sm sm:text-base text-medium-gray flex items-center gap-2">
+            <Calendar className="w-4 h-4 flex-shrink-0" />
             {formatMeetingDateLong(meetingDate)}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {isReporter && meeting.status === 'SCHEDULED' && (
             <MarkCompletedButton meetingId={meeting.id} />
           )}
-          {isReporter && (
+          {user.role === UserRole.SUPER_ADMIN && (
             <DeleteMeetingButton meetingId={meeting.id} />
           )}
-          <span className={`px-4 py-2 rounded-full text-sm font-medium ${
+          <span className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium ${
             meeting.status === 'COMPLETED'
               ? 'bg-green-500/10 text-green-600 dark:text-green-400'
               : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
@@ -305,9 +305,9 @@ export default async function MeetingDetailPage({
           <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-hidden">
             <div className="divide-y divide-off-white dark:divide-medium-gray/20">
               {meeting.todos.map((todo) => (
-                <div key={todo.id} className="p-5">
-                  <div className="flex items-start gap-4">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                <div key={todo.id} className="p-4 sm:p-5">
+                  <div className="flex items-start gap-3 sm:gap-4">
+                    <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
                       todo.status === 'DONE'
                         ? 'bg-green-500/10'
                         : todo.status === 'IN_PROGRESS'
@@ -315,51 +315,47 @@ export default async function MeetingDetailPage({
                         : 'bg-gray-500/10'
                     }`}>
                       {todo.status === 'DONE' ? (
-                        <CheckSquare className="w-5 h-5 text-green-500" />
+                        <CheckSquare className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
                       ) : (
-                        <Clock className="w-5 h-5 text-blue-500" />
+                        <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
                       )}
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className={`font-medium ${
-                            todo.status === 'DONE'
-                              ? 'text-medium-gray line-through'
-                              : 'text-dark-gray dark:text-white'
-                          }`}>
-                            {todo.title}
-                          </p>
-                          {todo.description && (
-                            <p className="text-sm text-medium-gray mt-1">{todo.description}</p>
-                          )}
-                          <div className="flex items-center gap-4 mt-2 text-xs text-medium-gray">
-                            <span>Assigned to: {todo.assignedTo.name}</span>
-                            {todo.dueDate && (
-                              <span>Due: {new Date(todo.dueDate).toLocaleDateString()}</span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${
-                            todo.priority === 'HIGH'
-                              ? 'bg-red-500/10 text-red-500'
-                              : todo.priority === 'MEDIUM'
-                              ? 'bg-orange/10 text-orange'
-                              : 'bg-gray-500/10 text-gray-500'
-                          }`}>
-                            {todo.priority}
-                          </span>
-                          <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${
-                            todo.status === 'DONE'
-                              ? 'bg-green-500/10 text-green-600 dark:text-green-400'
-                              : todo.status === 'IN_PROGRESS'
-                              ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                              : 'bg-gray-500/10 text-gray-600 dark:text-gray-400'
-                          }`}>
-                            {todo.status.replace('_', ' ')}
-                          </span>
-                        </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-medium text-sm sm:text-base ${
+                        todo.status === 'DONE'
+                          ? 'text-medium-gray line-through'
+                          : 'text-dark-gray dark:text-white'
+                      }`}>
+                        {todo.title}
+                      </p>
+                      {todo.description && (
+                        <p className="text-xs sm:text-sm text-medium-gray mt-1">{todo.description}</p>
+                      )}
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-2 text-xs text-medium-gray">
+                        <span>Assigned: {todo.assignedTo.name}</span>
+                        {todo.dueDate && (
+                          <span>Due: {new Date(todo.dueDate).toLocaleDateString()}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-2">
+                        <span className={`px-2 py-0.5 text-[10px] sm:text-xs font-medium rounded-full ${
+                          todo.priority === 'HIGH'
+                            ? 'bg-red-500/10 text-red-500'
+                            : todo.priority === 'MEDIUM'
+                            ? 'bg-orange/10 text-orange'
+                            : 'bg-gray-500/10 text-gray-500'
+                        }`}>
+                          {todo.priority}
+                        </span>
+                        <span className={`px-2 py-0.5 text-[10px] sm:text-xs font-medium rounded-full ${
+                          todo.status === 'DONE'
+                            ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                            : todo.status === 'IN_PROGRESS'
+                            ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                            : 'bg-gray-500/10 text-gray-600 dark:text-gray-400'
+                        }`}>
+                          {todo.status.replace('_', ' ')}
+                        </span>
                       </div>
                     </div>
                   </div>

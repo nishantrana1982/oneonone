@@ -21,10 +21,10 @@ export default async function InsightsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-dark-gray dark:text-white mb-2">
+        <h1 className="text-2xl sm:text-3xl font-bold text-dark-gray dark:text-white mb-1">
           Organization Insights
         </h1>
-        <p className="text-medium-gray">
+        <p className="text-sm sm:text-base text-medium-gray">
           Analytics and insights from meeting recordings across the organization
         </p>
       </div>
