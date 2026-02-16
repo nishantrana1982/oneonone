@@ -43,7 +43,8 @@ export function DatePicker({
   // Parse the value to display
   const selectedDate = value ? new Date(value) : null
 
-  // Position dropdown when opening (and on scroll/resize so it stays aligned)
+  // Position dropdown when opening; open upward if not enough space below
+  const DROPDOWN_HEIGHT = 380
   useEffect(() => {
     if (!isOpen || !containerRef.current) {
       setDropdownRect(null)
@@ -53,13 +54,18 @@ export function DatePicker({
       if (!containerRef.current) return
       const rect = containerRef.current.getBoundingClientRect()
       const dropdownWidth = 320
+      const spaceBelow = window.innerHeight - rect.bottom - 16
+      const openAbove = spaceBelow < DROPDOWN_HEIGHT && rect.top > DROPDOWN_HEIGHT + 16
+      let top: number
+      if (openAbove) {
+        top = rect.top - DROPDOWN_HEIGHT - 8
+      } else {
+        top = rect.bottom + 8
+      }
       let left = rect.left
       if (left + dropdownWidth > window.innerWidth) left = window.innerWidth - dropdownWidth
       if (left < 8) left = 8
-      setDropdownRect({
-        top: rect.bottom + 8,
-        left,
-      })
+      setDropdownRect({ top, left })
     }
     updatePosition()
     window.addEventListener('scroll', updatePosition, true)
@@ -206,8 +212,11 @@ export function DatePicker({
     } else if (option === 'nextWeek') {
       date.setDate(date.getDate() + 7)
     }
-    if (!isDateDisabled(date)) {
-      onChange(formatDateValue(date))
+    const value = formatDateValue(date)
+    const withinMin = !min || value >= min
+    const withinMax = !max || value <= max
+    if (withinMin && withinMax) {
+      onChange(value)
       setIsOpen(false)
     }
   }
