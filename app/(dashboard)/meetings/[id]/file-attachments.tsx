@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { Paperclip, Upload, File, Trash2, Download, Loader2, X, FileText, Image, FileArchive } from 'lucide-react'
 import { useToast } from '@/components/ui/toast'
+import { useConfirm } from '@/components/ui/confirm-modal'
 
 interface Attachment {
   id: string
@@ -40,6 +41,7 @@ function formatFileSize(bytes: number) {
 
 export function FileAttachments({ meetingId, initialAttachments, canUpload }: FileAttachmentsProps) {
   const { toastError } = useToast()
+  const confirm = useConfirm()
   const [attachments, setAttachments] = useState<Attachment[]>(initialAttachments)
   const [uploading, setUploading] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -114,7 +116,6 @@ export function FileAttachments({ meetingId, initialAttachments, canUpload }: Fi
       }
       setAttachments([newAttachment, ...attachments])
     } catch (error: any) {
-      console.error('Upload error:', error)
       toastError(error.message || 'Failed to upload file')
     } finally {
       setUploading(false)
@@ -125,7 +126,7 @@ export function FileAttachments({ meetingId, initialAttachments, canUpload }: Fi
   }
 
   const handleDelete = async (attachmentId: string) => {
-    if (!confirm('Are you sure you want to delete this file?')) return
+    if (!await confirm('Are you sure you want to delete this file?')) return
 
     setDeleting(attachmentId)
 

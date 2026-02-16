@@ -4,6 +4,35 @@ import { useState } from 'react'
 import { Download, TrendingUp, Smile, Meh, Frown, Calendar, CheckSquare, Target, Award, HelpCircle } from 'lucide-react'
 import { useToast } from '@/components/ui/toast'
 
+interface QuarterlyGoal {
+  date: string
+  professional?: string
+  agency?: string
+  progress?: string
+}
+
+interface QuarterlyItem {
+  text: string
+  date: string
+}
+
+interface QuarterlySummaryData {
+  period: { quarter: string }
+  statistics: {
+    totalMeetings: number
+    completedMeetings: number
+    taskCompletionRate: string
+    completedTasks: number
+    pendingTasks: number
+    highPriorityTasks: number
+  }
+  sentiment: { label: string }
+  keyThemes: string[]
+  goals: QuarterlyGoal[]
+  recentAchievements: QuarterlyItem[]
+  supportRequests: QuarterlyItem[]
+}
+
 interface QuarterlySummaryProps {
   userId: string
   userName: string
@@ -12,7 +41,7 @@ interface QuarterlySummaryProps {
 export function QuarterlySummary({ userId, userName }: QuarterlySummaryProps) {
   const { toastError } = useToast()
   const [loading, setLoading] = useState(false)
-  const [summary, setSummary] = useState<any>(null)
+  const [summary, setSummary] = useState<QuarterlySummaryData | null>(null)
   const [isOpen, setIsOpen] = useState(false)
 
   const loadSummary = async () => {
@@ -29,7 +58,6 @@ export function QuarterlySummary({ userId, userName }: QuarterlySummaryProps) {
       setSummary(data)
       setIsOpen(true)
     } catch (error) {
-      console.error('Error loading summary:', error)
       toastError('Failed to load quarterly summary')
     } finally {
       setLoading(false)
@@ -59,7 +87,7 @@ export function QuarterlySummary({ userId, userName }: QuarterlySummaryProps) {
       {isOpen && summary && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsOpen(false)} />
-          <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 shadow-2xl">
+          <div className="relative w-full max-w-4xl max-w-[95vw] max-h-[90vh] overflow-y-auto rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 shadow-2xl">
             {/* Header */}
             <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-off-white dark:border-medium-gray/20 bg-white dark:bg-charcoal">
               <div>
@@ -150,7 +178,7 @@ export function QuarterlySummary({ userId, userName }: QuarterlySummaryProps) {
                     Goals & Progress
                   </h3>
                   <div className="space-y-4">
-                    {summary.goals.map((goal: any, i: number) => (
+                    {summary.goals.map((goal, i) => (
                       <div key={i} className="p-4 rounded-lg bg-off-white dark:bg-charcoal">
                         <p className="text-xs text-medium-gray mb-2">
                           {new Date(goal.date).toLocaleDateString()}
@@ -187,7 +215,7 @@ export function QuarterlySummary({ userId, userName }: QuarterlySummaryProps) {
                     Achievements & Good News
                   </h3>
                   <div className="space-y-3">
-                    {summary.recentAchievements.map((item: any, i: number) => (
+                    {summary.recentAchievements.map((item, i) => (
                       <div key={i} className="flex gap-3 p-3 rounded-lg bg-green-500/5">
                         <Smile className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
                         <div>
@@ -210,7 +238,7 @@ export function QuarterlySummary({ userId, userName }: QuarterlySummaryProps) {
                     Support Requests
                   </h3>
                   <div className="space-y-3">
-                    {summary.supportRequests.map((item: any, i: number) => (
+                    {summary.supportRequests.map((item, i) => (
                       <div key={i} className="flex gap-3 p-3 rounded-lg bg-orange/5">
                         <HelpCircle className="w-5 h-5 text-orange flex-shrink-0 mt-0.5" />
                         <div>

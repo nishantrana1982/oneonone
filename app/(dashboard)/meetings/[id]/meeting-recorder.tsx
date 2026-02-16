@@ -203,7 +203,6 @@ export function MeetingRecorder({
       setChunksUploaded((n) => n + 1)
       return true
     } catch (err) {
-      console.error('[Recorder] Chunk upload error:', err)
       setChunkError(err instanceof Error ? err.message : 'Chunk upload failed')
       return false
     } finally {
@@ -262,7 +261,6 @@ export function MeetingRecorder({
         uploadPendingChunks()
       }, CHUNK_UPLOAD_INTERVAL)
     } catch (err) {
-      console.error('[Recorder] Start error:', err)
       setSubmitError(
         err instanceof Error ? err.message : 'Could not start recording. Check microphone access.'
       )
@@ -351,7 +349,6 @@ export function MeetingRecorder({
       setRecordingTime(0)
       setCurrentStatus('TRANSCRIBING')
     } catch (err) {
-      console.error('[Recorder] Submit error:', err)
       const msg = err instanceof Error ? err.message : 'Upload failed'
       setSubmitError(msg)
       setCurrentStatus('FAILED')
@@ -494,6 +491,7 @@ export function MeetingRecorder({
           </div>
           <button
             onClick={handleRetry}
+            aria-label="Retry recording"
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-orange hover:bg-orange/10 rounded-xl transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
@@ -586,6 +584,7 @@ export function MeetingRecorder({
           <div className="flex items-center justify-center gap-3">
             <button
               onClick={pauseRecording}
+              aria-label={isPaused ? 'Resume recording' : 'Pause recording'}
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-yellow-500/10 text-yellow-600 rounded-xl hover:bg-yellow-500/20 transition-colors"
             >
               {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
@@ -593,6 +592,7 @@ export function MeetingRecorder({
             </button>
             <button
               onClick={stopRecording}
+              aria-label="Stop recording"
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors"
             >
               <Square className="w-4 h-4" />
@@ -630,6 +630,7 @@ export function MeetingRecorder({
             <button
               onClick={discardRecording}
               disabled={isSubmitting}
+              aria-label="Discard recording"
               className="px-4 py-2 text-sm font-medium text-medium-gray hover:text-red-500 transition-colors disabled:opacity-50"
             >
               Discard
@@ -637,6 +638,7 @@ export function MeetingRecorder({
             <button
               onClick={submitRecording}
               disabled={isSubmitting}
+              aria-label="Save and transcribe recording"
               className="flex items-center gap-2 px-6 py-2 text-sm font-medium bg-orange text-white rounded-xl hover:bg-orange/90 disabled:opacity-50 transition-colors"
             >
               {isSubmitting ? (
@@ -663,6 +665,7 @@ export function MeetingRecorder({
             <select
               value={selectedLanguage}
               onChange={(e) => setSelectedLanguage(e.target.value)}
+              aria-label="Select recording language"
               className="px-3 py-2 rounded-xl border border-off-white dark:border-medium-gray/20 bg-white dark:bg-charcoal text-dark-gray dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange/50"
             >
               {LANGUAGE_OPTIONS.map((lang) => (
@@ -674,6 +677,7 @@ export function MeetingRecorder({
           </div>
           <button
             onClick={startRecording}
+            aria-label="Start recording"
             className="inline-flex items-center gap-3 px-8 py-4 text-lg font-medium bg-gradient-to-r from-red-500 to-orange text-white rounded-2xl hover:opacity-90 transition-opacity shadow-lg"
           >
             <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">

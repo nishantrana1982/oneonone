@@ -77,7 +77,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
 
       {/* Toast container */}
-      <div className="fixed top-4 right-4 z-[200] flex flex-col gap-2 pointer-events-none max-w-[90vw] sm:max-w-md">
+      <div role="status" aria-live="polite" className="fixed top-4 right-4 z-[200] flex flex-col gap-2 pointer-events-none max-w-[90vw] sm:max-w-md">
         {toasts.map((t) => {
           const Icon = icons[t.type]
           return (
@@ -92,6 +92,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <p className="text-sm font-medium flex-1">{t.message}</p>
               <button
                 onClick={() => removeToast(t.id)}
+                aria-label="Dismiss notification"
                 className="flex-shrink-0 opacity-70 hover:opacity-100 transition-opacity"
               >
                 <X className="w-4 h-4" />

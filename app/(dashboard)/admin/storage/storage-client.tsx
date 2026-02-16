@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { HardDrive, Trash2, Loader2, ArrowLeft, FileAudio } from 'lucide-react'
 import { useToast } from '@/components/ui/toast'
+import { useConfirm } from '@/components/ui/confirm-modal'
 
 type StorageStats = {
   storageType: 's3' | 'local'
@@ -36,6 +37,7 @@ type RecordingRow = {
 export function StorageClient() {
   const router = useRouter()
   const { toastError } = useToast()
+  const confirm = useConfirm()
   const [stats, setStats] = useState<StorageStats | null>(null)
   const [recordings, setRecordings] = useState<RecordingRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -51,7 +53,7 @@ export function StorageClient() {
         if (statsRes.ok) setStats(await statsRes.json())
         if (recordingsRes.ok) setRecordings(await recordingsRes.json())
       } catch (e) {
-        console.error(e)
+        // Error handled by toast
       } finally {
         setLoading(false)
       }
@@ -60,7 +62,7 @@ export function StorageClient() {
   }, [])
 
   const handleDelete = async (meetingId: string) => {
-    if (!confirm('Delete this recording? The file will be removed from storage.')) return
+    if (!await confirm('Delete this recording? The file will be removed from storage.', { variant: 'danger' })) return
     setDeletingId(meetingId)
     try {
       const res = await fetch(`/api/meetings/${meetingId}/recording`, { method: 'DELETE' })
@@ -74,7 +76,6 @@ export function StorageClient() {
         toastError(data.error || 'Failed to delete')
       }
     } catch (e) {
-      console.error(e)
       toastError('Failed to delete')
     } finally {
       setDeletingId(null)
@@ -164,7 +165,8 @@ export function StorageClient() {
           <FileAudio className="w-5 h-5 text-orange" />
           <h2 className="font-semibold text-dark-gray dark:text-white">Recordings</h2>
         </div>
-        <div className="overflow-x-auto">
+        {/* Desktop table */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-off-white dark:border-medium-gray/20">
@@ -234,6 +236,58 @@ export function StorageClient() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile cards */}
+        <div className="sm:hidden divide-y divide-off-white dark:divide-medium-gray/20">
+          {recordings.length === 0 ? (
+            <div className="p-6 text-center text-medium-gray">No recordings yet</div>
+          ) : (
+            recordings.map((r) => (
+              <div key={r.id} className="p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-dark-gray dark:text-white">{formatDate(r.meetingDate)}</p>
+                    <p className="text-sm text-medium-gray">{r.employeeName ?? '–'}</p>
+                  </div>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      r.status === 'COMPLETED'
+                        ? 'bg-green-500/10 text-green-600'
+                        : r.status === 'FAILED'
+                        ? 'bg-red-500/10 text-red-600'
+                        : 'bg-blue-500/10 text-blue-600'
+                    }`}
+                  >
+                    {r.status}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-medium-gray">{formatBytes(r.fileSize)}</span>
+                  <div className="flex items-center gap-3">
+                    <Link
+                      href={`/meetings/${r.meetingId}`}
+                      className="text-sm text-orange hover:underline"
+                    >
+                      View
+                    </Link>
+                    <button
+                      onClick={() => handleDelete(r.meetingId)}
+                      disabled={deletingId === r.meetingId}
+                      className="inline-flex items-center gap-1 text-sm text-red-500 hover:text-red-600 disabled:opacity-50"
+                    >
+                      {deletingId === r.meetingId ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

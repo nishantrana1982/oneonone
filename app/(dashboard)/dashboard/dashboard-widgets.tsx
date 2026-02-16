@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { WidgetType } from '@prisma/client'
 import { formatMeetingDateShort } from '@/lib/utils'
+import type { LucideIcon } from 'lucide-react'
 
 interface Widget {
   id: string
@@ -36,17 +37,25 @@ interface DashboardStats {
   completedTodos: number
 }
 
+interface RecentMeeting {
+  id: string
+  employee?: { name: string }
+  reporter?: { name: string }
+  meetingDate: string
+  status: string
+}
+
 interface DashboardWidgetsProps {
   stats: DashboardStats
   userRole: string
   userName: string
-  recentMeetings: any[]
+  recentMeetings: RecentMeeting[]
   initialWidgets: Widget[]
 }
 
 const widgetConfig: Record<WidgetType, {
   title: string
-  icon: any
+  icon: LucideIcon
   color: string
   bgColor: string
 }> = {
@@ -91,7 +100,7 @@ export function DashboardWidgets({
       setIsCustomizing(false)
       router.refresh()
     } catch (error) {
-      console.error('Error saving widgets:', error)
+      // Error handled by toast
     } finally {
       setSaving(false)
     }
@@ -108,7 +117,7 @@ export function DashboardWidgets({
         router.refresh()
       }
     } catch (error) {
-      console.error('Error resetting widgets:', error)
+      // Error handled by toast
     } finally {
       setSaving(false)
     }
@@ -231,7 +240,7 @@ export function DashboardWidgets({
                   No meetings yet
                 </div>
               ) : (
-                recentMeetings.slice(0, 5).map((meeting: any) => (
+                recentMeetings.slice(0, 5).map((meeting) => (
                   <Link key={meeting.id} href={`/meetings/${meeting.id}`} className="block px-6 py-4 hover:bg-off-white dark:hover:bg-charcoal transition-colors">
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">

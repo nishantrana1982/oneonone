@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/components/ui/toast'
+import { useConfirm } from '@/components/ui/confirm-modal'
 
 interface TranscriptViewerProps {
   recording: {
@@ -67,6 +68,7 @@ const languageNames: Record<string, string> = {
 export function TranscriptViewer({ recording, employeeId, reporterId }: TranscriptViewerProps) {
   const router = useRouter()
   const { toastError } = useToast()
+  const confirm = useConfirm()
   const [showFullTranscript, setShowFullTranscript] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [activeTab, setActiveTab] = useState<'summary' | 'transcript' | 'analysis'>('summary')
@@ -86,7 +88,7 @@ export function TranscriptViewer({ recording, employeeId, reporterId }: Transcri
           }
         }
       } catch (error) {
-        console.error('Error fetching audio URL:', error)
+        // Error handled by toast
       }
     }
     
@@ -96,7 +98,7 @@ export function TranscriptViewer({ recording, employeeId, reporterId }: Transcri
   }, [recording.meetingId, recording.audioPlaybackUrl])
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this recording? This cannot be undone.')) {
+    if (!await confirm('Are you sure you want to delete this recording? This cannot be undone.', { variant: 'danger' })) {
       return
     }
 
@@ -112,7 +114,6 @@ export function TranscriptViewer({ recording, employeeId, reporterId }: Transcri
         toastError('Failed to delete recording')
       }
     } catch (error) {
-      console.error('Error deleting recording:', error)
       toastError('Failed to delete recording')
     } finally {
       setIsDeleting(false)
@@ -149,7 +150,6 @@ export function TranscriptViewer({ recording, employeeId, reporterId }: Transcri
         toastError(error.error || 'Failed to add todo')
       }
     } catch (error) {
-      console.error('Error adding todo:', error)
       toastError('Failed to add todo')
     } finally {
       setAddingTodo(null)

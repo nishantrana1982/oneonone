@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useConfirm } from '@/components/ui/confirm-modal'
 
 interface Notification {
   id: string
@@ -84,6 +85,7 @@ const typeLabels: Record<string, string> = {
 
 export function NotificationsClient() {
   const router = useRouter()
+  const confirm = useConfirm()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [total, setTotal] = useState(0)
@@ -116,7 +118,7 @@ export function NotificationsClient() {
         setTotal(data.total || 0)
       }
     } catch (error) {
-      console.error('Error fetching notifications:', error)
+      // Error handled by toast
     } finally {
       setLoading(false)
     }
@@ -139,14 +141,14 @@ export function NotificationsClient() {
         setUnreadCount(0)
       }
     } catch (error) {
-      console.error('Error marking all read:', error)
+      // Error handled by toast
     } finally {
       setActionLoading(false)
     }
   }
 
   const handleDeleteAllRead = async () => {
-    if (!confirm('Delete all read notifications?')) return
+    if (!await confirm('Delete all read notifications?', { variant: 'danger' })) return
     setActionLoading(true)
     try {
       const res = await fetch('/api/notifications', {
@@ -158,7 +160,7 @@ export function NotificationsClient() {
         await fetchNotifications()
       }
     } catch (error) {
-      console.error('Error deleting read notifications:', error)
+      // Error handled by toast
     } finally {
       setActionLoading(false)
     }
@@ -177,7 +179,7 @@ export function NotificationsClient() {
         )
         setUnreadCount((c) => Math.max(0, c - 1))
       } catch (error) {
-        console.error('Error marking notification as read:', error)
+        // Error handled by toast
       }
     }
     if (notification.link) {
@@ -200,7 +202,7 @@ export function NotificationsClient() {
         }
       }
     } catch (error) {
-      console.error('Error deleting notification:', error)
+      // Error handled by toast
     }
   }
 

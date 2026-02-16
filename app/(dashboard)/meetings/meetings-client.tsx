@@ -19,6 +19,7 @@ import {
 import { formatMeetingDateShort } from '@/lib/utils'
 import { UserRole, RecurringFrequency } from '@prisma/client'
 import { useToast } from '@/components/ui/toast'
+import { useConfirm } from '@/components/ui/confirm-modal'
 
 interface Meeting {
   id: string
@@ -65,11 +66,14 @@ export function MeetingsClient({
 }: MeetingsClientProps) {
   const router = useRouter()
   const { toastError } = useToast()
+  const confirm = useConfirm()
   const [activeTab, setActiveTab] = useState<'all' | 'recurring'>('all')
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [isToggling, setIsToggling] = useState<string | null>(null)
   const [deletedScheduleIds, setDeletedScheduleIds] = useState<Set<string>>(new Set())
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const ITEMS_PER_PAGE = 15
 
   const showMessage = useCallback((type: 'success' | 'error', text: string) => {
     setMessage({ type, text })
@@ -98,8 +102,13 @@ export function MeetingsClient({
       !m.checkInPersonal
   )
 
+  const totalPages = Math.ceil(meetings.length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const paginatedMeetings = meetings.slice(startIndex, endIndex)
+
   const handleDeleteRecurring = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this recurring schedule?')) {
+    if (!await confirm('Are you sure you want to delete this recurring schedule?', { variant: 'danger' })) {
       return
     }
 
@@ -214,7 +223,7 @@ export function MeetingsClient({
                 handleToggleRecurring(schedule.id, schedule.isActive)
               }
               disabled={isToggling === schedule.id}
-              className="p-2 rounded-lg hover:bg-off-white dark:hover:bg-charcoal transition-colors"
+              className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-off-white dark:hover:bg-charcoal transition-colors focus-visible:ring-2 focus-visible:ring-orange/50 focus-visible:outline-none"
               title={schedule.isActive ? 'Pause' : 'Resume'}
             >
               {isToggling === schedule.id ? (
@@ -229,7 +238,7 @@ export function MeetingsClient({
               type="button"
               onClick={() => handleDeleteRecurring(schedule.id)}
               disabled={isDeleting === schedule.id}
-              className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+              className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors focus-visible:ring-2 focus-visible:ring-orange/50 focus-visible:outline-none"
               title="Delete"
             >
               {isDeleting === schedule.id ? (
@@ -278,7 +287,7 @@ export function MeetingsClient({
         {canSchedule && (
           <Link
             href="/meetings/new"
-            className="flex items-center gap-2 px-4 py-2.5 sm:px-5 sm:py-3 bg-dark-gray dark:bg-white text-white dark:text-dark-gray rounded-xl font-medium hover:bg-charcoal dark:hover:bg-off-white transition-colors text-sm sm:text-base flex-shrink-0 active:scale-[0.97]"
+            className="flex items-center gap-2 px-4 py-2.5 sm:px-5 sm:py-3 bg-dark-gray dark:bg-white text-white dark:text-dark-gray rounded-xl font-medium hover:bg-charcoal dark:hover:bg-off-white transition-colors text-sm sm:text-base flex-shrink-0 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-orange/50 focus-visible:outline-none"
           >
             <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
             <span className="hidden sm:inline">Schedule Meeting</span>
@@ -351,8 +360,8 @@ export function MeetingsClient({
         <div className="flex gap-1 p-1 bg-off-white dark:bg-charcoal rounded-xl w-fit">
           <button
             type="button"
-            onClick={() => setActiveTab('all')}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+            onClick={() => { setActiveTab('all'); setCurrentPage(1) }}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-orange/50 focus-visible:outline-none ${
               activeTab === 'all'
                 ? 'bg-white dark:bg-charcoal text-dark-gray dark:text-white shadow-sm'
                 : 'text-medium-gray hover:text-dark-gray dark:hover:text-white'
@@ -363,8 +372,8 @@ export function MeetingsClient({
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('recurring')}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+            onClick={() => { setActiveTab('recurring'); setCurrentPage(1) }}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-orange/50 focus-visible:outline-none ${
               activeTab === 'recurring'
                 ? 'bg-white dark:bg-charcoal text-dark-gray dark:text-white shadow-sm'
                 : 'text-medium-gray hover:text-dark-gray dark:hover:text-white'
@@ -428,7 +437,7 @@ export function MeetingsClient({
                 </div>
               )}
               <div className="divide-y divide-off-white dark:divide-medium-gray/20">
-                {meetings.map((meeting) => {
+                {paginatedMeetings.map((meeting) => {
                   const meetingDate = new Date(meeting.meetingDate)
                   const isPast = meetingDate < now
                   const needsForm =
@@ -471,7 +480,7 @@ export function MeetingsClient({
                             {otherPerson?.name ?? 'Unknown'}
                           </p>
                           {needsForm && isEmployee && (
-                            <span className="px-2 py-0.5 text-[10px] sm:text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-full flex-shrink-0">
+                            <span className="px-2 py-0.5 text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-full flex-shrink-0">
                               Form needed
                             </span>
                           )}
@@ -481,7 +490,7 @@ export function MeetingsClient({
                         </p>
                       </div>
                       <span
-                        className={`px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-medium rounded-full flex-shrink-0 ${
+                        className={`px-2 sm:px-3 py-1 text-xs font-medium rounded-full flex-shrink-0 ${
                           meeting.status === 'COMPLETED'
                             ? 'bg-green-500/10 text-green-600 dark:text-green-400'
                             : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
@@ -498,6 +507,33 @@ export function MeetingsClient({
                   )
                 })}
               </div>
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-off-white dark:border-medium-gray/20">
+                  <p className="text-sm text-medium-gray">
+                    Showing {startIndex + 1}-{Math.min(endIndex, meetings.length)} of {meetings.length} meetings
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="px-3 py-2 text-sm rounded-lg border border-off-white dark:border-medium-gray/20 disabled:opacity-40 hover:bg-off-white dark:hover:bg-dark-gray transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                    >
+                      Previous
+                    </button>
+                    <span className="text-sm text-medium-gray px-2">
+                      {currentPage} / {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-2 text-sm rounded-lg border border-off-white dark:border-medium-gray/20 disabled:opacity-40 hover:bg-off-white dark:hover:bg-dark-gray transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : null}
         </>

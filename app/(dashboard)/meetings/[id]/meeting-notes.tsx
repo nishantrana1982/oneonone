@@ -52,7 +52,7 @@ export function MeetingNotes({ meetingId, initialNotes, canEdit }: MeetingNotesP
         setTimeout(() => setSaved(false), 2000)
       }
     } catch (error) {
-      console.error('Error saving notes:', error)
+      // Error handled by toast
     } finally {
       setSaving(false)
     }

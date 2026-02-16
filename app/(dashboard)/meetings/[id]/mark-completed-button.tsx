@@ -21,7 +21,6 @@ export function MarkCompletedButton({ meetingId }: { meetingId: string }) {
       if (!res.ok) throw new Error('Failed to update')
       router.refresh()
     } catch (e) {
-      console.error(e)
       toastError('Failed to mark meeting as completed. Please try again.')
     } finally {
       setLoading(false)

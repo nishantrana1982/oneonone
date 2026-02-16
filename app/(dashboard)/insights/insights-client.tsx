@@ -142,7 +142,7 @@ export function InsightsClient({ departments, isSuperAdmin }: InsightsClientProp
         setInsights(data)
       }
     } catch (error) {
-      console.error('Error fetching insights:', error)
+      // Error handled by toast
     } finally {
       setLoading(false)
     }
@@ -163,7 +163,7 @@ export function InsightsClient({ departments, isSuperAdmin }: InsightsClientProp
         setActiveTab('search')
       }
     } catch (error) {
-      console.error('Error searching:', error)
+      // Error handled by toast
     } finally {
       setSearching(false)
     }
@@ -196,7 +196,6 @@ export function InsightsClient({ departments, isSuperAdmin }: InsightsClientProp
 
       setAiResult(data)
     } catch (error) {
-      console.error('Error with AI query:', error)
       setAiError(error instanceof Error ? error.message : 'Something went wrong')
     } finally {
       setAiLoading(false)

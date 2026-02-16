@@ -87,7 +87,7 @@ export function Sidebar() {
       {/* ================================================================
           MOBILE: Bottom Tab Bar (visible below lg breakpoint)
           ================================================================ */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-charcoal border-t border-off-white dark:border-medium-gray/20 safe-area-bottom">
+      <nav aria-label="Main navigation" className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-charcoal border-t border-off-white dark:border-medium-gray/20 safe-area-bottom">
         <div className="flex items-stretch justify-around h-16">
           {filteredBottomTabs.map((tab) => {
             const isMore = tab.href === '__more__'
@@ -98,10 +98,11 @@ export function Sidebar() {
                 <button
                   key={tab.name}
                   onClick={() => handleTabClick(tab.href)}
-                  className="flex flex-col items-center justify-center flex-1 gap-0.5 text-medium-gray active:bg-off-white/60 dark:active:bg-dark-gray/60 transition-colors"
+                  aria-label="Open menu"
+                  className="flex flex-col items-center justify-center flex-1 gap-0.5 text-medium-gray active:bg-off-white/60 dark:active:bg-dark-gray/60 transition-colors focus-visible:ring-2 focus-visible:ring-orange/50 focus-visible:outline-none"
                 >
                   <tab.icon className="w-5 h-5" />
-                  <span className="text-[10px] font-medium">{tab.name}</span>
+                  <span className="text-[11px] font-medium">{tab.name}</span>
                 </button>
               )
             }
@@ -111,12 +112,12 @@ export function Sidebar() {
                 key={tab.name}
                 href={tab.href}
                 className={cn(
-                  'flex flex-col items-center justify-center flex-1 gap-0.5 transition-colors active:bg-off-white/60 dark:active:bg-dark-gray/60',
+                  'flex flex-col items-center justify-center flex-1 gap-0.5 transition-colors active:bg-off-white/60 dark:active:bg-dark-gray/60 focus-visible:ring-2 focus-visible:ring-orange/50 focus-visible:outline-none',
                   isActive ? 'text-orange' : 'text-medium-gray'
                 )}
               >
                 <tab.icon className={cn('w-5 h-5', isActive && 'text-orange')} />
-                <span className={cn('text-[10px] font-medium', isActive && 'text-orange')}>
+                <span className={cn('text-[11px] font-medium', isActive && 'text-orange')}>
                   {tab.name}
                 </span>
               </Link>
@@ -136,6 +137,8 @@ export function Sidebar() {
       )}
 
       <aside
+        role="dialog"
+        aria-label="Navigation menu"
         className={cn(
           'fixed inset-y-0 right-0 z-[70] w-[85vw] max-w-sm bg-white dark:bg-charcoal shadow-2xl transform transition-transform duration-300 ease-out lg:hidden flex flex-col',
           isMobileOpen ? 'translate-x-0' : 'translate-x-full'
@@ -153,6 +156,7 @@ export function Sidebar() {
           </div>
           <button
             onClick={() => setIsMobileOpen(false)}
+            aria-label="Close menu"
             className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-off-white dark:hover:bg-dark-gray"
           >
             <X className="w-5 h-5 text-dark-gray dark:text-white" />
@@ -172,7 +176,7 @@ export function Sidebar() {
                 href={item.href}
                 onClick={() => setIsMobileOpen(false)}
                 className={cn(
-                  'flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-medium transition-all',
+                  'flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-medium transition-all focus-visible:ring-2 focus-visible:ring-orange/50 focus-visible:outline-none',
                   isActive
                     ? 'bg-off-white dark:bg-dark-gray text-dark-gray dark:text-white'
                     : 'text-medium-gray active:bg-off-white/50 dark:active:bg-dark-gray/50'
@@ -200,7 +204,7 @@ export function Sidebar() {
                     href={item.href}
                     onClick={() => setIsMobileOpen(false)}
                     className={cn(
-                      'flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-medium transition-all',
+                      'flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-medium transition-all focus-visible:ring-2 focus-visible:ring-orange/50 focus-visible:outline-none',
                       isActive
                         ? 'bg-off-white dark:bg-dark-gray text-dark-gray dark:text-white'
                         : 'text-medium-gray active:bg-off-white/50 dark:active:bg-dark-gray/50'
@@ -222,6 +226,7 @@ export function Sidebar() {
             <NotificationCenter />
             <button
               onClick={toggleTheme}
+              aria-label={theme === 'light' ? 'Toggle dark mode' : 'Toggle light mode'}
               className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-off-white dark:hover:bg-dark-gray transition-colors"
               title={theme === 'light' ? 'Dark Mode' : 'Light Mode'}
             >
@@ -232,6 +237,7 @@ export function Sidebar() {
           <Link
             href="/profile"
             onClick={() => setIsMobileOpen(false)}
+            aria-label="View profile"
             className="flex items-center gap-3 px-4 py-3 rounded-xl bg-off-white dark:bg-dark-gray"
           >
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-charcoal to-medium-gray dark:from-medium-gray dark:to-charcoal flex items-center justify-center text-white font-semibold">
@@ -250,6 +256,7 @@ export function Sidebar() {
 
           <button
             onClick={() => signOut({ callbackUrl: '/auth/signin' })}
+            aria-label="Sign out"
             className="w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
           >
             <LogOut className="h-5 w-5" />
@@ -261,7 +268,7 @@ export function Sidebar() {
       {/* ================================================================
           DESKTOP: Traditional left sidebar (visible at lg+)
           ================================================================ */}
-      <aside className="hidden lg:flex fixed inset-y-0 left-0 z-40 w-72 bg-white dark:bg-charcoal border-r border-off-white dark:border-dark-gray flex-col">
+      <aside aria-label="Sidebar navigation" className="hidden lg:flex fixed inset-y-0 left-0 z-40 w-72 bg-white dark:bg-charcoal border-r border-off-white dark:border-dark-gray flex-col">
         {/* Logo */}
         <div className="h-20 flex items-center px-6 border-b border-off-white dark:border-dark-gray">
           <div className="flex items-center gap-3">
@@ -289,7 +296,7 @@ export function Sidebar() {
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 group relative',
+                  'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 group relative focus-visible:ring-2 focus-visible:ring-orange/50 focus-visible:outline-none',
                   isActive
                     ? 'bg-off-white dark:bg-dark-gray text-dark-gray dark:text-white'
                     : 'text-medium-gray hover:bg-off-white/50 dark:hover:bg-dark-gray/50 hover:text-dark-gray dark:hover:text-white'
@@ -319,7 +326,7 @@ export function Sidebar() {
                     key={item.name}
                     href={item.href}
                     className={cn(
-                      'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 group relative',
+                      'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 group relative focus-visible:ring-2 focus-visible:ring-orange/50 focus-visible:outline-none',
                       isActive
                         ? 'bg-off-white dark:bg-dark-gray text-dark-gray dark:text-white'
                         : 'text-medium-gray hover:bg-off-white/50 dark:hover:bg-dark-gray/50 hover:text-dark-gray dark:hover:text-white'
@@ -344,6 +351,7 @@ export function Sidebar() {
             <NotificationCenter />
             <button
               onClick={toggleTheme}
+              aria-label={theme === 'light' ? 'Toggle dark mode' : 'Toggle light mode'}
               className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-off-white dark:hover:bg-dark-gray transition-colors"
               title={theme === 'light' ? 'Dark Mode' : 'Light Mode'}
             >
@@ -353,6 +361,7 @@ export function Sidebar() {
 
           <Link
             href="/profile"
+            aria-label="View profile"
             className="flex items-center gap-3 px-4 py-3 rounded-xl bg-off-white dark:bg-dark-gray hover:bg-off-white/80 dark:hover:bg-dark-gray/80 transition-colors"
           >
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-charcoal to-medium-gray dark:from-medium-gray dark:to-charcoal flex items-center justify-center text-white font-semibold">
@@ -371,6 +380,7 @@ export function Sidebar() {
 
           <button
             onClick={() => signOut({ callbackUrl: '/auth/signin' })}
+            aria-label="Sign out"
             className="w-full flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all duration-200"
           >
             <LogOut className="h-5 w-5" />

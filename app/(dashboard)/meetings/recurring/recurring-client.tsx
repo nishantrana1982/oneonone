@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { RecurringFrequency } from '@prisma/client'
 import { useToast } from '@/components/ui/toast'
+import { useConfirm } from '@/components/ui/confirm-modal'
 
 interface Employee {
   id: string
@@ -53,6 +54,7 @@ const frequencyLabels: Record<RecurringFrequency, string> = {
 export function RecurringSchedulesClient({ employees, initialSchedules }: Props) {
   const router = useRouter()
   const { toastError } = useToast()
+  const confirm = useConfirm()
   const [schedules, setSchedules] = useState<Schedule[]>(initialSchedules)
   const [showForm, setShowForm] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -121,12 +123,12 @@ export function RecurringSchedulesClient({ employees, initialSchedules }: Props)
         )
       }
     } catch (error) {
-      console.error('Failed to toggle schedule:', error)
+      // Error handled by toast
     }
   }
 
   const handleDelete = async (scheduleId: string) => {
-    if (!confirm('Are you sure you want to delete this recurring schedule?')) return
+    if (!await confirm('Are you sure you want to delete this recurring schedule?')) return
 
     try {
       const response = await fetch(`/api/recurring-schedules/${scheduleId}`, {
@@ -137,7 +139,7 @@ export function RecurringSchedulesClient({ employees, initialSchedules }: Props)
         setSchedules(schedules.filter((s) => s.id !== scheduleId))
       }
     } catch (error) {
-      console.error('Failed to delete schedule:', error)
+      // Error handled by toast
     }
   }
 

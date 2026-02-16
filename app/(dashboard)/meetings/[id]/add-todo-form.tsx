@@ -55,7 +55,6 @@ export function AddTodoForm({ meetingId, employeeId, employeeName, reporterId, r
       setIsOpen(false)
       router.refresh()
     } catch (error) {
-      console.error('Error creating todo:', error)
       toastError('Failed to create task. Please try again.')
     } finally {
       setIsLoading(false)

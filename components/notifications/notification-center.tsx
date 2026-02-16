@@ -67,7 +67,7 @@ export function NotificationCenter() {
         setUnreadCount(data.unreadCount || 0)
       }
     } catch (error) {
-      console.error('Error fetching notifications:', error)
+      // Error handled by toast
     }
   }
 
@@ -102,7 +102,7 @@ export function NotificationCenter() {
         setUnreadCount(0)
       }
     } catch (error) {
-      console.error('Error marking notifications as read:', error)
+      // Error handled by toast
     } finally {
       setLoading(false)
     }
@@ -122,7 +122,7 @@ export function NotificationCenter() {
         ))
         setUnreadCount(Math.max(0, unreadCount - 1))
       } catch (error) {
-        console.error('Error marking notification as read:', error)
+        // Error handled by toast
       }
     }
 
@@ -153,6 +153,8 @@ export function NotificationCenter() {
       {/* Bell Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
+        aria-label="Notifications"
+        aria-expanded={isOpen}
         className="relative w-10 h-10 flex items-center justify-center rounded-xl hover:bg-off-white dark:hover:bg-dark-gray transition-colors"
       >
         <Bell className="w-5 h-5 text-medium-gray" />
@@ -165,7 +167,7 @@ export function NotificationCenter() {
 
       {/* Dropdown - opens above the bell on desktop sidebar, or as a fixed panel on mobile */}
       {isOpen && (
-        <div className="fixed inset-x-3 bottom-20 sm:absolute sm:inset-auto sm:left-0 sm:bottom-full sm:mb-2 w-auto sm:w-96 max-h-[70vh] sm:max-h-[500px] bg-white dark:bg-charcoal rounded-2xl border border-off-white dark:border-medium-gray/20 shadow-2xl overflow-hidden z-[100] animate-in fade-in-0 zoom-in-95 duration-200">
+        <div role="dialog" aria-label="Notifications" className="fixed inset-x-3 bottom-20 sm:absolute sm:inset-auto sm:left-0 sm:bottom-full sm:mb-2 w-auto sm:w-96 max-h-[70vh] sm:max-h-[500px] bg-white dark:bg-charcoal rounded-2xl border border-off-white dark:border-medium-gray/20 shadow-2xl overflow-hidden z-[100] animate-in fade-in-0 zoom-in-95 duration-200">
           {/* Header */}
           <div className="px-4 py-3 border-b border-off-white dark:border-medium-gray/20 flex items-center justify-between">
             <h3 className="font-semibold text-dark-gray dark:text-white">Notifications</h3>

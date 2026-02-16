@@ -41,12 +41,19 @@ export function TodoList({ todos, currentUserId, userRole }: TodoListProps) {
   const { toastError } = useToast()
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('active')
   const [updating, setUpdating] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const ITEMS_PER_PAGE = 15
 
   const filteredTodos = todos.filter((todo) => {
     if (filter === 'active') return todo.status !== 'DONE'
     if (filter === 'completed') return todo.status === 'DONE'
     return true
   })
+
+  const totalPages = Math.ceil(filteredTodos.length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const paginatedTodos = filteredTodos.slice(startIndex, endIndex)
 
   const updateStatus = async (todoId: string, newStatus: TodoStatus) => {
     setUpdating(todoId)
@@ -60,7 +67,6 @@ export function TodoList({ todos, currentUserId, userRole }: TodoListProps) {
       if (!response.ok) throw new Error('Failed to update')
       router.refresh()
     } catch (error) {
-      console.error('Error updating todo:', error)
       toastError('Failed to update task. Please try again.')
     } finally {
       setUpdating(null)
@@ -88,8 +94,8 @@ export function TodoList({ todos, currentUserId, userRole }: TodoListProps) {
         {(['active', 'all', 'completed'] as const).map((tab) => (
           <button
             key={tab}
-            onClick={() => setFilter(tab)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+            onClick={() => { setFilter(tab); setCurrentPage(1) }}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all focus-visible:ring-2 focus-visible:ring-orange/50 focus-visible:outline-none ${
               filter === tab
                 ? 'bg-dark-gray dark:bg-white text-white dark:text-dark-gray'
                 : 'text-medium-gray hover:bg-off-white dark:hover:bg-dark-gray'
@@ -108,7 +114,7 @@ export function TodoList({ todos, currentUserId, userRole }: TodoListProps) {
               <p className="text-medium-gray">No {filter} tasks</p>
             </div>
           ) : (
-            filteredTodos.map((todo) => {
+            paginatedTodos.map((todo) => {
               const status = statusConfig[todo.status]
               const priority = priorityConfig[todo.priority]
               const isOverdue = todo.dueDate && new Date(todo.dueDate) < now && todo.status !== 'DONE'
@@ -117,7 +123,7 @@ export function TodoList({ todos, currentUserId, userRole }: TodoListProps) {
               return (
                 <div
                   key={todo.id}
-                  className={`p-5 transition-colors ${isOverdue ? 'bg-red-50/50 dark:bg-red-500/5' : ''}`}
+                  className={`p-5 transition-colors active:bg-off-white/70 dark:active:bg-dark-gray/70 ${isOverdue ? 'bg-red-50/50 dark:bg-red-500/5' : ''}`}
                 >
                   <div className="flex items-start gap-4">
                     {/* Status Toggle */}
@@ -202,6 +208,33 @@ export function TodoList({ todos, currentUserId, userRole }: TodoListProps) {
             })
           )}
         </div>
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-off-white dark:border-medium-gray/20">
+            <p className="text-sm text-medium-gray">
+              Showing {startIndex + 1}-{Math.min(endIndex, filteredTodos.length)} of {filteredTodos.length} tasks
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-2 text-sm rounded-lg border border-off-white dark:border-medium-gray/20 disabled:opacity-40 hover:bg-off-white dark:hover:bg-dark-gray transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-medium-gray px-2">
+                {currentPage} / {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-2 text-sm rounded-lg border border-off-white dark:border-medium-gray/20 disabled:opacity-40 hover:bg-off-white dark:hover:bg-dark-gray transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

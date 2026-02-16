@@ -10,6 +10,41 @@ interface Department {
   name: string
 }
 
+interface ReportMeeting {
+  id: string
+  date: string
+  employee: string
+  department: string
+  reporter: string
+  status: string
+  hasFormData: boolean
+}
+
+interface ReportIssue {
+  text: string
+  count: number
+}
+
+interface ReportSentiment {
+  positive: number
+  neutral: number
+  negative: number
+  averageScore: number
+}
+
+interface ReportData {
+  summary: {
+    totalMeetings: number
+    completedTasks: number
+    pendingTasks: number
+    totalEmployees: number
+  }
+  sentiment?: ReportSentiment
+  commonIssues?: ReportIssue[]
+  trends?: Record<string, string | number>
+  meetings: ReportMeeting[]
+}
+
 interface ReportsClientProps {
   departments: Department[]
 }
@@ -20,7 +55,7 @@ export function ReportsClient({ departments }: ReportsClientProps) {
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
   const [loading, setLoading] = useState(false)
-  const [reportData, setReportData] = useState<any>(null)
+  const [reportData, setReportData] = useState<ReportData | null>(null)
   const [selectedPreset, setSelectedPreset] = useState<string>('')
 
   const buildQueryParams = () => {
@@ -41,7 +76,6 @@ export function ReportsClient({ departments }: ReportsClientProps) {
       const data = await response.json()
       setReportData(data)
     } catch (error) {
-      console.error('Error generating report:', error)
       toastError('Failed to generate report. Please try again.')
     } finally {
       setLoading(false)
@@ -63,7 +97,6 @@ export function ReportsClient({ departments }: ReportsClientProps) {
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
     } catch (error) {
-      console.error('Error exporting:', error)
       toastError('Failed to export report.')
     }
   }
@@ -373,7 +406,7 @@ export function ReportsClient({ departments }: ReportsClientProps) {
                 Common Issues Identified
               </h3>
               <div className="space-y-3">
-                {reportData.commonIssues.map((issue: any, index: number) => (
+                {reportData.commonIssues.map((issue, index) => (
                   <div
                     key={index}
                     className="flex items-center justify-between p-4 rounded-xl bg-off-white dark:bg-charcoal"
@@ -399,10 +432,10 @@ export function ReportsClient({ departments }: ReportsClientProps) {
             <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-6">
               <h3 className="font-semibold text-dark-gray dark:text-white mb-4">Key Metrics</h3>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                {Object.entries(reportData.trends).map(([key, value]: [string, any]) => (
+                {Object.entries(reportData.trends).map(([key, value]) => (
                   <div key={key} className="p-4 rounded-xl bg-off-white dark:bg-charcoal">
                     <p className="text-sm text-medium-gray mb-1">{key}</p>
-                    <p className="text-xl font-bold text-dark-gray dark:text-white">{value}</p>
+                    <p className="text-xl font-bold text-dark-gray dark:text-white">{String(value)}</p>
                   </div>
                 ))}
               </div>
@@ -416,7 +449,8 @@ export function ReportsClient({ departments }: ReportsClientProps) {
                 Meeting Details ({reportData.meetings.length})
               </h3>
             </div>
-            <div className="overflow-x-auto">
+            {/* Desktop table */}
+            <div className="hidden sm:block overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-off-white dark:border-medium-gray/20 bg-off-white/50 dark:bg-charcoal/50">
@@ -429,7 +463,7 @@ export function ReportsClient({ departments }: ReportsClientProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {reportData.meetings.map((meeting: any) => (
+                  {reportData.meetings.map((meeting) => (
                     <tr
                       key={meeting.id}
                       className="border-b border-off-white/50 dark:border-medium-gray/10 hover:bg-off-white/50 dark:hover:bg-charcoal/50"
@@ -462,6 +496,37 @@ export function ReportsClient({ departments }: ReportsClientProps) {
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile cards */}
+            <div className="sm:hidden divide-y divide-off-white dark:divide-medium-gray/20">
+              {reportData.meetings.map((meeting) => (
+                <div key={meeting.id} className="p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-dark-gray dark:text-white">{meeting.employee}</span>
+                    <span className="text-sm text-medium-gray">
+                      {new Date(meeting.date).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${
+                      meeting.status === 'COMPLETED'
+                        ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                        : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                    }`}>
+                      {meeting.status}
+                    </span>
+                    <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${
+                      meeting.hasFormData
+                        ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                        : 'bg-gray-500/10 text-gray-600 dark:text-gray-400'
+                    }`}>
+                      Form: {meeting.hasFormData ? 'Submitted' : 'Pending'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-medium-gray">{meeting.department} · {meeting.reporter}</p>
+                </div>
+              ))}
             </div>
           </div>
         </div>

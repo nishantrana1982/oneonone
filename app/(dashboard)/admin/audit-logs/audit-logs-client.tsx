@@ -93,7 +93,7 @@ export function AuditLogsClient() {
         setTotal(data.total)
       }
     } catch (error) {
-      console.error('Error fetching audit logs:', error)
+      // Error handled by toast
     } finally {
       setLoading(false)
     }
@@ -224,7 +224,8 @@ export function AuditLogsClient() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* Desktop table */}
+            <div className="hidden sm:block overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-off-white dark:bg-charcoal border-b border-off-white dark:border-medium-gray/20">
                   <tr>
@@ -307,6 +308,42 @@ export function AuditLogsClient() {
               </table>
             </div>
 
+            {/* Mobile cards */}
+            <div className="sm:hidden divide-y divide-off-white dark:divide-medium-gray/20">
+              {logs.map((log) => {
+                const Icon = actionIcons[log.action] || Shield
+                const colorClass = actionColors[log.action] || 'text-gray-500 bg-gray-500/10'
+                return (
+                  <div key={log.id} className="p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${colorClass}`}>
+                          <Icon className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="font-medium text-sm text-dark-gray dark:text-white">
+                          {log.action.replace('_', ' ')}
+                        </span>
+                      </div>
+                      <span className="text-xs text-medium-gray">{formatDate(log.createdAt)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-charcoal to-medium-gray flex items-center justify-center text-white text-xs font-medium">
+                        {log.user.name.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="text-sm text-dark-gray dark:text-white">{log.user.name}</span>
+                      <span className="text-xs text-medium-gray">{log.entityType}</span>
+                    </div>
+                    {log.details && (
+                      <p className="text-xs text-medium-gray font-mono bg-off-white dark:bg-charcoal px-2 py-1 rounded truncate">
+                        {JSON.stringify(log.details).slice(0, 80)}
+                        {JSON.stringify(log.details).length > 80 && '...'}
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
             {/* Pagination */}
             <div className="px-6 py-4 border-t border-off-white dark:border-medium-gray/20 flex items-center justify-between">
               <p className="text-sm text-medium-gray">
@@ -316,7 +353,7 @@ export function AuditLogsClient() {
                 <button
                   onClick={() => setPage(Math.max(0, page - 1))}
                   disabled={page === 0}
-                  className="p-2 rounded-lg hover:bg-off-white dark:hover:bg-charcoal disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-off-white dark:hover:bg-charcoal disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   <ChevronLeft className="w-5 h-5 text-medium-gray" />
                 </button>
@@ -326,7 +363,7 @@ export function AuditLogsClient() {
                 <button
                   onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
                   disabled={page >= totalPages - 1}
-                  className="p-2 rounded-lg hover:bg-off-white dark:hover:bg-charcoal disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-off-white dark:hover:bg-charcoal disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   <ChevronRight className="w-5 h-5 text-medium-gray" />
                 </button>

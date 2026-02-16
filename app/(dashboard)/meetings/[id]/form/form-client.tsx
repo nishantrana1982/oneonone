@@ -48,7 +48,6 @@ export function MeetingFormClient({
         router.refresh()
       }
     } catch (error) {
-      console.error('Error saving form:', error)
       toastError(error instanceof Error ? error.message : 'Failed to save. Please try again.')
     } finally {
       setIsLoading(false)

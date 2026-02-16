@@ -106,7 +106,7 @@ export function SettingsClient() {
         setAvailableModels(data.models)
       }
     } catch (error) {
-      console.error('Error fetching models:', error)
+      // Error handled by toast
     } finally {
       setLoadingModels(false)
     }
@@ -120,7 +120,7 @@ export function SettingsClient() {
         setDataCounts(data)
       }
     } catch (error) {
-      console.error('Error fetching data counts:', error)
+      // Error handled by toast
     }
   }
 
@@ -149,7 +149,6 @@ export function SettingsClient() {
         setMessage({ type: 'error', text: data.error || 'Failed to clear data' })
       }
     } catch (error) {
-      console.error('Error clearing data:', error)
       setMessage({ type: 'error', text: 'Failed to clear data' })
     } finally {
       setClearing(false)
@@ -169,7 +168,6 @@ export function SettingsClient() {
         setMaxRecordingMins(data.maxRecordingMins || 25)
       }
     } catch (error) {
-      console.error('Error fetching settings:', error)
       setMessage({ type: 'error', text: 'Failed to load settings' })
     } finally {
       setLoading(false)
@@ -184,7 +182,7 @@ export function SettingsClient() {
     setMessage(null)
 
     try {
-      let updates: any = {}
+      let updates: Record<string, string | number | null> = {}
 
       if (section === 'openai') {
         updates = {
@@ -242,7 +240,6 @@ export function SettingsClient() {
         else setMessage(errorMsg)
       }
     } catch (error) {
-      console.error('Error saving settings:', error)
       const errorMsg = { type: 'error' as const, text: 'Failed to save settings' }
       if (section === 'openai') setOpenaiMessage(errorMsg)
       else if (section === 'aws') setAwsMessage(errorMsg)
@@ -271,7 +268,6 @@ export function SettingsClient() {
         setOpenaiMessage({ type: 'error', text: data.error })
       }
     } catch (error) {
-      console.error('Error testing OpenAI:', error)
       setOpenaiMessage({ type: 'error', text: 'Failed to test connection' })
     } finally {
       setTesting(false)
@@ -297,7 +293,6 @@ export function SettingsClient() {
         setAwsMessage({ type: 'error', text: data.error })
       }
     } catch (error) {
-      console.error('Error testing S3:', error)
       setAwsMessage({ type: 'error', text: 'Failed to test S3 connection' })
     } finally {
       setTestingS3(false)

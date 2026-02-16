@@ -4,14 +4,16 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Trash2 } from 'lucide-react'
 import { useToast } from '@/components/ui/toast'
+import { useConfirm } from '@/components/ui/confirm-modal'
 
 export function DeleteMeetingButton({ meetingId }: { meetingId: string }) {
   const router = useRouter()
   const { toastError } = useToast()
+  const confirm = useConfirm()
   const [loading, setLoading] = useState(false)
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this meeting? This action cannot be undone.')) {
+    if (!await confirm('Are you sure you want to delete this meeting? This action cannot be undone.', { variant: 'danger' })) {
       return
     }
 
@@ -27,7 +29,6 @@ export function DeleteMeetingButton({ meetingId }: { meetingId: string }) {
       router.push('/meetings')
       router.refresh()
     } catch (e) {
-      console.error(e)
       toastError(e instanceof Error ? e.message : 'Failed to delete meeting. Please try again.')
     } finally {
       setLoading(false)

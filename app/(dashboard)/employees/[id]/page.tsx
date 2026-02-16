@@ -12,12 +12,11 @@ import {
   XCircle,
   Mic,
   TrendingUp,
-  FileText,
-  Clock,
   CheckSquare,
 } from 'lucide-react'
 import { UserRole } from '@prisma/client'
 import { QuarterlySummary } from './quarterly-summary'
+import { MeetingHistoryList } from './meeting-history-list'
 
 export default async function EmployeeDetailPage({
   params,
@@ -364,115 +363,7 @@ export default async function EmployeeDetailPage({
             <p className="text-medium-gray">No meetings yet</p>
           </div>
         ) : (
-          <div className="divide-y divide-off-white dark:divide-medium-gray/20">
-            {meetings.map((meeting) => {
-              const date = new Date(meeting.meetingDate)
-              const isPast = date < now
-              const isMissed =
-                isPast && meeting.status === 'SCHEDULED' && !meeting.checkInPersonal
-              const hasRecording =
-                meeting.recording && meeting.recording.status === 'COMPLETED'
-              const sentiment = hasRecording
-                ? (meeting.recording!.sentiment as { label?: string } | null)?.label
-                : null
-              const quality = hasRecording ? meeting.recording!.qualityScore : null
-
-              return (
-                <Link
-                  key={meeting.id}
-                  href={`/meetings/${meeting.id}`}
-                  className="block px-4 sm:px-6 py-3 sm:py-4 hover:bg-off-white/50 dark:hover:bg-charcoal/50 active:bg-off-white dark:active:bg-charcoal transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    {/* Status icon */}
-                    <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                        meeting.status === 'COMPLETED'
-                          ? 'bg-green-500/10'
-                          : isMissed
-                            ? 'bg-red-500/10'
-                            : 'bg-blue-500/10'
-                      }`}
-                    >
-                      {meeting.status === 'COMPLETED' ? (
-                        <CheckCircle2 className="w-5 h-5 text-green-500" />
-                      ) : isMissed ? (
-                        <XCircle className="w-5 h-5 text-red-500" />
-                      ) : (
-                        <Clock className="w-5 h-5 text-blue-500" />
-                      )}
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-medium text-sm text-dark-gray dark:text-white">
-                          {date.toLocaleDateString('en-US', {
-                            weekday: 'short',
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric',
-                          })}
-                        </p>
-                        {hasRecording && (
-                          <Mic className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />
-                        )}
-                      </div>
-                      <p className="text-xs text-medium-gray">
-                        with {meeting.reporter.name}
-                      </p>
-                    </div>
-
-                    {/* Badges */}
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {sentiment && (
-                        <span
-                          className={`hidden sm:inline px-2 py-0.5 text-[10px] font-medium rounded-full ${
-                            sentiment === 'positive'
-                              ? 'bg-green-500/10 text-green-600 dark:text-green-400'
-                              : sentiment === 'negative'
-                                ? 'bg-red-500/10 text-red-600 dark:text-red-400'
-                                : 'bg-gray-500/10 text-gray-600 dark:text-gray-400'
-                          }`}
-                        >
-                          {sentiment}
-                        </span>
-                      )}
-                      {quality !== null && (
-                        <span className="hidden sm:inline px-2 py-0.5 text-[10px] font-medium rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                          Q:{quality}
-                        </span>
-                      )}
-                      <span
-                        className={`px-2 py-0.5 text-[10px] sm:text-xs font-medium rounded-full ${
-                          meeting.status === 'COMPLETED'
-                            ? 'bg-green-500/10 text-green-600 dark:text-green-400'
-                            : isMissed
-                              ? 'bg-red-500/10 text-red-600 dark:text-red-400'
-                              : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                        }`}
-                      >
-                        {meeting.status === 'COMPLETED'
-                          ? 'Completed'
-                          : isMissed
-                            ? 'Missed'
-                            : 'Scheduled'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Recording summary (if exists) */}
-                  {hasRecording && meeting.recording!.summary && (
-                    <div className="mt-2 ml-13 pl-[52px]">
-                      <p className="text-xs text-medium-gray line-clamp-2">
-                        {meeting.recording!.summary}
-                      </p>
-                    </div>
-                  )}
-                </Link>
-              )
-            })}
-          </div>
+          <MeetingHistoryList meetings={meetings} />
         )}
       </div>
 
@@ -533,7 +424,7 @@ export default async function EmployeeDetailPage({
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <span
-                      className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${
+                      className={`px-2 py-0.5 text-xs font-medium rounded-full ${
                         todo.priority === 'HIGH'
                           ? 'bg-red-500/10 text-red-500'
                           : todo.priority === 'MEDIUM'
@@ -544,7 +435,7 @@ export default async function EmployeeDetailPage({
                       {todo.priority}
                     </span>
                     <span
-                      className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${
+                      className={`px-2 py-0.5 text-xs font-medium rounded-full ${
                         todo.status === 'DONE'
                           ? 'bg-green-500/10 text-green-600'
                           : todo.status === 'IN_PROGRESS'

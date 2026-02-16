@@ -75,7 +75,6 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
       const meeting = await response.json()
       router.push(`/meetings/${meeting.id}`)
     } catch (error) {
-      console.error('Error creating meeting:', error)
       toastError(error instanceof Error ? error.message : 'Failed to create meeting. Please try again.')
     } finally {
       setIsLoading(false)

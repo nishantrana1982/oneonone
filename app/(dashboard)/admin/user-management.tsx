@@ -155,7 +155,6 @@ export function UserManagement({ users, departments, reporters }: UserManagement
       closeModal()
       router.refresh()
     } catch (error) {
-      console.error('Error saving user:', error)
       toastError(error instanceof Error ? error.message : 'Failed to save user')
     } finally {
       setIsLoading(false)
@@ -225,7 +224,8 @@ export function UserManagement({ users, departments, reporters }: UserManagement
         <div className="px-6 py-4 border-b border-off-white dark:border-medium-gray/20">
           <h2 className="font-semibold text-dark-gray dark:text-white">All Users</h2>
         </div>
-        <div className="overflow-x-auto">
+        {/* Desktop table */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-off-white dark:border-medium-gray/20 bg-off-white/50 dark:bg-charcoal/50">
@@ -329,7 +329,7 @@ export function UserManagement({ users, departments, reporters }: UserManagement
                   <td className="py-4 px-6">
                     <button
                       onClick={() => openEditModal(user)}
-                      className="p-2 hover:bg-off-white dark:hover:bg-charcoal rounded-lg transition-colors"
+                      className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-off-white dark:hover:bg-charcoal rounded-lg transition-colors"
                     >
                       <Edit2 className="w-4 h-4 text-medium-gray" />
                     </button>
@@ -339,13 +339,59 @@ export function UserManagement({ users, departments, reporters }: UserManagement
             </tbody>
           </table>
         </div>
+
+        {/* Mobile cards */}
+        <div className="sm:hidden divide-y divide-off-white dark:divide-medium-gray/20">
+          {sortedUsers.map((user) => (
+            <div key={user.id} className="p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange/20 to-orange/10 flex items-center justify-center">
+                    <span className="text-xs font-medium text-orange">
+                      {user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-dark-gray dark:text-white">{user.name}</span>
+                    <span className={`ml-2 px-2 py-0.5 text-xs font-medium rounded-full ${
+                      user.role === 'SUPER_ADMIN'
+                        ? 'bg-orange/10 text-orange'
+                        : user.role === 'REPORTER'
+                        ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                        : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                    }`}>
+                      {user.role.replace('_', ' ')}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => openEditModal(user)}
+                  className="p-2 hover:bg-off-white dark:hover:bg-charcoal rounded-lg transition-colors"
+                >
+                  <Edit2 className="w-4 h-4 text-medium-gray" />
+                </button>
+              </div>
+              <p className="text-sm text-medium-gray">{user.email}</p>
+              <div className="flex items-center gap-3 text-sm">
+                <span className="text-medium-gray">{user.department?.name || 'No department'}</span>
+                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                  user.isActive
+                    ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                    : 'bg-red-500/10 text-red-600 dark:text-red-400'
+                }`}>
+                  {user.isActive ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Modal */}
       {isAddOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeModal} />
-          <div className="relative w-full max-w-lg rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 shadow-2xl">
+          <div className="relative w-full max-w-lg max-w-[95vw] rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 shadow-2xl">
             <div className="flex items-center justify-between px-6 py-4 border-b border-off-white dark:border-medium-gray/20">
               <h2 className="text-lg font-semibold text-dark-gray dark:text-white">
                 {editingUser ? 'Edit User' : 'Add New User'}
@@ -355,7 +401,7 @@ export function UserManagement({ users, departments, reporters }: UserManagement
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[85vh] overflow-y-auto">
               <div>
                 <label className="block text-sm font-medium text-dark-gray dark:text-white mb-1">
                   Full Name *

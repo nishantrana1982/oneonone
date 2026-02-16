@@ -129,7 +129,7 @@ export default async function EmployeesPage() {
               <Link
                 key={person.id}
                 href={`/employees/${person.id}`}
-                className="flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4 hover:bg-off-white/50 dark:hover:bg-charcoal/50 active:bg-off-white dark:active:bg-charcoal transition-colors"
+                className="flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4 hover:bg-off-white/50 dark:hover:bg-charcoal/50 active:bg-off-white dark:active:bg-charcoal active:scale-[0.98] transition-colors"
               >
                 {/* Avatar */}
                 <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-off-white dark:bg-dark-gray flex items-center justify-center flex-shrink-0">
@@ -149,7 +149,7 @@ export default async function EmployeesPage() {
                       {person.name}
                     </p>
                     {person.role === UserRole.REPORTER && (
-                      <span className="px-1.5 py-0.5 text-[10px] font-medium bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-full flex-shrink-0">
+                      <span className="px-1.5 py-0.5 text-xs font-medium bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-full flex-shrink-0">
                         Reporter
                       </span>
                     )}
@@ -177,7 +177,7 @@ export default async function EmployeesPage() {
                 </div>
 
                 {/* Mobile compact stats */}
-                <div className="flex sm:hidden items-center gap-2 text-[10px] text-medium-gray flex-shrink-0">
+                <div className="flex sm:hidden items-center gap-2 text-xs text-medium-gray flex-shrink-0">
                   <span className="text-green-500 font-medium">{person.completed}</span>
                   <span>/</span>
                   <span className="text-red-500 font-medium">{person.missed}</span>

@@ -114,7 +114,7 @@ export default async function DashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <Link href="/meetings">
+        <Link href="/meetings" aria-label="View upcoming meetings">
           <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-4 sm:p-5 hover:border-blue-500/30 transition-colors active:scale-[0.98]">
             <div className="flex items-center gap-3 sm:gap-4">
               <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
@@ -128,7 +128,7 @@ export default async function DashboardPage() {
           </div>
         </Link>
 
-        <Link href="/todos">
+        <Link href="/todos" aria-label="View pending tasks">
           <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-4 sm:p-5 hover:border-amber-500/30 transition-colors active:scale-[0.98]">
             <div className="flex items-center gap-3 sm:gap-4">
               <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
@@ -155,7 +155,7 @@ export default async function DashboardPage() {
         </div>
 
         {(user.role === UserRole.REPORTER || user.role === UserRole.SUPER_ADMIN) && (
-          <Link href="/employees">
+          <Link href="/employees" aria-label="View team members">
             <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-4 sm:p-5 hover:border-medium-gray/50 transition-colors active:scale-[0.98]">
               <div className="flex items-center gap-3 sm:gap-4">
                 <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-off-white dark:bg-dark-gray flex items-center justify-center flex-shrink-0">
@@ -197,7 +197,7 @@ export default async function DashboardPage() {
                 <Link 
                   key={meeting.id} 
                   href={`/meetings/${meeting.id}`} 
-                  className="flex items-center gap-4 px-6 py-4 hover:bg-off-white/50 dark:hover:bg-charcoal/50 transition-colors"
+                  className="flex items-center gap-4 px-6 py-4 hover:bg-off-white/50 dark:hover:bg-charcoal/50 transition-colors active:scale-[0.98]"
                 >
                   <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
                     <Calendar className="w-5 h-5 text-blue-500" />
@@ -232,7 +232,8 @@ export default async function DashboardPage() {
             {(user.role === UserRole.REPORTER || user.role === UserRole.SUPER_ADMIN) && (
               <Link 
                 href="/meetings/new" 
-                className="flex items-center gap-4 p-4 rounded-xl hover:bg-off-white/50 dark:hover:bg-charcoal/50 transition-colors group"
+                aria-label="Schedule a new meeting"
+                className="flex items-center gap-4 p-4 rounded-xl hover:bg-off-white/50 dark:hover:bg-charcoal/50 transition-colors group active:scale-[0.98]"
               >
                 <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
                   <Calendar className="w-5 h-5 text-blue-500" />
@@ -247,7 +248,8 @@ export default async function DashboardPage() {
 
             <Link 
               href="/todos" 
-              className="flex items-center gap-4 p-4 rounded-xl hover:bg-off-white/50 dark:hover:bg-charcoal/50 transition-colors group"
+              aria-label="View your pending to-dos"
+              className="flex items-center gap-4 p-4 rounded-xl hover:bg-off-white/50 dark:hover:bg-charcoal/50 transition-colors group active:scale-[0.98]"
             >
               <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
                 <CheckSquare className="w-5 h-5 text-amber-500" />
@@ -262,7 +264,8 @@ export default async function DashboardPage() {
             {(user.role === UserRole.REPORTER || user.role === UserRole.SUPER_ADMIN) && (
               <Link 
                 href="/reports" 
-                className="flex items-center gap-4 p-4 rounded-xl hover:bg-off-white/50 dark:hover:bg-charcoal/50 transition-colors group"
+                aria-label="View team reports and analytics"
+                className="flex items-center gap-4 p-4 rounded-xl hover:bg-off-white/50 dark:hover:bg-charcoal/50 transition-colors group active:scale-[0.98]"
               >
                 <div className="w-10 h-10 rounded-xl bg-off-white dark:bg-dark-gray flex items-center justify-center">
                   <TrendingUp className="w-5 h-5 text-dark-gray dark:text-white" />
