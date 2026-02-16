@@ -2,7 +2,17 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Mic, MicOff, Square, Loader2, CheckCircle2, AlertCircle, Play, Pause, RefreshCw, Globe } from 'lucide-react'
+import {
+  Mic,
+  Square,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  Play,
+  Pause,
+  RefreshCw,
+  Globe,
+} from 'lucide-react'
 
 interface MeetingRecorderProps {
   meetingId: string
@@ -12,17 +22,13 @@ interface MeetingRecorderProps {
 }
 
 const PROCESSING_STAGES = [
-  { status: 'UPLOADING', label: 'Uploading audio...', progress: 10 },
+  { status: 'UPLOADING', label: 'Uploading audio to S3...', progress: 10 },
   { status: 'UPLOADED', label: 'Preparing for transcription...', progress: 25 },
   { status: 'TRANSCRIBING', label: 'Transcribing audio...', progress: 50 },
   { status: 'ANALYZING', label: 'Analyzing transcript...', progress: 80 },
   { status: 'COMPLETED', label: 'Complete!', progress: 100 },
 ]
 
-// Language options for transcription (ISO-639-1 codes)
-// Note: Some languages are not explicitly supported by OpenAI's API and will use auto-detection
-// Supported by API: en, hi, mr, ta, te, kn, ml, bn, pa, ur
-// Auto-detect fallback: gu (Gujarati)
 const LANGUAGE_OPTIONS = [
   { code: 'auto', label: 'Auto-detect' },
   { code: 'en', label: 'English' },
@@ -38,77 +44,82 @@ const LANGUAGE_OPTIONS = [
   { code: 'ur', label: 'Urdu (اردو)' },
 ]
 
-export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStatus: initialStatus, errorMessage: initialError }: MeetingRecorderProps) {
+export function MeetingRecorder({
+  meetingId,
+  hasExistingRecording,
+  recordingStatus: initialStatus,
+  errorMessage: initialError,
+}: MeetingRecorderProps) {
   const router = useRouter()
+
+  // Recording state
   const [isRecording, setIsRecording] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
-  const [isUploading, setIsUploading] = useState(false)
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
-  const [selectedLanguage, setSelectedLanguage] = useState('auto') // ISO-639-1 code
-  
-  // Processing status state
+  const [selectedLanguage, setSelectedLanguage] = useState('auto')
+
+  // Upload/processing state
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [currentStatus, setCurrentStatus] = useState(initialStatus)
   const [currentError, setCurrentError] = useState(initialError)
-  const [isPolling, setIsPolling] = useState(false)
-  
-  // Track if we've started uploading this session (fixes UI not updating after submit)
-  const [hasStartedUpload, setHasStartedUpload] = useState(false)
-  
+  const [didStartUpload, setDidStartUpload] = useState(false)
+
+  // Refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
-  const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const pollingRef = useRef<NodeJS.Timeout | null>(null)
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const MAX_DURATION = 25 * 60 // 25 minutes in seconds
+  const MAX_DURATION = 25 * 60
 
-  // Get current progress info
-  const getCurrentProgress = useCallback(() => {
-    const stage = PROCESSING_STAGES.find(s => s.status === currentStatus)
-    return stage || { status: currentStatus, label: 'Processing...', progress: 0 }
+  // --- helpers ---
+  const formatTime = (s: number) =>
+    `${Math.floor(s / 60)
+      .toString()
+      .padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`
+
+  const getProgress = useCallback(() => {
+    return (
+      PROCESSING_STAGES.find((s) => s.status === currentStatus) ?? {
+        status: currentStatus,
+        label: 'Processing...',
+        progress: 0,
+      }
+    )
   }, [currentStatus])
 
-  // Poll for status updates
+  // --- polling ---
   const pollStatus = useCallback(async () => {
     try {
-      const response = await fetch(`/api/meetings/${meetingId}/recording`)
-      if (response.ok) {
-        const data = await response.json()
-        if (data.recording) {
-          setCurrentStatus(data.recording.status)
-          setCurrentError(data.recording.errorMessage)
-          
-          // Stop polling if completed or failed
-          if (data.recording.status === 'COMPLETED' || data.recording.status === 'FAILED') {
-            setIsPolling(false)
-            if (pollingRef.current) {
-              clearInterval(pollingRef.current)
-              pollingRef.current = null
-            }
-            // Refresh the page to show results
-            if (data.recording.status === 'COMPLETED') {
-              router.refresh()
-            }
-          }
+      const res = await fetch(`/api/meetings/${meetingId}/recording`)
+      if (!res.ok) return
+      const data = await res.json()
+      const rec = data.recording
+      if (!rec) return
+      setCurrentStatus(rec.status)
+      setCurrentError(rec.errorMessage)
+      if (rec.status === 'COMPLETED' || rec.status === 'FAILED') {
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current)
+          pollingRef.current = null
         }
+        if (rec.status === 'COMPLETED') router.refresh()
       }
-    } catch (err) {
-      console.error('Error polling status:', err)
+    } catch {
+      // ignore polling errors
     }
   }, [meetingId, router])
 
-  // Start polling when processing starts
   useEffect(() => {
-    const isProcessingStatus = ['UPLOADING', 'UPLOADED', 'TRANSCRIBING', 'ANALYZING'].includes(currentStatus || '')
-    
-    if (isProcessingStatus && !pollingRef.current) {
-      setIsPolling(true)
-      pollingRef.current = setInterval(pollStatus, 2000) // Poll every 2 seconds
+    const shouldPoll = ['UPLOADING', 'UPLOADED', 'TRANSCRIBING', 'ANALYZING'].includes(
+      currentStatus ?? ''
+    )
+    if (shouldPoll && !pollingRef.current) {
+      pollingRef.current = setInterval(pollStatus, 3000)
     }
-    
     return () => {
       if (pollingRef.current) {
         clearInterval(pollingRef.current)
@@ -117,245 +128,67 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
     }
   }, [currentStatus, pollStatus])
 
+  // cleanup on unmount
   useEffect(() => {
     return () => {
-      // Cleanup on unmount
       if (timerRef.current) clearInterval(timerRef.current)
       if (pollingRef.current) clearInterval(pollingRef.current)
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop())
-      }
+      if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop())
     }
   }, [])
 
+  // auto-stop at max
   useEffect(() => {
-    // Auto-stop at 25 minutes
-    if (recordingTime >= MAX_DURATION && isRecording) {
-      stopRecording()
-    }
+    if (recordingTime >= MAX_DURATION && isRecording) stopRecording()
   }, [recordingTime, isRecording])
 
+  // --- recording controls ---
   const startRecording = async () => {
     try {
-      setError(null)
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          sampleRate: 44100,
-        } 
+      setSubmitError(null)
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 44100 },
       })
-      
       streamRef.current = stream
       chunksRef.current = []
 
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus',
-      })
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunksRef.current.push(e.data)
-        }
+      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' })
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data)
       }
-
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
-        setAudioBlob(blob)
+      recorder.onstop = () => {
+        setAudioBlob(new Blob(chunksRef.current, { type: 'audio/webm' }))
       }
-
-      mediaRecorderRef.current = mediaRecorder
-      mediaRecorder.start(1000) // Collect data every second
+      mediaRecorderRef.current = recorder
+      recorder.start(1000)
 
       setIsRecording(true)
       setRecordingTime(0)
-
-      timerRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1)
-      }, 1000)
-    } catch (err) {
-      console.error('Error starting recording:', err)
-      setError('Could not access microphone. Please grant permission.')
+      timerRef.current = setInterval(() => setRecordingTime((t) => t + 1), 1000)
+    } catch {
+      setSubmitError('Could not access microphone. Please grant permission and try again.')
     }
   }
 
   const pauseRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      if (isPaused) {
-        mediaRecorderRef.current.resume()
-        timerRef.current = setInterval(() => {
-          setRecordingTime(prev => prev + 1)
-        }, 1000)
-      } else {
-        mediaRecorderRef.current.pause()
-        if (timerRef.current) clearInterval(timerRef.current)
-      }
-      setIsPaused(!isPaused)
+    if (!mediaRecorderRef.current || !isRecording) return
+    if (isPaused) {
+      mediaRecorderRef.current.resume()
+      timerRef.current = setInterval(() => setRecordingTime((t) => t + 1), 1000)
+    } else {
+      mediaRecorderRef.current.pause()
+      if (timerRef.current) clearInterval(timerRef.current)
     }
+    setIsPaused(!isPaused)
   }
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop()
-      if (timerRef.current) clearInterval(timerRef.current)
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop())
-      }
-      setIsRecording(false)
-      setIsPaused(false)
-    }
-  }
-
-  const uploadRecording = async () => {
-    if (!audioBlob) return
-
-    setIsUploading(true)
-    setError(null)
-    setCurrentStatus('UPLOADING')
-    setHasStartedUpload(true) // Track that we've started uploading this session
-
-    try {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meeting-recorder.tsx:uploadRecording',message:'Before presign',data:{meetingId,blobSize:audioBlob.size,duration:recordingTime},timestamp:Date.now(),hypothesisId:'A,D'})}).catch(()=>{});
-      // #endregion
-      // Get presigned URL or check if using local storage
-      const presignResponse = await fetch(`/api/meetings/${meetingId}/recording/presign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contentType: 'audio/webm',
-          duration: recordingTime,
-          fileSize: audioBlob.size,
-        }),
-      })
-
-      if (!presignResponse.ok) {
-        const errorData = await presignResponse.json().catch(() => ({}))
-        throw new Error(errorData.error || 'Failed to get upload URL')
-      }
-      
-      const { uploadUrl, key, useLocalUpload } = await presignResponse.json()
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meeting-recorder.tsx:presignDone',message:'Presign response',data:{useLocalUpload,hasKey:!!key},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-
-      if (useLocalUpload) {
-        // Upload directly to server (local storage) with timeout so we don't hang forever
-        console.log('Using local storage upload')
-        const formData = new FormData()
-        formData.append('file', audioBlob, 'recording.webm')
-        formData.append('duration', recordingTime.toString())
-
-        const uploadTimeoutMs = 25 * 60 * 1000 // 25 minutes for long recordings
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), uploadTimeoutMs)
-
-        let localUploadResponse: Response
-        try {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meeting-recorder.tsx:beforeUpload',message:'Before upload fetch',data:{blobSize:audioBlob.size},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
-          // #endregion
-          localUploadResponse = await fetch(`/api/meetings/${meetingId}/recording/upload`, {
-            method: 'POST',
-            body: formData,
-            signal: controller.signal,
-          })
-        } catch (uploadErr: unknown) {
-          clearTimeout(timeoutId)
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meeting-recorder.tsx:uploadCatch',message:'Upload fetch threw',data:{name:uploadErr instanceof Error?uploadErr.name:'',message:uploadErr instanceof Error?uploadErr.message:''},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
-          // #endregion
-          if (uploadErr instanceof Error && uploadErr.name === 'AbortError') {
-            throw new Error('Upload timed out. The recording may be too large or the connection is slow. Try a shorter recording.')
-          }
-          throw uploadErr
-        }
-        clearTimeout(timeoutId)
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meeting-recorder.tsx:uploadResponse',message:'Upload response',data:{ok:localUploadResponse.ok,status:localUploadResponse.status},timestamp:Date.now(),hypothesisId:'A,D'})}).catch(()=>{});
-        // #endregion
-        if (!localUploadResponse.ok) {
-          const errorData = await localUploadResponse.json().catch(() => ({}))
-          const msg = errorData.detail || errorData.error || 'Failed to upload file'
-          throw new Error(msg)
-        }
-        
-        const localData = await localUploadResponse.json()
-        setCurrentStatus('UPLOADED')
-        
-        // Start processing with language hint
-        setIsProcessing(true)
-        const processResponse = await fetch(`/api/meetings/${meetingId}/recording/process`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            key: localData.key, 
-            duration: recordingTime,
-            language: selectedLanguage !== 'auto' ? selectedLanguage : undefined,
-          }),
-        })
-
-        if (!processResponse.ok) {
-          const errorData = await processResponse.json().catch(() => ({}))
-          throw new Error(errorData.error || 'Failed to start processing')
-        }
-      } else {
-        // Upload to S3 using XMLHttpRequest
-        console.log('Using S3 upload')
-        await new Promise<void>((resolve, reject) => {
-          const xhr = new XMLHttpRequest()
-          xhr.open('PUT', uploadUrl, true)
-          xhr.setRequestHeader('Content-Type', 'audio/webm')
-          xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              resolve()
-            } else {
-              reject(new Error(`Upload failed (${xhr.status}). Check S3 bucket CORS and permissions.`))
-            }
-          }
-          xhr.onerror = () => reject(new Error('Network error during upload. Try again.'))
-          xhr.send(audioBlob)
-        })
-
-        setCurrentStatus('UPLOADED')
-
-        // Confirm upload and start processing with language hint
-        setIsProcessing(true)
-        const processResponse = await fetch(`/api/meetings/${meetingId}/recording/process`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            key, 
-            duration: recordingTime,
-            language: selectedLanguage !== 'auto' ? selectedLanguage : undefined,
-          }),
-        })
-
-        if (!processResponse.ok) {
-          const errorData = await processResponse.json().catch(() => ({}))
-          throw new Error(errorData.error || 'Failed to start processing')
-        }
-      }
-
-      // Clear audio blob and start polling for status
-      setAudioBlob(null)
-      setRecordingTime(0)
-      setCurrentStatus('TRANSCRIBING')
-      
-      // Polling will be started by useEffect watching currentStatus
-
-    } catch (err) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/3586127d-afb9-4fd9-8176-bb1ac89ea454',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'meeting-recorder.tsx:uploadError',message:'Upload error',data:{message:err instanceof Error?err.message:'',name:err instanceof Error?err.name:''},timestamp:Date.now(),hypothesisId:'A,D'})}).catch(()=>{});
-      // #endregion
-      console.error('Error uploading recording:', err)
-      setError(err instanceof Error ? err.message : 'Failed to upload recording')
-      setCurrentStatus('FAILED')
-      setCurrentError(err instanceof Error ? err.message : 'Failed to upload recording')
-    } finally {
-      setIsUploading(false)
-      setIsProcessing(false)
-    }
+    if (!mediaRecorderRef.current || !isRecording) return
+    mediaRecorderRef.current.stop()
+    if (timerRef.current) clearInterval(timerRef.current)
+    if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop())
+    setIsRecording(false)
+    setIsPaused(false)
   }
 
   const discardRecording = () => {
@@ -364,21 +197,99 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
     chunksRef.current = []
   }
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  // --- upload (single path: FormData → server → S3) ---
+  const submitRecording = async () => {
+    if (!audioBlob) return
+    setIsSubmitting(true)
+    setSubmitError(null)
+    setCurrentStatus('UPLOADING')
+    setDidStartUpload(true)
+
+    try {
+      // Step 1: Upload file to server (server forwards to S3)
+      const form = new FormData()
+      form.append('file', audioBlob, 'recording.webm')
+      form.append('duration', recordingTime.toString())
+
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 25 * 60 * 1000)
+
+      let uploadRes: Response
+      try {
+        uploadRes = await fetch(`/api/meetings/${meetingId}/recording/upload`, {
+          method: 'POST',
+          body: form,
+          signal: controller.signal,
+        })
+      } catch (fetchErr: unknown) {
+        clearTimeout(timeout)
+        if (fetchErr instanceof Error && fetchErr.name === 'AbortError') {
+          throw new Error('Upload timed out. Try a shorter recording or check your connection.')
+        }
+        throw new Error('Network error during upload. Please check your connection and try again.')
+      }
+      clearTimeout(timeout)
+
+      if (!uploadRes.ok) {
+        const body = await uploadRes.json().catch(() => ({}))
+        throw new Error(body.detail || body.error || `Upload failed (${uploadRes.status})`)
+      }
+
+      const uploadData = await uploadRes.json()
+      setCurrentStatus('UPLOADED')
+
+      // Step 2: Kick off processing (transcription + analysis)
+      const processRes = await fetch(`/api/meetings/${meetingId}/recording/process`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: uploadData.key,
+          duration: recordingTime,
+          language: selectedLanguage !== 'auto' ? selectedLanguage : undefined,
+        }),
+      })
+
+      if (!processRes.ok) {
+        const body = await processRes.json().catch(() => ({}))
+        throw new Error(body.error || 'Failed to start transcription')
+      }
+
+      // Success → clear blob, start polling
+      setAudioBlob(null)
+      setRecordingTime(0)
+      setCurrentStatus('TRANSCRIBING')
+    } catch (err) {
+      console.error('Recording upload error:', err)
+      const msg = err instanceof Error ? err.message : 'Upload failed'
+      setSubmitError(msg)
+      setCurrentStatus('FAILED')
+      setCurrentError(msg)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  const remainingTime = MAX_DURATION - recordingTime
+  // --- retry after failure ---
+  const handleRetry = async () => {
+    try {
+      await fetch(`/api/meetings/${meetingId}/recording`, { method: 'DELETE' })
+    } catch {
+      // ignore
+    }
+    setCurrentStatus(undefined)
+    setCurrentError(null)
+    setSubmitError(null)
+    setDidStartUpload(false)
+    router.refresh()
+  }
 
-  // If already has a recording and it's being processed
-  // Also check hasStartedUpload to show processing UI after upload starts (before page refresh)
-  const isProcessingStatus = ['UPLOADING', 'UPLOADED', 'TRANSCRIBING', 'ANALYZING'].includes(currentStatus || '')
-  
-  if ((hasExistingRecording || hasStartedUpload) && isProcessingStatus) {
-    const progress = getCurrentProgress()
-    
+  // --- render: processing ---
+  const isProcessing = ['UPLOADING', 'UPLOADED', 'TRANSCRIBING', 'ANALYZING'].includes(
+    currentStatus ?? ''
+  )
+
+  if ((hasExistingRecording || didStartUpload) && isProcessing) {
+    const progress = getProgress()
     return (
       <div className="rounded-2xl bg-blue-500/5 border border-blue-500/20 p-6 space-y-4">
         <div className="flex items-center gap-4">
@@ -389,61 +300,56 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
             <p className="font-medium text-dark-gray dark:text-white">Processing Recording</p>
             <p className="text-sm text-medium-gray">{progress.label}</p>
           </div>
-          <div className="text-right">
-            <p className="text-2xl font-bold text-blue-500">{progress.progress}%</p>
-          </div>
+          <p className="text-2xl font-bold text-blue-500">{progress.progress}%</p>
         </div>
-        
-        {/* Progress Bar */}
-        <div className="space-y-2">
-          <div className="w-full h-3 bg-blue-500/10 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-blue-500 rounded-full transition-all duration-500 ease-out"
-              style={{ width: `${progress.progress}%` }}
-            />
-          </div>
-          
-          {/* Stage Indicators */}
-          <div className="flex justify-between text-xs">
-            {PROCESSING_STAGES.slice(0, 4).map((stage, i) => {
-              const isActive = currentStatus === stage.status
-              const isPast = PROCESSING_STAGES.findIndex(s => s.status === currentStatus) > i
-              return (
-                <div 
-                  key={stage.status}
-                  className={`flex items-center gap-1 ${
-                    isActive ? 'text-blue-500 font-medium' : 
-                    isPast ? 'text-green-500' : 'text-medium-gray'
-                  }`}
-                >
-                  {isPast ? (
-                    <CheckCircle2 className="w-3 h-3" />
-                  ) : isActive ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <div className="w-3 h-3 rounded-full border border-current" />
-                  )}
-                  <span className="hidden sm:inline">
-                    {stage.status === 'UPLOADING' && 'Upload'}
-                    {stage.status === 'UPLOADED' && 'Prepare'}
-                    {stage.status === 'TRANSCRIBING' && 'Transcribe'}
-                    {stage.status === 'ANALYZING' && 'Analyze'}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
+        <div className="w-full h-3 bg-blue-500/10 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-blue-500 rounded-full transition-all duration-500 ease-out"
+            style={{ width: `${progress.progress}%` }}
+          />
         </div>
-        
+        <div className="flex justify-between text-xs">
+          {PROCESSING_STAGES.slice(0, 4).map((stage, i) => {
+            const active = currentStatus === stage.status
+            const past =
+              PROCESSING_STAGES.findIndex((s) => s.status === currentStatus) > i
+            return (
+              <div
+                key={stage.status}
+                className={`flex items-center gap-1 ${
+                  active
+                    ? 'text-blue-500 font-medium'
+                    : past
+                      ? 'text-green-500'
+                      : 'text-medium-gray'
+                }`}
+              >
+                {past ? (
+                  <CheckCircle2 className="w-3 h-3" />
+                ) : active ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <div className="w-3 h-3 rounded-full border border-current" />
+                )}
+                <span className="hidden sm:inline">
+                  {stage.status === 'UPLOADING' && 'Upload'}
+                  {stage.status === 'UPLOADED' && 'Prepare'}
+                  {stage.status === 'TRANSCRIBING' && 'Transcribe'}
+                  {stage.status === 'ANALYZING' && 'Analyze'}
+                </span>
+              </div>
+            )
+          })}
+        </div>
         <p className="text-xs text-medium-gray text-center">
-          This may take 1-3 minutes depending on the recording length
+          This may take 1–3 minutes depending on the recording length
         </p>
       </div>
     )
   }
 
-  // If has a completed recording
-  if ((hasExistingRecording || hasStartedUpload) && currentStatus === 'COMPLETED') {
+  // --- render: completed ---
+  if ((hasExistingRecording || didStartUpload) && currentStatus === 'COMPLETED') {
     return (
       <div className="rounded-2xl bg-green-500/5 border border-green-500/20 p-6">
         <div className="flex items-center gap-4">
@@ -459,18 +365,8 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
     )
   }
 
-  // If has a failed recording
-  if ((hasExistingRecording || hasStartedUpload) && currentStatus === 'FAILED') {
-    const handleRetry = async () => {
-      // Delete the failed recording and allow re-recording
-      try {
-        await fetch(`/api/meetings/${meetingId}/recording`, { method: 'DELETE' })
-        router.refresh()
-      } catch (err) {
-        console.error('Error deleting failed recording:', err)
-      }
-    }
-    
+  // --- render: failed ---
+  if ((hasExistingRecording || didStartUpload) && currentStatus === 'FAILED') {
     return (
       <div className="rounded-2xl bg-red-500/5 border border-red-500/20 p-6">
         <div className="flex items-center justify-between">
@@ -481,11 +377,16 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
             <div>
               <p className="font-medium text-dark-gray dark:text-white">Recording Failed</p>
               <p className="text-sm text-medium-gray">
-                {currentError || 'There was an error processing the recording'}
+                {currentError || 'An error occurred while processing'}
               </p>
               {currentError?.includes('API key') && (
                 <p className="text-xs text-red-400 mt-1">
                   Please configure the OpenAI API key in Admin → Settings
+                </p>
+              )}
+              {currentError?.includes('S3') && (
+                <p className="text-xs text-red-400 mt-1">
+                  Please configure AWS S3 in Admin → Settings → Recording Storage
                 </p>
               )}
             </div>
@@ -502,6 +403,7 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
     )
   }
 
+  // --- render: default (record / preview / submit) ---
   return (
     <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-6">
       <div className="flex items-center justify-between mb-4">
@@ -514,9 +416,9 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
         )}
       </div>
 
-      {error && (
+      {submitError && (
         <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
-          <p className="text-sm text-red-500">{error}</p>
+          <p className="text-sm text-red-500">{submitError}</p>
         </div>
       )}
 
@@ -525,24 +427,25 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
         <div className="space-y-4">
           <div className="flex items-center justify-center gap-6">
             <div className="text-center">
-              <div className={`w-4 h-4 rounded-full mx-auto mb-2 ${isPaused ? 'bg-yellow-500' : 'bg-red-500 animate-pulse'}`} />
+              <div
+                className={`w-4 h-4 rounded-full mx-auto mb-2 ${
+                  isPaused ? 'bg-yellow-500' : 'bg-red-500 animate-pulse'
+                }`}
+              />
               <p className="text-3xl font-mono font-bold text-dark-gray dark:text-white">
                 {formatTime(recordingTime)}
               </p>
               <p className="text-xs text-medium-gray mt-1">
-                {formatTime(remainingTime)} remaining
+                {formatTime(MAX_DURATION - recordingTime)} remaining
               </p>
             </div>
           </div>
-
-          {/* Recording progress bar */}
           <div className="w-full h-2 bg-off-white dark:bg-charcoal rounded-full overflow-hidden">
-            <div 
+            <div
               className="h-full bg-gradient-to-r from-red-500 to-orange transition-all duration-1000"
               style={{ width: `${(recordingTime / MAX_DURATION) * 100}%` }}
             />
           </div>
-
           <div className="flex items-center justify-center gap-3">
             <button
               onClick={pauseRecording}
@@ -562,45 +465,44 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
         </div>
       )}
 
-      {/* Recording preview */}
+      {/* Preview recorded audio */}
       {!isRecording && audioBlob && (
         <div className="space-y-4">
           <div className="flex items-center justify-center">
             <div className="text-center">
               <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-2" />
-              <p className="text-lg font-medium text-dark-gray dark:text-white">Recording Complete</p>
-              <p className="text-sm text-medium-gray">Duration: {formatTime(recordingTime)}</p>
+              <p className="text-lg font-medium text-dark-gray dark:text-white">
+                Recording Complete
+              </p>
+              <p className="text-sm text-medium-gray">
+                Duration: {formatTime(recordingTime)} &middot;{' '}
+                {(audioBlob.size / 1024 / 1024).toFixed(1)} MB
+              </p>
             </div>
           </div>
-
-          <audio 
-            controls 
-            src={URL.createObjectURL(audioBlob)} 
-            className="w-full"
-          />
-
+          <audio controls src={URL.createObjectURL(audioBlob)} className="w-full" />
           <div className="flex items-center justify-center gap-3">
             <button
               onClick={discardRecording}
-              disabled={isUploading}
+              disabled={isSubmitting}
               className="px-4 py-2 text-sm font-medium text-medium-gray hover:text-red-500 transition-colors disabled:opacity-50"
             >
               Discard
             </button>
             <button
-              onClick={uploadRecording}
-              disabled={isUploading || isProcessing}
+              onClick={submitRecording}
+              disabled={isSubmitting}
               className="flex items-center gap-2 px-6 py-2 text-sm font-medium bg-orange text-white rounded-xl hover:bg-orange/90 disabled:opacity-50 transition-colors"
             >
-              {isUploading || isProcessing ? (
+              {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  {isUploading ? 'Uploading...' : 'Processing...'}
+                  Uploading to S3...
                 </>
               ) : (
                 <>
                   <CheckCircle2 className="w-4 h-4" />
-                  Save & Transcribe
+                  Save &amp; Transcribe
                 </>
               )}
             </button>
@@ -608,10 +510,9 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
         </div>
       )}
 
-      {/* Start recording button */}
+      {/* Start recording */}
       {!isRecording && !audioBlob && (
         <div className="text-center space-y-4">
-          {/* Language selector */}
           <div className="flex items-center justify-center gap-2">
             <Globe className="w-4 h-4 text-medium-gray" />
             <select
@@ -626,7 +527,6 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
               ))}
             </select>
           </div>
-          
           <button
             onClick={startRecording}
             className="inline-flex items-center gap-3 px-8 py-4 text-lg font-medium bg-gradient-to-r from-red-500 to-orange text-white rounded-2xl hover:opacity-90 transition-opacity shadow-lg"
@@ -637,10 +537,9 @@ export function MeetingRecorder({ meetingId, hasExistingRecording, recordingStat
             Start Recording
           </button>
           <p className="text-xs text-medium-gray">
-            {selectedLanguage === 'auto' 
+            {selectedLanguage === 'auto'
               ? 'Language will be auto-detected. Select a specific language for better accuracy.'
-              : `Recording will be transcribed in ${LANGUAGE_OPTIONS.find(l => l.code === selectedLanguage)?.label}`
-            }
+              : `Recording will be transcribed in ${LANGUAGE_OPTIONS.find((l) => l.code === selectedLanguage)?.label}`}
           </p>
         </div>
       )}

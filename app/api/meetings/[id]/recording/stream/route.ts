@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole, canAccessEmployeeData } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
-import { readFromLocalStorage } from '@/lib/s3'
+import { getSignedDownloadUrl, isS3Configured } from '@/lib/s3'
 import { UserRole } from '@prisma/client'
 
-// GET - Stream audio file from local storage (used when S3 is not configured)
+// GET — redirect to S3 signed URL for audio playback
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -21,27 +21,21 @@ export async function GET(
       return new NextResponse('Not Found', { status: 404 })
     }
 
-    const canAccess = canAccessEmployeeData(
-      user.role,
-      user.id,
-      meeting.employeeId,
-      meeting.employee.reportsToId
-    )
-    if (!canAccess) {
+    if (
+      !canAccessEmployeeData(user.role, user.id, meeting.employeeId, meeting.employee.reportsToId)
+    ) {
       return new NextResponse('Forbidden', { status: 403 })
     }
 
-    const buffer = await readFromLocalStorage(meeting.recording.audioKey)
-    const body = new Uint8Array(buffer)
+    const s3Ok = await isS3Configured()
+    if (!s3Ok) {
+      return new NextResponse('S3 not configured', { status: 503 })
+    }
 
-    return new NextResponse(body, {
-      headers: {
-        'Content-Type': 'audio/webm',
-        'Content-Length': String(buffer.length),
-      },
-    })
+    const url = await getSignedDownloadUrl(meeting.recording.audioKey)
+    return NextResponse.redirect(url)
   } catch (error) {
-    console.error('Error streaming recording:', error)
+    console.error('[Recording] Stream error:', error)
     return new NextResponse('Failed to stream recording', { status: 500 })
   }
 }
