@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireRole, getCurrentUser } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { UserRole, RecurringFrequency } from '@prisma/client'
-import { notifyMeetingScheduled } from '@/lib/notifications'
 
 // Get all recurring schedules for the current user
 export async function GET(request: NextRequest) {
@@ -59,7 +58,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if schedule already exists for this employee
-    const existing = await prisma.recurringSchedule.findFirst({
+    const existingForEmployee = await prisma.recurringSchedule.findFirst({
       where: {
         reporterId: user.id,
         employeeId,
@@ -67,9 +66,51 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    if (existing) {
+    if (existingForEmployee) {
       return NextResponse.json(
         { error: 'A recurring schedule already exists for this employee' },
+        { status: 400 }
+      )
+    }
+
+    // Check if reporter already has a schedule at the same day and time (with any employee)
+    const existingAtSameTime = await prisma.recurringSchedule.findFirst({
+      where: {
+        reporterId: user.id,
+        dayOfWeek,
+        timeOfDay,
+        isActive: true,
+      },
+      include: {
+        employee: { select: { name: true } },
+      },
+    })
+
+    if (existingAtSameTime) {
+      const empName = existingAtSameTime.employee?.name || 'another employee'
+      return NextResponse.json(
+        { error: `You already have a recurring schedule at this day and time with ${empName}. Please choose a different time.` },
+        { status: 400 }
+      )
+    }
+
+    // Check if the employee already has a meeting/schedule at the same day and time (with any reporter)
+    const employeeBusyAtSameTime = await prisma.recurringSchedule.findFirst({
+      where: {
+        employeeId,
+        dayOfWeek,
+        timeOfDay,
+        isActive: true,
+      },
+      include: {
+        reporter: { select: { name: true } },
+      },
+    })
+
+    if (employeeBusyAtSameTime) {
+      const employee = await prisma.user.findUnique({ where: { id: employeeId }, select: { name: true } })
+      return NextResponse.json(
+        { error: `${employee?.name || 'This employee'} already has a recurring schedule at this day and time. Please choose a different time.` },
         { status: 400 }
       )
     }
@@ -93,23 +134,47 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Create the first meeting
+    // Create the first meeting as PROPOSED (requires employee acceptance)
     const meeting = await prisma.meeting.create({
       data: {
         employeeId,
         reporterId: user.id,
         meetingDate: nextMeetingDate,
         recurringScheduleId: schedule.id,
+        status: 'PROPOSED',
+        proposedById: user.id,
       },
     })
 
-    // Notify the employee
-    await notifyMeetingScheduled(
-      employeeId,
-      user.name || 'Your manager',
-      nextMeetingDate,
-      meeting.id
-    )
+    // Send proposal email to the employee
+    try {
+      const employee = await prisma.user.findUnique({ where: { id: employeeId }, select: { email: true, name: true } })
+      if (employee) {
+        const { sendMeetingProposalEmail } = await import('@/lib/email')
+        await sendMeetingProposalEmail(
+          employee.email,
+          employee.name,
+          user.name,
+          nextMeetingDate,
+          meeting.id
+        )
+      }
+    } catch (error) {
+      console.error('Failed to send proposal email for recurring schedule:', error)
+    }
+
+    // In-app notification for the employee
+    try {
+      const { notifyMeetingProposed } = await import('@/lib/notifications')
+      await notifyMeetingProposed(
+        employeeId,
+        user.name || 'Your manager',
+        nextMeetingDate,
+        meeting.id
+      )
+    } catch (error) {
+      console.error('Failed to send proposal notification:', error)
+    }
 
     return NextResponse.json({ schedule, meeting })
   } catch (error) {

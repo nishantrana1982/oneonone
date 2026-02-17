@@ -76,6 +76,43 @@ export async function POST(request: NextRequest) {
         ? employee.reportsToId
         : user.id
 
+    // Check for time conflicts (30-minute meeting window)
+    const proposedTime = new Date(meetingDate)
+    const windowStart = new Date(proposedTime.getTime() - 29 * 60 * 1000)
+    const windowEnd = new Date(proposedTime.getTime() + 29 * 60 * 1000)
+    const activeStatuses = ['PROPOSED', 'SCHEDULED']
+
+    const conflictingMeeting = await prisma.meeting.findFirst({
+      where: {
+        OR: [
+          { employeeId, status: { in: activeStatuses } },
+          { reporterId, status: { in: activeStatuses } },
+          { employeeId: reporterId, status: { in: activeStatuses } },
+          { reporterId: employeeId, status: { in: activeStatuses } },
+        ],
+        meetingDate: { gte: windowStart, lte: windowEnd },
+      },
+      include: {
+        employee: { select: { name: true } },
+        reporter: { select: { name: true } },
+      },
+    })
+
+    if (conflictingMeeting) {
+      const otherPerson =
+        conflictingMeeting.employeeId === employeeId
+          ? conflictingMeeting.reporter?.name || 'someone'
+          : conflictingMeeting.employee?.name || 'someone'
+      const conflictWith =
+        conflictingMeeting.employeeId === employeeId || conflictingMeeting.reporterId === employeeId
+          ? employee.name || 'This employee'
+          : 'You'
+      return NextResponse.json(
+        { error: `${conflictWith} already has a meeting with ${otherPerson} at this time. Please choose a different time slot.` },
+        { status: 409 }
+      )
+    }
+
     const meeting = await prisma.meeting.create({
       data: {
         employeeId,
