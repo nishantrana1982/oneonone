@@ -120,11 +120,13 @@ export async function createCalendarEvent(
     }
 
     throw new Error('Failed to create calendar event')
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating calendar event:', error)
     
     // Check if it's an auth error
-    if (error.message?.includes('No Google account') || error.code === 401) {
+    const errMsg = error instanceof Error ? error.message : ''
+    const errCode = error && typeof error === 'object' && 'code' in error ? (error as { code: unknown }).code : undefined
+    if (errMsg.includes('No Google account') || errCode === 401) {
       throw new Error('Calendar access not authorized. Please re-login to grant calendar permissions.')
     }
     

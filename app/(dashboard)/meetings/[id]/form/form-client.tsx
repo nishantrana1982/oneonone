@@ -7,9 +7,22 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { useToast } from '@/components/ui/toast'
 
+interface MeetingFormData {
+  checkInPersonal?: string
+  checkInProfessional?: string
+  priorityGoalProfessional?: string
+  priorityGoalAgency?: string
+  progressReport?: string
+  goodNews?: string
+  supportNeeded?: string
+  priorityDiscussions?: string
+  headsUp?: string
+  anythingElse?: string
+}
+
 interface MeetingFormClientProps {
   meetingId: string
-  initialData: any
+  initialData: MeetingFormData
   isReadOnly?: boolean
   isSubmitted?: boolean
 }
@@ -25,7 +38,7 @@ export function MeetingFormClient({
   const [isLoading, setIsLoading] = useState(false)
   const [draftSaved, setDraftSaved] = useState(false)
 
-  const save = async (data: any, draft: boolean) => {
+  const save = async (data: MeetingFormData, draft: boolean) => {
     setIsLoading(true)
     setDraftSaved(false)
     try {

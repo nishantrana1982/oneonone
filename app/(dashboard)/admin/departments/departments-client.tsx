@@ -48,8 +48,8 @@ export function DepartmentsClient({ departments: initialDepartments }: Departmen
       setNewName('')
       setIsAddOpen(false)
       router.refresh()
-    } catch (error: any) {
-      toastError(error.message)
+    } catch (error: unknown) {
+      toastError(error instanceof Error ? error.message : 'Unknown error')
     } finally {
       setLoading(false)
     }
@@ -76,8 +76,8 @@ export function DepartmentsClient({ departments: initialDepartments }: Departmen
       setEditingId(null)
       setEditName('')
       router.refresh()
-    } catch (error: any) {
-      toastError(error.message)
+    } catch (error: unknown) {
+      toastError(error instanceof Error ? error.message : 'Unknown error')
     } finally {
       setLoading(false)
     }
@@ -98,8 +98,8 @@ export function DepartmentsClient({ departments: initialDepartments }: Departmen
       setDepartments(departments.filter(d => d.id !== id))
       setDeleteConfirm(null)
       router.refresh()
-    } catch (error: any) {
-      toastError(error.message)
+    } catch (error: unknown) {
+      toastError(error instanceof Error ? error.message : 'Unknown error')
     } finally {
       setLoading(false)
     }

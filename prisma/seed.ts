@@ -140,7 +140,7 @@ async function main() {
     { email: 'new-user@test.com', name: 'New User', dept: null, reportsTo: null },
   ]
 
-  const employees: any[] = []
+  const employees: Array<{ id: string; email: string; name: string }> = []
   for (const emp of employeesData) {
     const user = await prisma.user.create({
       data: {

@@ -114,7 +114,7 @@ export async function GET() {
         })
 
       // Remove duplicates and limit
-      const uniqueModels = chatModels.reduce((acc: any[], model) => {
+      const uniqueModels = chatModels.reduce((acc: typeof chatModels, model) => {
         // Skip dated versions if base version exists
         const baseId = model.id.replace(/-\d{4}-\d{2}-\d{2}$/, '')
         if (baseId !== model.id && acc.some(m => m.id === baseId)) {
@@ -130,11 +130,11 @@ export async function GET() {
         models: uniqueModels,
         total: chatModels.length
       })
-    } catch (apiError: any) {
+    } catch (apiError: unknown) {
       console.error('OpenAI API error:', apiError)
       return NextResponse.json({ 
         models: [],
-        error: apiError.message || 'Failed to fetch models from OpenAI'
+        error: apiError instanceof Error ? apiError.message : 'Failed to fetch models from OpenAI'
       })
     }
   } catch (error) {

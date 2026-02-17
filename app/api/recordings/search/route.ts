@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireRole, UnauthorizedError, ForbiddenError } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { searchTranscripts } from '@/lib/openai'
-import { UserRole } from '@prisma/client'
+import { UserRole, Prisma } from '@prisma/client'
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,10 +28,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Build where clause based on role
-    const whereClause: any = {
+    const whereClause: Prisma.MeetingWhereInput = {
       recording: {
-        status: 'COMPLETED',
-        transcript: { not: null },
+        is: {
+          status: 'COMPLETED',
+          transcript: { not: null },
+        },
       },
     }
 

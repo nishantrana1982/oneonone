@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
-import { TodoStatus } from '@prisma/client'
+import { TodoStatus, TodoPriority } from '@prisma/client'
 
 export async function PATCH(
   request: NextRequest,
@@ -25,9 +25,9 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    const updateData: any = {}
+    const updateData: { status?: TodoStatus; priority?: TodoPriority; dueDate?: Date; completedAt?: Date | null } = {}
     if (status) updateData.status = status as TodoStatus
-    if (priority) updateData.priority = priority
+    if (priority) updateData.priority = priority as TodoPriority
     if (dueDate) updateData.dueDate = new Date(dueDate)
     if (status === 'DONE') {
       updateData.completedAt = new Date()

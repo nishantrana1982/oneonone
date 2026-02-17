@@ -1,12 +1,12 @@
 import { prisma } from './prisma'
-import { AuditAction } from '@prisma/client'
+import { AuditAction, Prisma } from '@prisma/client'
 
 interface AuditLogParams {
   userId: string
   action: AuditAction
   entityType: string
   entityId?: string
-  details?: any
+  details?: Prisma.InputJsonValue
   ipAddress?: string
   userAgent?: string
 }
@@ -39,7 +39,12 @@ export async function getAuditLogs(options: {
   limit?: number
   offset?: number
 }) {
-  const where: any = {}
+  const where: {
+    userId?: string
+    action?: AuditAction
+    entityType?: string
+    createdAt?: { gte?: Date; lte?: Date }
+  } = {}
   
   if (options.userId) where.userId = options.userId
   if (options.action) where.action = options.action
@@ -69,7 +74,7 @@ export async function getAuditLogs(options: {
 }
 
 // Helper functions for common audit actions
-export async function logUserCreated(adminId: string, newUserId: string, details?: any) {
+export async function logUserCreated(adminId: string, newUserId: string, details?: Prisma.InputJsonValue) {
   return createAuditLog({
     userId: adminId,
     action: 'CREATE',
@@ -79,7 +84,7 @@ export async function logUserCreated(adminId: string, newUserId: string, details
   })
 }
 
-export async function logUserUpdated(adminId: string, targetUserId: string, changes: any) {
+export async function logUserUpdated(adminId: string, targetUserId: string, changes: Prisma.InputJsonValue) {
   return createAuditLog({
     userId: adminId,
     action: 'UPDATE',
@@ -99,7 +104,7 @@ export async function logUserDeleted(adminId: string, deletedUserId: string, use
   })
 }
 
-export async function logSettingsChanged(adminId: string, changes: any) {
+export async function logSettingsChanged(adminId: string, changes: Prisma.InputJsonValue) {
   return createAuditLog({
     userId: adminId,
     action: 'SETTINGS_CHANGE',
@@ -108,7 +113,7 @@ export async function logSettingsChanged(adminId: string, changes: any) {
   })
 }
 
-export async function logDataCleared(adminId: string, clearType: string, counts: any) {
+export async function logDataCleared(adminId: string, clearType: string, counts: Record<string, number>) {
   return createAuditLog({
     userId: adminId,
     action: 'CLEAR_DATA',
@@ -117,7 +122,7 @@ export async function logDataCleared(adminId: string, clearType: string, counts:
   })
 }
 
-export async function logDataExport(userId: string, exportType: string, details?: any) {
+export async function logDataExport(userId: string, exportType: string, details?: Prisma.InputJsonValue) {
   return createAuditLog({
     userId,
     action: 'EXPORT',
@@ -126,12 +131,12 @@ export async function logDataExport(userId: string, exportType: string, details?
   })
 }
 
-export async function logBulkImport(adminId: string, entityType: string, count: number, details?: any) {
+export async function logBulkImport(adminId: string, entityType: string, count: number, details?: Prisma.InputJsonValue) {
   return createAuditLog({
     userId: adminId,
     action: 'IMPORT',
     entityType,
-    details: { count, ...details },
+    details: { count, ...(typeof details === 'object' && details !== null && !Array.isArray(details) ? details : {}) },
   })
 }
 

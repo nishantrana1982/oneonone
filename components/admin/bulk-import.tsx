@@ -17,7 +17,7 @@ export function BulkImport() {
   const [isOpen, setIsOpen] = useState(false)
   const [importing, setImporting] = useState(false)
   const [result, setResult] = useState<ImportResult | null>(null)
-  const [csvData, setCsvData] = useState<any[]>([])
+  const [csvData, setCsvData] = useState<Record<string, string>[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -36,7 +36,7 @@ export function BulkImport() {
       const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
       const users = lines.slice(1).map(line => {
         const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''))
-        const user: any = {}
+        const user: Record<string, string> = {}
         headers.forEach((header, index) => {
           user[header] = values[index] || ''
         })
@@ -76,8 +76,8 @@ export function BulkImport() {
       } else {
         setResult({ success: 0, failed: csvData.length, errors: [data.error] })
       }
-    } catch (error: any) {
-      setResult({ success: 0, failed: csvData.length, errors: [error.message] })
+    } catch (error: unknown) {
+      setResult({ success: 0, failed: csvData.length, errors: [error instanceof Error ? error.message : 'Unknown error'] })
     } finally {
       setImporting(false)
     }

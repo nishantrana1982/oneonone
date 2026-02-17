@@ -51,7 +51,7 @@ export async function PUT(request: NextRequest) {
       maxRecordingMins,
     } = body
 
-    const updates: any = {}
+    const updates: Record<string, string | number | null> = {}
 
     // Only update fields that are explicitly provided
     // Empty string means clear, undefined means don't change
@@ -116,9 +116,9 @@ export async function POST(request: NextRequest) {
       try {
         await openai.models.list()
         return NextResponse.json({ success: true, message: 'OpenAI connection successful' })
-      } catch (err: any) {
+      } catch (err: unknown) {
         return NextResponse.json(
-          { error: `OpenAI connection failed: ${err.message}` },
+          { error: `OpenAI connection failed: ${err instanceof Error ? err.message : 'Unknown error'}` },
           { status: 400 }
         )
       }
@@ -157,16 +157,17 @@ export async function POST(request: NextRequest) {
           success: true, 
           message: `S3 connection successful! Bucket "${bucket}" is accessible.` 
         })
-      } catch (err: any) {
-        let errorMessage = err.message
+      } catch (err: unknown) {
+        const s3Error = err as { message?: string; name?: string; Code?: string; $metadata?: { httpStatusCode?: number } }
+        let errorMessage = s3Error.message || 'Unknown error'
         
-        if (err.name === 'NotFound' || err.$metadata?.httpStatusCode === 404) {
+        if (s3Error.name === 'NotFound' || s3Error.$metadata?.httpStatusCode === 404) {
           errorMessage = `Bucket "${bucket}" not found. Please check the bucket name.`
-        } else if (err.name === 'InvalidAccessKeyId' || err.Code === 'InvalidAccessKeyId') {
+        } else if (s3Error.name === 'InvalidAccessKeyId' || s3Error.Code === 'InvalidAccessKeyId') {
           errorMessage = 'Invalid Access Key ID. Please check your credentials.'
-        } else if (err.name === 'SignatureDoesNotMatch') {
+        } else if (s3Error.name === 'SignatureDoesNotMatch') {
           errorMessage = 'Invalid Secret Access Key. Please check your credentials.'
-        } else if (err.name === 'AccessDenied' || err.$metadata?.httpStatusCode === 403) {
+        } else if (s3Error.name === 'AccessDenied' || s3Error.$metadata?.httpStatusCode === 403) {
           errorMessage = `Access denied to bucket "${bucket}". Please check IAM permissions.`
         }
         

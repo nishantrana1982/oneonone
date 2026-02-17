@@ -85,7 +85,12 @@ export async function transcribeAudio(audioBuffer: Buffer, filename: string, lan
     const fileStream = fs.createReadStream(tempFilePath)
 
     // Build transcription options - include language if specified
-    const transcriptionOptions: any = {
+    const transcriptionOptions: {
+      file: typeof fileStream
+      model: string
+      response_format: 'verbose_json'
+      language?: string
+    } = {
       file: fileStream,
       model: models.whisperModel,
       response_format: 'verbose_json',
@@ -100,7 +105,7 @@ export async function transcribeAudio(audioBuffer: Buffer, filename: string, lan
       transcriptionOptions.language = language
     }
 
-    const response = await openai.audio.transcriptions.create(transcriptionOptions) as any
+    const response = await openai.audio.transcriptions.create(transcriptionOptions) as { text: string; language?: string; duration?: number }
     console.log(`[OpenAI] Transcription successful. Text length: ${response.text?.length || 0}`)
     
     // Clean up temp file
@@ -116,28 +121,28 @@ export async function transcribeAudio(audioBuffer: Buffer, filename: string, lan
       language: response.language || language || 'en',
       duration: response.duration || 0,
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[OpenAI] Transcription error:', error)
+    const err = error as { message?: string; status?: number; code?: string; type?: string; error?: { message?: string } }
     console.error('[OpenAI] Error details:', JSON.stringify({
-      message: error.message,
-      status: error.status,
-      code: error.code,
-      type: error.type,
+      message: err.message,
+      status: err.status,
+      code: err.code,
+      type: err.type,
     }))
     
     // Provide helpful error messages
-    if (error.message?.includes('API key')) {
+    if (err.message?.includes('API key')) {
       throw new Error('OpenAI API key is invalid or not configured. Please check Admin > Settings.')
     }
-    if (error.status === 401) {
+    if (err.status === 401) {
       throw new Error('OpenAI API authentication failed. Please verify your API key in Admin > Settings.')
     }
-    if (error.status === 429) {
+    if (err.status === 429) {
       throw new Error('OpenAI rate limit exceeded. Please try again later.')
     }
-    if (error.status === 400) {
-      // Include more details in the error message
-      const details = error.message || error.error?.message || 'Unknown error'
+    if (err.status === 400) {
+      const details = err.message || err.error?.message || 'Unknown error'
       throw new Error(`Invalid audio file: ${details}`)
     }
     
@@ -269,18 +274,18 @@ Only include transcripts with relevance > 30. Sort by relevance descending.`
   const parsed = JSON.parse(content)
   const results = parsed.results || parsed || []
 
-  return results.map((r: any) => ({
+  return results.map((r: { index: number; relevance: number; snippet: string }) => ({
     id: transcripts[r.index]?.id,
     meetingId: transcripts[r.index]?.meetingId,
     relevance: r.relevance,
     snippet: r.snippet,
-  })).filter((r: any) => r.id)
+  })).filter((r: { id?: string }) => r.id)
 }
 
 export async function generateOrganizationInsights(
   transcriptSummaries: Array<{
     department: string
-    sentiment: any
+    sentiment: { score: number; label: string } | null
     keyPoints: string[]
     commonThemes: string[]
     qualityScore: number

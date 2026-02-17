@@ -1,6 +1,6 @@
 import { getCurrentUser } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
-import { UserRole } from '@prisma/client'
+import { UserRole, RecurringFrequency } from '@prisma/client'
 import { MeetingsClient } from './meetings-client'
 
 export default async function MeetingsPage() {
@@ -8,7 +8,17 @@ export default async function MeetingsPage() {
   if (!user) return null
 
   let meetings
-  let recurringSchedules: any[] = []
+  let recurringSchedules: Array<{
+    id: string
+    frequency: RecurringFrequency
+    dayOfWeek: number
+    timeOfDay: string
+    isActive: boolean
+    nextMeetingDate: Date | null
+    createdAt: Date
+    employee: { id: string; name: string | null; email?: string | null }
+    reporter?: { name: string | null } | null
+  }> = []
 
   const canManageRecurring = user.role === UserRole.REPORTER || user.role === UserRole.SUPER_ADMIN
 

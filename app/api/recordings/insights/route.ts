@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireRole, UnauthorizedError, ForbiddenError } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { generateOrganizationInsights } from '@/lib/openai'
-import { UserRole } from '@prisma/client'
+import { UserRole, Prisma } from '@prisma/client'
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,11 +26,13 @@ export async function GET(request: NextRequest) {
     startDate.setDate(startDate.getDate() - parseInt(period))
 
     // Build where clause
-    const whereClause: any = {
+    const whereClause: Prisma.MeetingWhereInput = {
       meetingDate: { gte: startDate },
       recording: {
-        status: 'COMPLETED',
-        sentiment: { not: null },
+        is: {
+          status: 'COMPLETED',
+          sentiment: { not: Prisma.JsonNull },
+        },
       },
     }
 
@@ -73,7 +75,7 @@ export async function GET(request: NextRequest) {
     const departmentStats: Record<string, {
       meetings: number
       avgQuality: number
-      sentiments: any[]
+      sentiments: Array<{ score: number; label: string } | unknown>
       themes: string[]
     }> = {}
 
@@ -132,9 +134,9 @@ export async function GET(request: NextRequest) {
     if (recordingsWithAnalysis.length >= 3) {
       const summariesForAI = recordingsWithAnalysis.map(m => ({
         department: m.employee.department?.name || 'Unassigned',
-        sentiment: m.recording?.sentiment,
+        sentiment: (m.recording?.sentiment as { score: number; label: string } | null) ?? null,
         keyPoints: (m.recording?.keyPoints as string[]) || [],
-        commonThemes: [],
+        commonThemes: [] as string[],
         qualityScore: m.recording?.qualityScore || 0,
       }))
 
@@ -154,9 +156,9 @@ export async function GET(request: NextRequest) {
 
     for (const meeting of meetings) {
       if (meeting.recording?.sentiment) {
-        const sentiment = meeting.recording.sentiment as any
-        const label = sentiment.label as 'positive' | 'neutral' | 'negative'
-        if (label in sentimentDistribution) {
+        const sentiment = meeting.recording.sentiment as { label?: string }
+        const label = sentiment.label as 'positive' | 'neutral' | 'negative' | undefined
+        if (label && label in sentimentDistribution) {
           sentimentDistribution[label]++
         }
       }
@@ -169,7 +171,7 @@ export async function GET(request: NextRequest) {
       employee: m.employee.name,
       department: m.employee.department?.name,
       qualityScore: m.recording?.qualityScore,
-      sentiment: (m.recording?.sentiment as any)?.label,
+      sentiment: (m.recording?.sentiment as { label?: string } | null)?.label,
     }))
 
     return NextResponse.json({

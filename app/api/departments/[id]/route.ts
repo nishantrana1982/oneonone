@@ -55,12 +55,14 @@ export async function PATCH(
     })
 
     return NextResponse.json(department)
-  } catch (error: any) {
-    if (error.code === 'P2002') {
-      return NextResponse.json({ error: 'Department with this name already exists' }, { status: 400 })
-    }
-    if (error.code === 'P2025') {
-      return NextResponse.json({ error: 'Department not found' }, { status: 404 })
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'code' in error) {
+      if ((error as { code: string }).code === 'P2002') {
+        return NextResponse.json({ error: 'Department with this name already exists' }, { status: 400 })
+      }
+      if ((error as { code: string }).code === 'P2025') {
+        return NextResponse.json({ error: 'Department not found' }, { status: 404 })
+      }
     }
     return NextResponse.json({ error: 'Failed to update department' }, { status: 500 })
   }
@@ -85,8 +87,8 @@ export async function DELETE(
     })
 
     return NextResponse.json({ success: true })
-  } catch (error: any) {
-    if (error.code === 'P2025') {
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'code' in error && (error as { code: string }).code === 'P2025') {
       return NextResponse.json({ error: 'Department not found' }, { status: 404 })
     }
     return NextResponse.json({ error: 'Failed to delete department' }, { status: 500 })

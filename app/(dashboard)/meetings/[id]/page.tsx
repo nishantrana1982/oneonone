@@ -220,10 +220,10 @@ export default async function MeetingDetailPage({
                 language: meeting.recording.language,
                 summary: meeting.recording.summary,
                 keyPoints: meeting.recording.keyPoints as string[] | null,
-                autoTodos: meeting.recording.autoTodos as any,
-                sentiment: meeting.recording.sentiment as any,
+                autoTodos: meeting.recording.autoTodos as Array<{ title: string; description: string; assignTo: string; priority: string }> | null,
+                sentiment: meeting.recording.sentiment as { score: number; label: string; employeeMood: string; reporterEngagement: string; overallTone: string } | null,
                 qualityScore: meeting.recording.qualityScore,
-                qualityDetails: meeting.recording.qualityDetails as any,
+                qualityDetails: meeting.recording.qualityDetails as { clarity: number; actionability: number; engagement: number; goalAlignment: number; followUp: number; overallFeedback: string } | null,
                 duration: meeting.recording.duration,
                 audioPlaybackUrl: null, // Will be fetched client-side with signed URL
               }}

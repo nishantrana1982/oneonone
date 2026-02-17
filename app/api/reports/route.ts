@@ -28,7 +28,7 @@ function analyzeSentiment(text: string): { score: number; label: string } {
   return { score: Math.round(score * 100) / 100, label }
 }
 
-function extractCommonIssues(meetings: any[]): Array<{ text: string; count: number; category: string }> {
+function extractCommonIssues(meetings: Array<{ supportNeeded: string | null; priorityDiscussions: string | null; headsUp: string | null }>): Array<{ text: string; count: number; category: string }> {
   const issueKeywords: Record<string, string[]> = {
     'Workload': ['workload', 'too much', 'overwhelmed', 'capacity', 'bandwidth', 'busy'],
     'Communication': ['communication', 'unclear', 'miscommunication', 'feedback', 'response'],
@@ -63,7 +63,7 @@ function extractCommonIssues(meetings: any[]): Array<{ text: string; count: numb
     .slice(0, 5)
 }
 
-function calculateTrends(meetings: any[], todos: any[]): Record<string, string> {
+function calculateTrends(meetings: Array<{ status: string }>, todos: Array<{ status: string; priority: string }>): Record<string, string> {
   const trends: Record<string, string> = {}
   
   // Meeting completion rate
@@ -102,9 +102,9 @@ export async function GET(request: NextRequest) {
     const format = searchParams.get('format') // 'json' or 'csv'
 
     // Build filters
-    const meetingWhere: any = {}
-    const todoWhere: any = {}
-    const userWhere: any = { isActive: true }
+    const meetingWhere: { meetingDate?: { gte?: Date; lte?: Date }; employeeId?: { in: string[] } } = {}
+    const todoWhere: { assignedToId?: { in: string[] } } = {}
+    const userWhere: { isActive: boolean; departmentId?: string } = { isActive: true }
 
     if (departmentId) {
       userWhere.departmentId = departmentId

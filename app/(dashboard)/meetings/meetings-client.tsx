@@ -27,8 +27,8 @@ interface Meeting {
   status: string
   checkInPersonal: string | null
   employeeId: string
-  reporter?: { name: string; email: string }
-  employee?: { name: string; email: string }
+  reporter?: { name: string | null; email: string | null } | null
+  employee?: { name: string | null; email: string | null } | null
 }
 
 interface RecurringSchedule {
@@ -38,7 +38,8 @@ interface RecurringSchedule {
   timeOfDay: string
   isActive: boolean
   nextMeetingDate: Date | null
-  employee: { id: string; name: string; email: string }
+  employee: { id: string; name: string | null; email?: string | null }
+  reporter?: { name: string | null } | null
 }
 
 interface MeetingsClientProps {

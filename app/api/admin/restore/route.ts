@@ -50,8 +50,8 @@ export async function POST(request: NextRequest) {
               create: { id: dept.id, name: dept.name },
             })
             results.departments++
-          } catch (error: any) {
-            results.errors.push(`Department ${dept.name}: ${error.message}`)
+          } catch (error: unknown) {
+            results.errors.push(`Department ${dept.name}: ${error instanceof Error ? error.message : 'Unknown error'}`)
           }
         }
       }
@@ -86,8 +86,8 @@ export async function POST(request: NextRequest) {
               },
             })
             results.users++
-          } catch (error: any) {
-            results.errors.push(`User ${userData.email}: ${error.message}`)
+          } catch (error: unknown) {
+            results.errors.push(`User ${userData.email}: ${error instanceof Error ? error.message : 'Unknown error'}`)
           }
         }
       }
@@ -160,13 +160,13 @@ export async function POST(request: NextRequest) {
                     },
                   })
                   results.todos++
-                } catch (error: any) {
-                  results.errors.push(`Todo ${todo.title}: ${error.message}`)
+                } catch (error: unknown) {
+                  results.errors.push(`Todo ${todo.title}: ${error instanceof Error ? error.message : 'Unknown error'}`)
                 }
               }
             }
-          } catch (error: any) {
-            results.errors.push(`Meeting ${meeting.id}: ${error.message}`)
+          } catch (error: unknown) {
+            results.errors.push(`Meeting ${meeting.id}: ${error instanceof Error ? error.message : 'Unknown error'}`)
           }
         }
       }

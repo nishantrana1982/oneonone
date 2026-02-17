@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function generateRecurringMeetings(results: any) {
+async function generateRecurringMeetings(results: { recurringMeetingsCreated: number; reminders24hSent: number; reminders1hSent: number; errors: string[] }) {
   const now = new Date()
   
   // Find all active recurring schedules that need a new meeting
@@ -103,7 +103,7 @@ async function generateRecurringMeetings(results: any) {
   }
 }
 
-async function sendMeetingReminders(results: any) {
+async function sendMeetingReminders(results: { recurringMeetingsCreated: number; reminders24hSent: number; reminders1hSent: number; errors: string[] }) {
   const now = new Date()
   const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000)
   const in1h = new Date(now.getTime() + 60 * 60 * 1000)

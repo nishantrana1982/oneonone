@@ -62,7 +62,7 @@ export async function getSettings(): Promise<SystemSettings> {
 
 export async function updateSettings(updates: Partial<SystemSettings>): Promise<SystemSettings> {
   // Encrypt sensitive fields if provided
-  const dataToUpdate: any = {}
+  const dataToUpdate: Record<string, string | number | null> = {}
 
   if (updates.openaiApiKey !== undefined) {
     dataToUpdate.openaiApiKey = updates.openaiApiKey ? encrypt(updates.openaiApiKey) : null

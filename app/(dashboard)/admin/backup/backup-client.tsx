@@ -93,8 +93,8 @@ export function BackupClient({ initialBackups }: BackupClientProps) {
       } else {
         setMessage({ type: 'error', text: result.error || 'Failed to restore backup' })
       }
-    } catch (error: any) {
-      setMessage({ type: 'error', text: `Failed to restore: ${error.message}` })
+    } catch (error: unknown) {
+      setMessage({ type: 'error', text: `Failed to restore: ${error instanceof Error ? error.message : 'Unknown error'}` })
     } finally {
       setRestoring(false)
       if (fileInputRef.current) {
@@ -114,7 +114,7 @@ export function BackupClient({ initialBackups }: BackupClientProps) {
     return new Date(date).toLocaleString()
   }
 
-  const statusIcons: Record<BackupStatus, any> = {
+  const statusIcons: Record<BackupStatus, typeof Clock> = {
     PENDING: Clock,
     IN_PROGRESS: Loader2,
     COMPLETED: CheckCircle,

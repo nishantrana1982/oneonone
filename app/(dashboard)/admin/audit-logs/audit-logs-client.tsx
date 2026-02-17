@@ -32,13 +32,13 @@ interface AuditLog {
   action: AuditAction
   entityType: string
   entityId: string | null
-  details: any
+  details: Record<string, string | number | boolean | null> | null
   ipAddress: string | null
   userAgent: string | null
   createdAt: string
 }
 
-const actionIcons: Record<AuditAction, any> = {
+const actionIcons: Record<AuditAction, typeof Plus> = {
   CREATE: Plus,
   UPDATE: Edit,
   DELETE: Trash2,

@@ -30,8 +30,8 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json(department)
-  } catch (error: any) {
-    if (error.code === 'P2002') {
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'code' in error && (error as { code: string }).code === 'P2002') {
       return NextResponse.json({ error: 'Department with this name already exists' }, { status: 400 })
     }
     return NextResponse.json({ error: 'Failed to create department' }, { status: 500 })

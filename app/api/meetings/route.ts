@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
         )
         console.log('Calendar event created:', calendarResult)
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to create calendar event:', error)
     }
 
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
         new Date(meetingDate),
         meeting.id
       )
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to send email notification:', error)
     }
 

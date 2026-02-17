@@ -3,7 +3,7 @@ import { requireRole, UnauthorizedError, ForbiddenError } from '@/lib/auth-helpe
 import { prisma } from '@/lib/prisma'
 import { getSettings } from '@/lib/settings'
 import OpenAI from 'openai'
-import { UserRole } from '@prisma/client'
+import { UserRole, Prisma } from '@prisma/client'
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,26 +35,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Build where clause
-    const whereClause: any = {
-      status: 'COMPLETED',
-    }
+    // Build meeting filter based on role and department
+    const meetingFilter: Prisma.MeetingWhereInput = {}
 
     // Reporters can only see their direct reports
     if (user.role === UserRole.REPORTER) {
-      whereClause.meeting = {
-        reporterId: user.id,
-      }
+      meetingFilter.reporterId = user.id
     }
 
     // Filter by department if specified
     if (departmentId) {
-      whereClause.meeting = {
-        ...whereClause.meeting,
-        employee: {
-          departmentId,
-        },
-      }
+      meetingFilter.employee = { departmentId }
+    }
+
+    // Build where clause
+    const whereClause: Prisma.MeetingRecordingWhereInput = {
+      status: 'COMPLETED',
+      ...(Object.keys(meetingFilter).length > 0 && { meeting: { is: meetingFilter } }),
     }
 
     // Get all completed meetings with their data
@@ -190,20 +187,21 @@ Format your response as JSON:
       meetingsAnalyzed: meetingData.length,
       ...analysis,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error analyzing recordings:', error)
     
     // Provide more specific error messages
     let errorMessage = 'Failed to analyze data. Please try again.'
+    const err = error as { status?: number; message?: string }
     
-    if (error?.status === 401 || error?.message?.includes('API key')) {
+    if (err?.status === 401 || err?.message?.includes('API key')) {
       errorMessage = 'OpenAI API key is invalid. Please check your API key in Admin > Settings.'
-    } else if (error?.status === 429) {
+    } else if (err?.status === 429) {
       errorMessage = 'Rate limit exceeded. Please try again in a few minutes.'
-    } else if (error?.status === 400) {
+    } else if (err?.status === 400) {
       errorMessage = 'Invalid request. The data may be too large to process.'
-    } else if (error?.message) {
-      errorMessage = `Error: ${error.message}`
+    } else if (err?.message) {
+      errorMessage = `Error: ${err.message}`
     }
     
     return NextResponse.json(

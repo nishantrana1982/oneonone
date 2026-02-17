@@ -43,7 +43,7 @@ interface InsightsData {
   departmentStats: Record<string, {
     meetings: number
     avgQuality: number
-    sentiments: any[]
+    sentiments: { date: string; sentiment: string; score?: number }[]
     themes: string[]
   }>
   languageDistribution: Record<string, number>

@@ -1,5 +1,5 @@
 import { prisma } from './prisma'
-import { NotificationType } from '@prisma/client'
+import { NotificationType, Prisma } from '@prisma/client'
 
 interface CreateNotificationParams {
   userId: string
@@ -7,7 +7,7 @@ interface CreateNotificationParams {
   title: string
   message: string
   link?: string
-  data?: any
+  data?: Prisma.InputJsonValue
 }
 
 export async function createNotification(params: CreateNotificationParams) {
@@ -96,8 +96,8 @@ export async function getFilteredNotifications(
     offset?: number
   } = {}
 ) {
-  const where: any = { userId }
-  if (options.type) where.type = options.type
+  const where: Prisma.NotificationWhereInput = { userId }
+  if (options.type) where.type = options.type as NotificationType
   if (options.isRead !== undefined) where.isRead = options.isRead
 
   const [notifications, total] = await Promise.all([

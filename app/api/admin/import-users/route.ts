@@ -110,9 +110,9 @@ export async function POST(request: NextRequest) {
         // Add to map for subsequent lookups
         userMap.set(userData.email.toLowerCase(), newUser.id)
         results.success++
-      } catch (error: any) {
+      } catch (error: unknown) {
         results.failed++
-        results.errors.push(`Failed to import ${userData.email}: ${error.message}`)
+        results.errors.push(`Failed to import ${userData.email}: ${error instanceof Error ? error.message : 'Unknown error'}`)
       }
     }
 

@@ -19,7 +19,7 @@ interface FileAttachmentsProps {
   canUpload: boolean
 }
 
-const fileIcons: Record<string, any> = {
+const fileIcons: Record<string, typeof File> = {
   'image/': Image,
   'application/pdf': FileText,
   'application/zip': FileArchive,
@@ -115,8 +115,8 @@ export function FileAttachments({ meetingId, initialAttachments, canUpload }: Fi
         createdAt: new Date().toISOString(),
       }
       setAttachments([newAttachment, ...attachments])
-    } catch (error: any) {
-      toastError(error.message || 'Failed to upload file')
+    } catch (error: unknown) {
+      toastError(error instanceof Error ? error.message : 'Failed to upload file')
     } finally {
       setUploading(false)
       if (fileInputRef.current) {
