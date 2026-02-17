@@ -4,12 +4,14 @@ import { UserRole } from '@prisma/client'
 import { formatMeetingDateShort } from '@/lib/utils'
 import Link from 'next/link'
 import { Calendar, CheckSquare, Users, TrendingUp, Clock, AlertCircle, ChevronRight } from 'lucide-react'
+import { WeekCalendar } from './week-calendar'
+import { PendingRequests } from './pending-requests'
 
 export default async function DashboardPage() {
   const user = await getCurrentUser()
   if (!user) return null
 
-  let stats = {
+  const stats = {
     upcomingMeetings: 0,
     pendingTodos: 0,
     overdueTodos: 0,
@@ -24,7 +26,7 @@ export default async function DashboardPage() {
       prisma.meeting.count({
         where: {
           employeeId: user.id,
-          status: 'SCHEDULED',
+          status: { in: ['SCHEDULED', 'PROPOSED'] },
           meetingDate: { gte: now },
         },
       }),
@@ -50,17 +52,16 @@ export default async function DashboardPage() {
       ? await prisma.user.count({ where: { isActive: true } })
       : await prisma.user.count({ where: { reportsToId: user.id, isActive: true } })
 
+    const statuses: ('SCHEDULED' | 'PROPOSED')[] = ['SCHEDULED', 'PROPOSED']
+    const meetingFilter = user.role === UserRole.SUPER_ADMIN
+      ? { status: { in: statuses }, meetingDate: { gte: now } }
+      : { OR: [
+          { employeeId: user.id, status: { in: statuses }, meetingDate: { gte: now } },
+          { reporterId: user.id, status: { in: statuses }, meetingDate: { gte: now } },
+        ] }
+
     const [meetings, todos, completedMeetings] = await Promise.all([
-      prisma.meeting.count({
-        where: {
-          OR: [
-            { employeeId: user.id, status: 'SCHEDULED', meetingDate: { gte: now } },
-            user.role === UserRole.SUPER_ADMIN
-              ? { status: 'SCHEDULED', meetingDate: { gte: now } }
-              : { reporterId: user.id, status: 'SCHEDULED', meetingDate: { gte: now } },
-          ],
-        },
-      }),
+      prisma.meeting.count({ where: meetingFilter }),
       prisma.todo.findMany({
         where: {
           assignedToId: user.id,
@@ -79,6 +80,59 @@ export default async function DashboardPage() {
     stats.directReports = directReports
     stats.completedMeetings = completedMeetings
   }
+
+  // ── Pending proposal requests (where user is receiver) ──────────
+  const pendingRequestsForMe = await prisma.meeting.findMany({
+    where: {
+      status: 'PROPOSED',
+      OR: [
+        { employeeId: user.id, proposedById: { not: user.id } },
+        { reporterId: user.id, proposedById: { not: user.id } },
+      ],
+    },
+    include: {
+      employee: { select: { id: true, name: true } },
+      reporter: { select: { id: true, name: true } },
+    },
+    orderBy: { meetingDate: 'asc' },
+  })
+
+  // ── Proposals I sent that are awaiting acceptance ───────────────
+  const awaitingAcceptance = await prisma.meeting.findMany({
+    where: {
+      status: 'PROPOSED',
+      proposedById: user.id,
+    },
+    include: {
+      employee: { select: { id: true, name: true } },
+      reporter: { select: { id: true, name: true } },
+    },
+    orderBy: { meetingDate: 'asc' },
+  })
+
+  // ── Week calendar meetings ─────────────────────────────────────
+  const dayOfWeek = now.getDay()
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+  const weekStart = new Date(now)
+  weekStart.setHours(0, 0, 0, 0)
+  weekStart.setDate(weekStart.getDate() + mondayOffset)
+  const weekEnd = new Date(weekStart)
+  weekEnd.setDate(weekEnd.getDate() + 7)
+
+  const weekMeetingsWhere = user.role === UserRole.EMPLOYEE
+    ? { employeeId: user.id, meetingDate: { gte: weekStart, lt: weekEnd }, status: { not: 'CANCELLED' as const } }
+    : user.role === UserRole.REPORTER
+      ? { OR: [{ employeeId: user.id }, { reporterId: user.id }], meetingDate: { gte: weekStart, lt: weekEnd }, status: { not: 'CANCELLED' as const } }
+      : { meetingDate: { gte: weekStart, lt: weekEnd }, status: { not: 'CANCELLED' as const } }
+
+  const weekMeetings = await prisma.meeting.findMany({
+    where: weekMeetingsWhere,
+    include: {
+      employee: { select: { name: true } },
+      reporter: { select: { name: true } },
+    },
+    orderBy: { meetingDate: 'asc' },
+  })
 
   // Get recent meetings
   const recentMeetings = await prisma.meeting.findMany({
@@ -103,7 +157,7 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-dark-gray dark:text-white mb-1">
@@ -111,6 +165,35 @@ export default async function DashboardPage() {
         </h1>
         <p className="text-sm sm:text-base text-medium-gray">Here&apos;s what&apos;s happening with your one-on-ones</p>
       </div>
+
+      {/* (1) Pending requests – receiver first */}
+      {pendingRequestsForMe.length > 0 && (
+        <PendingRequests
+          type="receiver"
+          meetings={pendingRequestsForMe.map((m) => ({
+            id: m.id,
+            meetingDate: m.meetingDate.toISOString(),
+            proposerName:
+              (m.proposedById === m.reporterId ? m.reporter.name : m.employee.name) || 'Someone',
+            otherPartyName:
+              (user.id === m.employeeId ? m.reporter.name : m.employee.name) || 'the other party',
+          }))}
+        />
+      )}
+
+      {/* (2) Awaiting acceptance – proposer */}
+      {awaitingAcceptance.length > 0 && (
+        <PendingRequests
+          type="proposer"
+          meetings={awaitingAcceptance.map((m) => ({
+            id: m.id,
+            meetingDate: m.meetingDate.toISOString(),
+            proposerName: user.name || 'You',
+            otherPartyName:
+              (user.id === m.reporterId ? m.employee.name : m.reporter.name) || 'the other party',
+          }))}
+        />
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
@@ -171,6 +254,19 @@ export default async function DashboardPage() {
         )}
       </div>
 
+      {/* (3) Week Calendar */}
+      <WeekCalendar
+        meetings={weekMeetings.map((m) => ({
+          id: m.id,
+          meetingDate: m.meetingDate.toISOString(),
+          status: m.status,
+          employee: m.employee,
+          reporter: m.reporter,
+        }))}
+        weekStart={weekStart.toISOString()}
+        userRole={user.role}
+      />
+
       {/* Recent Meetings & Quick Actions */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Recent Meetings */}
@@ -213,9 +309,11 @@ export default async function DashboardPage() {
                   <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
                     meeting.status === 'COMPLETED' 
                       ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                      : meeting.status === 'PROPOSED'
+                      ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
                       : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
                   }`}>
-                    {meeting.status === 'COMPLETED' ? 'Completed' : 'Scheduled'}
+                    {meeting.status === 'COMPLETED' ? 'Completed' : meeting.status === 'PROPOSED' ? 'Proposed' : 'Scheduled'}
                   </span>
                 </Link>
               ))}
@@ -232,14 +330,14 @@ export default async function DashboardPage() {
             {(user.role === UserRole.REPORTER || user.role === UserRole.SUPER_ADMIN) && (
               <Link 
                 href="/meetings/new" 
-                aria-label="Schedule a new meeting"
+                aria-label="Propose a new meeting"
                 className="flex items-center gap-4 p-4 rounded-xl hover:bg-off-white/50 dark:hover:bg-charcoal/50 transition-colors group active:scale-[0.98]"
               >
                 <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
                   <Calendar className="w-5 h-5 text-blue-500" />
                 </div>
                 <div className="flex-1">
-                  <p className="font-medium text-dark-gray dark:text-white">Schedule Meeting</p>
+                  <p className="font-medium text-dark-gray dark:text-white">Propose Meeting</p>
                   <p className="text-sm text-medium-gray">Set up a new one-on-one</p>
                 </div>
                 <ChevronRight className="w-5 h-5 text-light-gray group-hover:text-medium-gray transition-colors" />

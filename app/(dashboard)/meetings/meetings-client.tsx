@@ -93,7 +93,7 @@ export function MeetingsClient({
   )
 
   const upcomingMeetings = meetings.filter(
-    (m) => new Date(m.meetingDate) >= now && m.status === 'SCHEDULED'
+    (m) => new Date(m.meetingDate) >= now && (m.status === 'SCHEDULED' || m.status === 'PROPOSED')
   )
   const completedMeetings = meetings.filter((m) => m.status === 'COMPLETED')
   const pendingFormMeetings = meetings.filter(
@@ -494,11 +494,19 @@ export function MeetingsClient({
                         className={`px-2 sm:px-3 py-1 text-xs font-medium rounded-full flex-shrink-0 ${
                           meeting.status === 'COMPLETED'
                             ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                            : meeting.status === 'PROPOSED'
+                            ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                            : meeting.status === 'CANCELLED'
+                            ? 'bg-red-500/10 text-red-600 dark:text-red-400'
                             : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
                         }`}
                       >
                         {meeting.status === 'COMPLETED'
                           ? 'Completed'
+                          : meeting.status === 'PROPOSED'
+                          ? 'Proposed'
+                          : meeting.status === 'CANCELLED'
+                          ? 'Cancelled'
                           : isPast
                             ? 'Pending'
                             : 'Scheduled'}

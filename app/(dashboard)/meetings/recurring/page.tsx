@@ -1,8 +1,9 @@
-import { getCurrentUser, requireRole } from '@/lib/auth-helpers'
+import { getCurrentUser } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { RecurringSchedulesClient } from './recurring-client'
 import { redirect } from 'next/navigation'
 import { UserRole } from '@prisma/client'
+import { MeetingStatus } from '@prisma/client'
 
 export default async function RecurringSchedulesPage() {
   const user = await getCurrentUser()
@@ -29,16 +30,27 @@ export default async function RecurringSchedulesPage() {
     orderBy: { createdAt: 'desc' },
   })
 
-  // Add employee info to schedules and serialize dates
+  const now = new Date()
+  // Add employee info and upcoming meeting count
   const schedulesWithEmployees = await Promise.all(
     schedules.map(async (schedule) => {
-      const employee = await prisma.user.findUnique({
-        where: { id: schedule.employeeId },
-        select: { id: true, name: true, email: true },
-      })
-      return { 
-        ...schedule, 
+      const [employee, upcomingMeetingCount] = await Promise.all([
+        prisma.user.findUnique({
+          where: { id: schedule.employeeId },
+          select: { id: true, name: true, email: true },
+        }),
+        prisma.meeting.count({
+          where: {
+            recurringScheduleId: schedule.id,
+            status: MeetingStatus.SCHEDULED,
+            meetingDate: { gt: now },
+          },
+        }),
+      ])
+      return {
+        ...schedule,
         employee,
+        upcomingMeetingCount,
         nextMeetingDate: schedule.nextMeetingDate?.toISOString() || null,
         createdAt: schedule.createdAt.toISOString(),
       }

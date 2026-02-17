@@ -212,3 +212,117 @@ export async function isCalendarEnabled(userId: string): Promise<boolean> {
     return false
   }
 }
+
+// ── Availability / FreeBusy ─────────────────────────────────────────
+
+interface BusyRange {
+  start: string
+  end: string
+}
+
+/**
+ * Fetch free/busy data for a user's primary calendar over a time window.
+ * Returns an array of busy ranges (ISO strings).
+ */
+export async function getFreeBusy(
+  userId: string,
+  timeMin: Date,
+  timeMax: Date
+): Promise<BusyRange[]> {
+  const oauth2Client = await getAuthenticatedClient(userId)
+  const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
+
+  const response = await calendar.freebusy.query({
+    requestBody: {
+      timeMin: timeMin.toISOString(),
+      timeMax: timeMax.toISOString(),
+      timeZone: 'Asia/Kolkata',
+      items: [{ id: 'primary' }],
+    },
+  })
+
+  const busy = response.data.calendars?.primary?.busy ?? []
+  return busy
+    .filter((b): b is { start: string; end: string } => !!b.start && !!b.end)
+    .map((b) => ({ start: b.start!, end: b.end! }))
+}
+
+interface FreeSlot {
+  start: string
+  end: string
+}
+
+/**
+ * Business-hours window (9 AM – 7 PM IST).
+ * These are used to constrain free-slot generation.
+ */
+const BUSINESS_START_HOUR = 9
+const BUSINESS_END_HOUR = 19
+
+/**
+ * Given busy ranges from both users, compute mutually free slots of
+ * `slotMinutes` duration within business hours of the given date (IST).
+ */
+export async function getMutualFreeSlots(
+  reporterId: string,
+  employeeId: string,
+  date: Date,
+  slotMinutes = 30
+): Promise<FreeSlot[]> {
+  // Build day window in IST (UTC+5:30)
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000
+  const dayStart = new Date(date)
+  dayStart.setHours(0, 0, 0, 0)
+  // Convert IST business hours to UTC for the API
+  const windowStart = new Date(dayStart.getTime() + BUSINESS_START_HOUR * 3600000 - IST_OFFSET_MS)
+  const windowEnd = new Date(dayStart.getTime() + BUSINESS_END_HOUR * 3600000 - IST_OFFSET_MS)
+
+  // Fetch busy ranges for both users in parallel
+  const [reporterBusy, employeeBusy] = await Promise.all([
+    getFreeBusy(reporterId, windowStart, windowEnd),
+    getFreeBusy(employeeId, windowStart, windowEnd),
+  ])
+
+  // Merge all busy ranges into a single sorted list
+  const allBusy = [...reporterBusy, ...employeeBusy]
+    .map((b) => ({ start: new Date(b.start).getTime(), end: new Date(b.end).getTime() }))
+    .sort((a, b) => a.start - b.start)
+
+  // Flatten overlapping busy ranges
+  const merged: { start: number; end: number }[] = []
+  for (const range of allBusy) {
+    const last = merged[merged.length - 1]
+    if (last && range.start <= last.end) {
+      last.end = Math.max(last.end, range.end)
+    } else {
+      merged.push({ ...range })
+    }
+  }
+
+  // Generate free slots in the gaps
+  const slotMs = slotMinutes * 60 * 1000
+  const slots: FreeSlot[] = []
+  let cursor = windowStart.getTime()
+
+  for (const busy of merged) {
+    while (cursor + slotMs <= busy.start) {
+      slots.push({
+        start: new Date(cursor).toISOString(),
+        end: new Date(cursor + slotMs).toISOString(),
+      })
+      cursor += slotMs
+    }
+    cursor = Math.max(cursor, busy.end)
+  }
+
+  // After all busy ranges, fill remaining window
+  while (cursor + slotMs <= windowEnd.getTime()) {
+    slots.push({
+      start: new Date(cursor).toISOString(),
+      end: new Date(cursor + slotMs).toISOString(),
+    })
+    cursor += slotMs
+  }
+
+  return slots
+}

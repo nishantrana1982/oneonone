@@ -3,19 +3,24 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Calendar, Clock, User, ArrowLeft, Check, Search } from 'lucide-react'
+import { Calendar, Clock, User, ArrowLeft, Check, Search, Loader2, AlertCircle } from 'lucide-react'
 import { DatePicker } from '@/components/ui/date-picker'
 import { useToast } from '@/components/ui/toast'
 
 const formSchema = z.object({
   employeeId: z.string().min(1, 'Please select a team member'),
   meetingDate: z.string().min(1, 'Please select a date'),
-  meetingTime: z.string().min(1, 'Please select a time'),
+  meetingTime: z.string().min(1, 'Please select a time slot'),
 })
 
 type FormData = z.infer<typeof formSchema>
+
+interface FreeSlot {
+  start: string
+  end: string
+}
 
 interface NewMeetingFormProps {
   employees: Array<{ id: string; name: string; email: string }>
@@ -24,9 +29,17 @@ interface NewMeetingFormProps {
 
 export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps) {
   const router = useRouter()
-  const { toastError } = useToast()
+  const { toastError, toastSuccess } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [employeeSearch, setEmployeeSearch] = useState('')
+
+  // Availability state
+  const [slots, setSlots] = useState<FreeSlot[]>([])
+  const [slotsLoading, setSlotsLoading] = useState(false)
+  const [calendarUnavailable, setCalendarUnavailable] = useState(false)
+  const [calendarMessage, setCalendarMessage] = useState('')
+  const [slotsFetched, setSlotsFetched] = useState(false)
+
   const {
     register,
     handleSubmit,
@@ -39,6 +52,7 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
 
   const watchedEmployee = watch('employeeId')
   const watchedDate = watch('meetingDate')
+  const watchedTime = watch('meetingTime')
 
   const filteredEmployees = useMemo(() => {
     const q = employeeSearch.trim().toLowerCase()
@@ -49,41 +63,80 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
     )
   }, [employees, employeeSearch])
 
+  // Fetch availability when both employee and date are selected
+  const fetchAvailability = useCallback(async (employeeId: string, date: string) => {
+    setSlotsLoading(true)
+    setSlots([])
+    setSlotsFetched(false)
+    setCalendarUnavailable(false)
+    setCalendarMessage('')
+    setValue('meetingTime', '')
+
+    try {
+      const res = await fetch(`/api/meetings/availability?employeeId=${employeeId}&date=${date}`)
+      const data = await res.json()
+
+      if (data.calendarUnavailable) {
+        setCalendarUnavailable(true)
+        setCalendarMessage(data.message || 'Calendar not connected.')
+      } else {
+        setSlots(data.slots ?? [])
+      }
+      setSlotsFetched(true)
+    } catch {
+      toastError('Failed to load availability')
+    } finally {
+      setSlotsLoading(false)
+    }
+  }, [setValue, toastError])
+
+  useEffect(() => {
+    if (watchedEmployee && watchedDate) {
+      fetchAvailability(watchedEmployee, watchedDate)
+    } else {
+      setSlots([])
+      setSlotsFetched(false)
+      setCalendarUnavailable(false)
+    }
+  }, [watchedEmployee, watchedDate, fetchAvailability])
+
   const onSubmit = async (data: FormData) => {
     setIsLoading(true)
     try {
-      // Fix: Use explicit Date constructor to ensure local time interpretation
-      // String parsing like new Date("2026-02-17T15:30") can inconsistently treat time as UTC
-      const [year, month, day] = data.meetingDate.split('-').map(Number)
-      const [hours, minutes] = data.meetingTime.split(':').map(Number)
-      const meetingDateTime = new Date(year, month - 1, day, hours, minutes)
-
       const response = await fetch('/api/meetings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           employeeId: data.employeeId,
-          meetingDate: meetingDateTime.toISOString(),
+          meetingDate: data.meetingTime,
         }),
       })
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.error || 'Failed to create meeting')
+        throw new Error(error.error || 'Failed to propose meeting')
       }
 
       const meeting = await response.json()
+      toastSuccess('Meeting proposal sent')
       router.push(`/meetings/${meeting.id}`)
     } catch (error) {
-      toastError(error instanceof Error ? error.message : 'Failed to create meeting. Please try again.')
+      toastError(error instanceof Error ? error.message : 'Failed to propose meeting. Please try again.')
     } finally {
       setIsLoading(false)
     }
   }
 
-  // Allow today onward for scheduling
   const today = new Date()
   const minDate = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0')
+
+  function formatSlotTime(isoString: string) {
+    return new Date(isoString).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
+  }
 
   return (
     <div className="max-w-4xl">
@@ -99,7 +152,7 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid gap-6 lg:grid-cols-[1fr,1fr] items-start">
           {/* Left: Team Member with search + scrollable list */}
-          <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-hidden flex flex-col max-h-[420px]">
+          <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-hidden flex flex-col max-h-[520px]">
             <div className="px-6 py-4 border-b border-off-white dark:border-medium-gray/20 flex items-center gap-3 shrink-0">
               <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
                 <User className="w-5 h-5 text-blue-500" />
@@ -170,19 +223,20 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
             </div>
           </div>
 
-          {/* Right: Date, Time, Submit - always visible */}
-          <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-visible flex flex-col">
-            <div className="px-6 py-4 border-b border-off-white dark:border-medium-gray/20 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-green-500" />
+          {/* Right: Date, Available Slots, Submit */}
+          <div className="space-y-6">
+            {/* Date picker card */}
+            <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-visible flex flex-col">
+              <div className="px-6 py-4 border-b border-off-white dark:border-medium-gray/20 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-green-500" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-dark-gray dark:text-white">Pick a date</h2>
+                  <p className="text-sm text-medium-gray">Available time slots will appear below</p>
+                </div>
               </div>
-              <div>
-                <h2 className="font-semibold text-dark-gray dark:text-white">Date & time</h2>
-                <p className="text-sm text-medium-gray">Pick when to meet</p>
-              </div>
-            </div>
-            <div className="p-6 space-y-6">
-              <div>
+              <div className="p-6">
                 <DatePicker
                   label="Date"
                   value={watchedDate || ''}
@@ -194,43 +248,96 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
                   <p className="mt-2 text-sm text-red-500">{errors.meetingDate.message}</p>
                 )}
               </div>
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-dark-gray dark:text-white mb-2">
-                  <Clock className="w-4 h-4 text-medium-gray" />
-                  Time
-                </label>
-                <div className="relative">
-                  <select
-                    {...register('meetingTime')}
-                    className="w-full appearance-none rounded-xl border border-off-white dark:border-medium-gray/20 bg-white dark:bg-charcoal px-4 py-3 text-dark-gray dark:text-white focus:outline-none focus:ring-2 focus:ring-dark-gray/20 dark:focus:ring-white/20 transition-all"
-                  >
-                    <option value="">Select time</option>
-                    {Array.from({ length: 24 }, (_, hour) =>
-                      ['00', '30'].map((min) => {
-                        const time = `${String(hour).padStart(2, '0')}:${min}`
-                        const displayTime = new Date(`2000-01-01T${time}`).toLocaleTimeString('en-US', {
-                          hour: 'numeric',
-                          minute: '2-digit',
-                          hour12: true,
-                        })
-                        return (
-                          <option key={time} value={time}>
-                            {displayTime}
-                          </option>
-                        )
-                      })
-                    )}
-                  </select>
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <Clock className="w-4 h-4 text-medium-gray" />
+            </div>
+
+            {/* Time slots card (visible after date + employee selected) */}
+            {watchedEmployee && watchedDate && (
+              <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-hidden">
+                <div className="px-6 py-4 border-b border-off-white dark:border-medium-gray/20 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
+                    <Clock className="w-5 h-5 text-purple-500" />
+                  </div>
+                  <div>
+                    <h2 className="font-semibold text-dark-gray dark:text-white">Available time slots</h2>
+                    <p className="text-sm text-medium-gray">Free on both calendars (9 AM – 7 PM)</p>
                   </div>
                 </div>
-                {errors.meetingTime && (
-                  <p className="mt-2 text-sm text-red-500">{errors.meetingTime.message}</p>
-                )}
+                <div className="p-4">
+                  {slotsLoading ? (
+                    <div className="flex items-center justify-center gap-2 py-8 text-medium-gray">
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span className="text-sm">Checking calendars...</span>
+                    </div>
+                  ) : calendarUnavailable ? (
+                    <div className="flex items-start gap-3 py-4 px-2">
+                      <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-dark-gray dark:text-white mb-1">Calendar not connected</p>
+                        <p className="text-sm text-medium-gray">{calendarMessage}</p>
+                        <p className="text-sm text-medium-gray mt-2">You can still propose any time. The employee will be able to accept or suggest a different time.</p>
+                        {/* Fallback: show all 30-min slots */}
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-4">
+                          {Array.from({ length: 20 }, (_, i) => {
+                            const hour = 9 + Math.floor(i / 2)
+                            const min = i % 2 === 0 ? '00' : '30'
+                            const time = `${String(hour).padStart(2, '0')}:${min}`
+                            const [year, month, day] = watchedDate.split('-').map(Number)
+                            const dt = new Date(year, month - 1, day, hour, parseInt(min))
+                            const iso = dt.toISOString()
+                            const display = dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+                            return (
+                              <button
+                                key={time}
+                                type="button"
+                                onClick={() => setValue('meetingTime', iso, { shouldValidate: true })}
+                                className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                                  watchedTime === iso
+                                    ? 'bg-dark-gray dark:bg-white text-white dark:text-dark-gray'
+                                    : 'bg-off-white dark:bg-dark-gray text-dark-gray dark:text-white hover:bg-dark-gray/10 dark:hover:bg-white/10'
+                                }`}
+                              >
+                                {display}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  ) : slotsFetched && slots.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Calendar className="w-10 h-10 text-light-gray mx-auto mb-2" />
+                      <p className="text-sm font-medium text-dark-gray dark:text-white mb-1">No available slots</p>
+                      <p className="text-sm text-medium-gray">Both calendars are fully booked on this date. Try another day.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {slots.map((slot) => (
+                        <button
+                          key={slot.start}
+                          type="button"
+                          onClick={() => setValue('meetingTime', slot.start, { shouldValidate: true })}
+                          className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                            watchedTime === slot.start
+                              ? 'bg-dark-gray dark:bg-white text-white dark:text-dark-gray'
+                              : 'bg-off-white dark:bg-dark-gray text-dark-gray dark:text-white hover:bg-dark-gray/10 dark:hover:bg-white/10'
+                          }`}
+                        >
+                          {formatSlotTime(slot.start)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {/* Hidden input for react-hook-form */}
+                  <input type="hidden" {...register('meetingTime')} />
+                  {errors.meetingTime && (
+                    <p className="mt-3 text-sm text-red-500">{errors.meetingTime.message}</p>
+                  )}
+                </div>
               </div>
-            </div>
-            <div className="p-6 pt-0 flex flex-col sm:flex-row justify-end gap-3">
+            )}
+
+            {/* Submit */}
+            <div className="flex flex-col sm:flex-row justify-end gap-3">
               <button
                 type="button"
                 onClick={() => router.back()}
@@ -240,18 +347,18 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
               </button>
               <button
                 type="submit"
-                disabled={isLoading || employees.length === 0}
-                className="px-6 py-3 rounded-xl bg-dark-gray dark:bg-white text-white dark:text-dark-gray font-medium hover:bg-charcoal dark:hover:bg-off-white disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 order-1 sm:order-2"
+                disabled={isLoading || employees.length === 0 || !watchedTime}
+                className="px-6 py-3 rounded-xl bg-dark-gray dark:bg-white text-white dark:text-dark-gray font-medium hover:bg-charcoal dark:hover:bg-off-white disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 order-1 sm:order-2 min-h-[44px]"
               >
                 {isLoading ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white/30 dark:border-dark-gray/30 border-t-white dark:border-t-dark-gray rounded-full animate-spin" />
-                    Creating...
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Sending proposal...
                   </>
                 ) : (
                   <>
                     <Calendar className="w-4 h-4" />
-                    Schedule Meeting
+                    Propose Time
                   </>
                 )}
               </button>

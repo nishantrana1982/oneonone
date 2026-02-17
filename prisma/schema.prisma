@@ -104,7 +104,8 @@ model Meeting {
   headsUp                  String?
   anythingElse             String?
   formSubmittedAt          DateTime?
-  status                   MeetingStatus      @default(SCHEDULED)
+  status                   MeetingStatus      @default(PROPOSED)
+  proposedById             String?
   createdAt                DateTime           @default(now())
   updatedAt                DateTime           @updatedAt
   notes                    String?
@@ -319,6 +320,7 @@ enum UserRole {
 }
 
 enum MeetingStatus {
+  PROPOSED
   SCHEDULED
   COMPLETED
   CANCELLED

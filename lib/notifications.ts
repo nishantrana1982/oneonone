@@ -265,3 +265,50 @@ export async function notifyTodoOverdue(
     link: `/todos`,
   })
 }
+
+// ── Proposal-based scheduling notifications ─────────────────────────
+
+export async function notifyMeetingProposed(
+  employeeId: string,
+  reporterName: string,
+  meetingDate: Date,
+  meetingId: string
+) {
+  return createNotification({
+    userId: employeeId,
+    type: 'MEETING_SCHEDULED',
+    title: 'Meeting Request',
+    message: `${reporterName} proposed a one-on-one for ${meetingDate.toLocaleDateString()}. Accept or suggest a new time.`,
+    link: `/meetings/${meetingId}`,
+  })
+}
+
+export async function notifyMeetingAccepted(
+  proposerId: string,
+  acceptorName: string,
+  meetingDate: Date,
+  meetingId: string
+) {
+  return createNotification({
+    userId: proposerId,
+    type: 'MEETING_SCHEDULED',
+    title: 'Meeting Confirmed',
+    message: `${acceptorName} accepted the one-on-one for ${meetingDate.toLocaleDateString()}.`,
+    link: `/meetings/${meetingId}`,
+  })
+}
+
+export async function notifyMeetingSuggested(
+  recipientId: string,
+  suggestorName: string,
+  newDate: Date,
+  meetingId: string
+) {
+  return createNotification({
+    userId: recipientId,
+    type: 'MEETING_SCHEDULED',
+    title: 'New Time Suggested',
+    message: `${suggestorName} suggested a new time for the one-on-one: ${newDate.toLocaleDateString()}. Accept or suggest another time.`,
+    link: `/meetings/${meetingId}`,
+  })
+}

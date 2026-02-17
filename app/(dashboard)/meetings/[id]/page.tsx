@@ -13,6 +13,7 @@ import { DeleteMeetingButton } from './delete-meeting-button'
 import { TranscriptViewer } from './transcript-viewer'
 import { MeetingNotes } from './meeting-notes'
 import { FileAttachments } from './file-attachments'
+import { ProposalActions } from './proposal-actions'
 
 export default async function MeetingDetailPage({
   params,
@@ -62,6 +63,17 @@ export default async function MeetingDetailPage({
   const showFillFormCta = canEditForm && !formSubmitted
   const showEditFormCta = canEditForm && formSubmitted && !isPast
 
+  // Proposal flow
+  const isProposed = meeting.status === 'PROPOSED'
+  const proposedById = meeting.proposedById
+  const isProposalReceiver = isProposed && (
+    (proposedById === meeting.reporterId && user.id === meeting.employeeId) ||
+    (proposedById === meeting.employeeId && user.id === meeting.reporterId)
+  )
+  const isProposalProposer = isProposed && user.id === proposedById
+  const proposedByName = proposedById === meeting.reporterId ? meeting.reporter.name : meeting.employee.name
+  const otherPartyName = user.id === meeting.employeeId ? meeting.reporter.name : meeting.employee.name
+
   const formSections = [
     { title: 'Check-In: Personal Best', content: meeting.checkInPersonal },
     { title: 'Check-In: Professional Best', content: meeting.checkInProfessional },
@@ -107,12 +119,28 @@ export default async function MeetingDetailPage({
           <span className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium ${
             meeting.status === 'COMPLETED'
               ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+              : meeting.status === 'PROPOSED'
+              ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+              : meeting.status === 'CANCELLED'
+              ? 'bg-red-500/10 text-red-600 dark:text-red-400'
               : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
           }`}>
-            {meeting.status === 'COMPLETED' ? 'Completed' : isPast ? 'Form submitted' : 'Scheduled'}
+            {meeting.status === 'COMPLETED' ? 'Completed' : meeting.status === 'PROPOSED' ? 'Proposed' : meeting.status === 'CANCELLED' ? 'Cancelled' : isPast ? 'Form submitted' : 'Scheduled'}
           </span>
         </div>
       </div>
+
+      {/* Proposal Actions – accept or suggest new time */}
+      {isProposed && (
+        <ProposalActions
+          meetingId={meeting.id}
+          meetingDate={meetingDate.toISOString()}
+          proposedByName={proposedByName || 'Someone'}
+          isReceiver={!!isProposalReceiver}
+          isProposer={!!isProposalProposer}
+          otherPartyName={otherPartyName || 'the other party'}
+        />
+      )}
 
       {/* Form CTA – first thing employee sees: fill before meeting, or edit until meeting time */}
       {showFillFormCta && (

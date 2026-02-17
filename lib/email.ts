@@ -409,3 +409,114 @@ export async function sendFormSubmittedEmail(
     html,
   })
 }
+
+// ---------------------------------------------------------------------------
+// Proposal-based scheduling emails
+// ---------------------------------------------------------------------------
+
+function formatDateFull(date: Date): string {
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date)
+}
+
+/** Email sent to the employee when a reporter proposes a meeting time. */
+export async function sendMeetingProposalEmail(
+  employeeEmail: string,
+  employeeName: string | null,
+  reporterName: string | null,
+  meetingDate: Date,
+  meetingId: string
+) {
+  const empName = employeeName || 'Team Member'
+  const mgrName = reporterName || 'Your Manager'
+  const formattedDate = formatDateFull(meetingDate)
+
+  const html = emailLayout({
+    preheader: `${mgrName} has proposed a one-on-one meeting for ${formattedDate}`,
+    heading: 'Meeting Request',
+    body: `
+      <p style="margin:0 0 16px;">Hi ${empName},</p>
+      <p style="margin:0 0 20px;"><strong>${mgrName}</strong> has proposed a one-on-one meeting with you. Please review the details and either accept the proposed time or suggest an alternative.</p>
+      ${detailRow('Proposed By', mgrName)}
+      ${detailRow('Date & Time', formattedDate)}
+    `,
+    ctaText: 'Accept or Suggest New Time',
+    ctaUrl: `${baseUrl()}/meetings/${meetingId}`,
+  })
+
+  await sendEmail({
+    to: employeeEmail,
+    subject: `Meeting Request – ${mgrName} · ${formattedDate}`,
+    html,
+  })
+}
+
+/** Email sent to the proposer when the receiver accepts. */
+export async function sendMeetingAcceptedEmail(
+  proposerEmail: string,
+  proposerName: string | null,
+  acceptorName: string | null,
+  meetingDate: Date,
+  meetingId: string
+) {
+  const pName = proposerName || 'Manager'
+  const aName = acceptorName || 'Team Member'
+  const formattedDate = formatDateFull(meetingDate)
+
+  const html = emailLayout({
+    preheader: `${aName} accepted the one-on-one for ${formattedDate}`,
+    heading: 'Meeting Confirmed',
+    body: `
+      <p style="margin:0 0 16px;">Hi ${pName},</p>
+      <p style="margin:0 0 20px;"><strong>${aName}</strong> has accepted the proposed one-on-one meeting. The meeting has been added to your calendar.</p>
+      ${detailRow('Accepted By', aName)}
+      ${detailRow('Date & Time', formattedDate)}
+    `,
+    ctaText: 'View Meeting',
+    ctaUrl: `${baseUrl()}/meetings/${meetingId}`,
+  })
+
+  await sendEmail({
+    to: proposerEmail,
+    subject: `Meeting Confirmed – ${aName} · ${formattedDate}`,
+    html,
+  })
+}
+
+/** Email sent to the other party when the receiver suggests a new time. */
+export async function sendMeetingSuggestionEmail(
+  recipientEmail: string,
+  recipientName: string | null,
+  suggestorName: string | null,
+  newDate: Date,
+  meetingId: string
+) {
+  const rName = recipientName || 'Manager'
+  const sName = suggestorName || 'Team Member'
+  const formattedDate = formatDateFull(newDate)
+
+  const html = emailLayout({
+    preheader: `${sName} suggested a new time: ${formattedDate}`,
+    heading: 'New Time Suggested',
+    body: `
+      <p style="margin:0 0 16px;">Hi ${rName},</p>
+      <p style="margin:0 0 20px;"><strong>${sName}</strong> has suggested a different time for the one-on-one meeting. Please review and either accept or propose another time.</p>
+      ${detailRow('Suggested By', sName)}
+      ${detailRow('New Date & Time', formattedDate)}
+    `,
+    ctaText: 'Accept or Suggest Another Time',
+    ctaUrl: `${baseUrl()}/meetings/${meetingId}`,
+  })
+
+  await sendEmail({
+    to: recipientEmail,
+    subject: `New Time Suggested – ${sName} · ${formattedDate}`,
+    html,
+  })
+}

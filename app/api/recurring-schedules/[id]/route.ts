@@ -2,11 +2,54 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
+import { MeetingStatus } from '@prisma/client'
 
 function getScheduleId(params: { id?: string }): string | null {
   const id = params?.id
   if (typeof id === 'string' && id.length > 0) return id
   return null
+}
+
+/** Cancel all future SCHEDULED meetings linked to this recurring schedule. Returns count cancelled. */
+async function cancelFutureMeetingsForSchedule(
+  scheduleId: string,
+  reporterName: string
+): Promise<number> {
+  const now = new Date()
+  const futureMeetings = await prisma.meeting.findMany({
+    where: {
+      recurringScheduleId: scheduleId,
+      status: MeetingStatus.SCHEDULED,
+      meetingDate: { gt: now },
+    },
+    include: { calendarEvent: true },
+  })
+
+  const { deleteCalendarEvent } = await import('@/lib/google-calendar')
+  const { notifyMeetingCancelled } = await import('@/lib/notifications')
+
+  let cancelled = 0
+  for (const meeting of futureMeetings) {
+    if (meeting.calendarEvent) {
+      try {
+        await deleteCalendarEvent(meeting.calendarEvent.googleEventId, meeting.reporterId)
+      } catch (error) {
+        console.error('Failed to delete calendar event for meeting', meeting.id, error)
+      }
+    }
+    await prisma.meeting.update({
+      where: { id: meeting.id },
+      data: { status: MeetingStatus.CANCELLED },
+    })
+    await notifyMeetingCancelled(
+      meeting.employeeId,
+      reporterName,
+      meeting.meetingDate,
+      meeting.id
+    )
+    cancelled++
+  }
+  return cancelled
 }
 
 // Get a specific recurring schedule
@@ -42,7 +85,16 @@ export async function GET(
       select: { id: true, name: true, email: true },
     })
 
-    return NextResponse.json({ ...schedule, employee })
+    const now = new Date()
+    const upcomingMeetingCount = await prisma.meeting.count({
+      where: {
+        recurringScheduleId: id,
+        status: MeetingStatus.SCHEDULED,
+        meetingDate: { gt: now },
+      },
+    })
+
+    return NextResponse.json({ ...schedule, employee, upcomingMeetingCount })
   } catch (error) {
     console.error('Error fetching recurring schedule:', error)
     return NextResponse.json(
@@ -69,7 +121,7 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const { frequency, dayOfWeek, timeOfDay, isActive } = body
+    const { frequency, dayOfWeek, timeOfDay, isActive, cancelFutureMeetings } = body
 
     const isSuperAdmin = user.role === UserRole.SUPER_ADMIN
     const existing = await prisma.recurringSchedule.findFirst({
@@ -78,6 +130,14 @@ export async function PATCH(
 
     if (!existing) {
       return NextResponse.json({ error: 'Schedule not found' }, { status: 404 })
+    }
+
+    let cancelledMeetingCount = 0
+    if (isActive === false && cancelFutureMeetings === true) {
+      cancelledMeetingCount = await cancelFutureMeetingsForSchedule(
+        id,
+        user.name || 'Your manager'
+      )
     }
 
     const schedule = await prisma.recurringSchedule.update({
@@ -90,7 +150,7 @@ export async function PATCH(
       },
     })
 
-    return NextResponse.json(schedule)
+    return NextResponse.json({ ...schedule, cancelledMeetingCount })
   } catch (error) {
     console.error('Error updating recurring schedule:', error)
     return NextResponse.json(
@@ -116,6 +176,9 @@ export async function DELETE(
       return NextResponse.json({ error: 'Schedule ID is required' }, { status: 400 })
     }
 
+    const url = new URL(request.url)
+    const cancelFutureMeetings = url.searchParams.get('cancelFutureMeetings') !== 'false'
+
     const isSuperAdmin = user.role === UserRole.SUPER_ADMIN
     const whereClause = isSuperAdmin ? { id } : { id, reporterId: user.id }
 
@@ -130,12 +193,24 @@ export async function DELETE(
       )
     }
 
+    let cancelledMeetingCount = 0
+    if (cancelFutureMeetings) {
+      cancelledMeetingCount = await cancelFutureMeetingsForSchedule(
+        id,
+        user.name || 'Your manager'
+      )
+    }
+
     await prisma.recurringSchedule.update({
       where: { id },
       data: { isActive: false },
     })
 
-    return NextResponse.json({ success: true, message: 'Schedule deleted' })
+    return NextResponse.json({
+      success: true,
+      message: 'Schedule deleted',
+      cancelledMeetingCount,
+    })
   } catch (error) {
     console.error('Error deleting recurring schedule:', error)
     return NextResponse.json(
