@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { RecurringFrequency } from '@prisma/client'
-import { notifyMeetingScheduled, notifyMeetingReminder } from '@/lib/notifications'
-import { sendEmail } from '@/lib/email'
+import { notifyMeetingProposed, notifyMeetingReminder } from '@/lib/notifications'
+import { sendEmail, sendMeetingProposalEmail } from '@/lib/email'
 
 // This endpoint should be called by a cron job (e.g., every hour)
 // Set up a cron job to call: POST /api/cron/meetings with header: x-cron-secret: YOUR_SECRET
@@ -55,18 +55,23 @@ async function generateRecurringMeetings(results: { recurringMeetingsCreated: nu
     },
     include: {
       reporter: { select: { id: true, name: true, email: true } },
+      employee: { select: { id: true, name: true, email: true } },
     },
   })
 
   for (const schedule of schedules) {
     try {
-      // Create the meeting
+      const meetingDate = schedule.nextMeetingDate || now
+
+      // Create the meeting as PROPOSED (requires employee acceptance)
       const meeting = await prisma.meeting.create({
         data: {
           employeeId: schedule.employeeId,
           reporterId: schedule.reporterId,
-          meetingDate: schedule.nextMeetingDate || now,
+          meetingDate,
           recurringScheduleId: schedule.id,
+          status: 'PROPOSED',
+          proposedById: schedule.reporterId,
         },
       })
 
@@ -75,7 +80,7 @@ async function generateRecurringMeetings(results: { recurringMeetingsCreated: nu
         schedule.dayOfWeek,
         schedule.timeOfDay,
         schedule.frequency,
-        schedule.nextMeetingDate || now
+        meetingDate
       )
 
       // Update the schedule
@@ -87,13 +92,30 @@ async function generateRecurringMeetings(results: { recurringMeetingsCreated: nu
         },
       })
 
-      // Notify the employee
-      await notifyMeetingScheduled(
-        schedule.employeeId,
-        schedule.reporter.name || 'Your manager',
-        schedule.nextMeetingDate || now,
-        meeting.id
-      )
+      // Send proposal email to the employee
+      try {
+        await sendMeetingProposalEmail(
+          schedule.employee.email,
+          schedule.employee.name,
+          schedule.reporter.name,
+          meetingDate,
+          meeting.id
+        )
+      } catch (emailError) {
+        console.error('Failed to send proposal email for recurring meeting:', emailError)
+      }
+
+      // In-app notification for the employee
+      try {
+        await notifyMeetingProposed(
+          schedule.employeeId,
+          schedule.reporter.name || 'Your manager',
+          meetingDate,
+          meeting.id
+        )
+      } catch (notifError) {
+        console.error('Failed to send proposal notification:', notifError)
+      }
 
       results.recurringMeetingsCreated++
     } catch (error) {
