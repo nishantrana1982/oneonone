@@ -111,7 +111,26 @@ export async function POST(request: NextRequest) {
         meeting.id
       )
     } catch (error: unknown) {
-      console.error('Failed to send proposal email:', error)
+      console.error('Failed to send proposal email to employee:', error)
+    }
+
+    // Send confirmation email to the reporter (proposer)
+    try {
+      const { sendEmail } = await import('@/lib/email')
+      const formattedDate = new Intl.DateTimeFormat('en-US', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+        hour: 'numeric', minute: '2-digit',
+      }).format(new Date(meetingDate))
+      await sendEmail({
+        to: meeting.reporter.email,
+        subject: `Meeting Proposed – ${meeting.employee.name || 'Team Member'} · ${formattedDate}`,
+        html: `<p>Hi ${meeting.reporter.name || 'Manager'},</p>
+<p>Your one-on-one meeting proposal with <strong>${meeting.employee.name || 'Team Member'}</strong> for <strong>${formattedDate}</strong> has been sent.</p>
+<p>You'll be notified when they accept or suggest a new time.</p>
+<p><a href="${process.env.NEXTAUTH_URL || 'https://app.example.com'}/meetings/${meeting.id}">View Meeting</a></p>`,
+      })
+    } catch (error: unknown) {
+      console.error('Failed to send confirmation email to reporter:', error)
     }
 
     // Create in-app notification for the employee
