@@ -149,3 +149,107 @@ export async function logLogin(userId: string, ipAddress?: string, userAgent?: s
     userAgent,
   })
 }
+
+// Meeting audit helpers
+export async function logMeetingCreated(userId: string, meetingId: string, details?: Prisma.InputJsonValue) {
+  return createAuditLog({
+    userId,
+    action: 'CREATE',
+    entityType: 'Meeting',
+    entityId: meetingId,
+    details,
+  })
+}
+
+export async function logMeetingUpdated(userId: string, meetingId: string, details?: Prisma.InputJsonValue) {
+  return createAuditLog({
+    userId,
+    action: 'UPDATE',
+    entityType: 'Meeting',
+    entityId: meetingId,
+    details,
+  })
+}
+
+export async function logMeetingDeleted(userId: string, meetingId: string, details?: Prisma.InputJsonValue) {
+  return createAuditLog({
+    userId,
+    action: 'DELETE',
+    entityType: 'Meeting',
+    entityId: meetingId,
+    details,
+  })
+}
+
+// Todo audit helpers
+export async function logTodoCreated(userId: string, todoId: string, details?: Prisma.InputJsonValue) {
+  return createAuditLog({
+    userId,
+    action: 'CREATE',
+    entityType: 'Todo',
+    entityId: todoId,
+    details,
+  })
+}
+
+export async function logTodoUpdated(userId: string, todoId: string, details?: Prisma.InputJsonValue) {
+  return createAuditLog({
+    userId,
+    action: 'UPDATE',
+    entityType: 'Todo',
+    entityId: todoId,
+    details,
+  })
+}
+
+export async function logTodoDeleted(userId: string, todoId: string, details?: Prisma.InputJsonValue) {
+  return createAuditLog({
+    userId,
+    action: 'DELETE',
+    entityType: 'Todo',
+    entityId: todoId,
+    details,
+  })
+}
+
+// Department audit helpers
+export async function logDepartmentCreated(userId: string, deptId: string, details?: Prisma.InputJsonValue) {
+  return createAuditLog({
+    userId,
+    action: 'CREATE',
+    entityType: 'Department',
+    entityId: deptId,
+    details,
+  })
+}
+
+export async function logDepartmentUpdated(userId: string, deptId: string, details?: Prisma.InputJsonValue) {
+  return createAuditLog({
+    userId,
+    action: 'UPDATE',
+    entityType: 'Department',
+    entityId: deptId,
+    details,
+  })
+}
+
+export async function logDepartmentDeleted(userId: string, deptId: string, details?: Prisma.InputJsonValue) {
+  return createAuditLog({
+    userId,
+    action: 'DELETE',
+    entityType: 'Department',
+    entityId: deptId,
+    details,
+  })
+}
+
+// Recording audit helpers
+export async function logRecordingProcessed(userId: string, meetingId: string, details?: Prisma.InputJsonValue) {
+  return createAuditLog({
+    userId,
+    action: 'UPDATE',
+    entityType: 'Recording',
+    entityId: meetingId,
+    details,
+  })
+}

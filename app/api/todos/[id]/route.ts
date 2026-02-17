@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { TodoStatus, TodoPriority } from '@prisma/client'
+import { logTodoUpdated, logTodoDeleted } from '@/lib/audit'
 
 export async function PATCH(
   request: NextRequest,
@@ -45,6 +46,12 @@ export async function PATCH(
       },
     })
 
+    // Audit log
+    await logTodoUpdated(user.id, params.id, {
+      title: todo.title,
+      changes: updateData,
+    })
+
     return NextResponse.json(updatedTodo)
   } catch (error) {
     console.error('Error updating todo:', error)
@@ -74,6 +81,11 @@ export async function DELETE(
 
     await prisma.todo.delete({
       where: { id: params.id },
+    })
+
+    // Audit log
+    await logTodoDeleted(user.id, params.id, {
+      title: todo.title,
     })
 
     return NextResponse.json({ success: true })

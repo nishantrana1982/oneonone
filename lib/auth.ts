@@ -2,6 +2,7 @@ import { NextAuthOptions } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
 import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import { prisma } from './prisma'
+import { logLogin } from './audit'
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -14,6 +15,12 @@ export const authOptions: NextAuthOptions = {
           where: { id: user.id },
           data: { name },
         })
+      }
+    },
+    // Log sign-in to audit trail
+    signIn: async ({ user }) => {
+      if (user?.id) {
+        await logLogin(user.id)
       }
     },
   },

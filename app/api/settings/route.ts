@@ -3,6 +3,7 @@ import { requireRole } from '@/lib/auth-helpers'
 import { getSettings, updateSettings } from '@/lib/settings'
 import { maskApiKey } from '@/lib/encryption'
 import { UserRole } from '@prisma/client'
+import { logSettingsChanged } from '@/lib/audit'
 
 // GET - Fetch settings (masked for security)
 export async function GET() {
@@ -37,7 +38,7 @@ export async function GET() {
 // PUT - Update settings
 export async function PUT(request: NextRequest) {
   try {
-    await requireRole([UserRole.SUPER_ADMIN])
+    const user = await requireRole([UserRole.SUPER_ADMIN])
     
     const body = await request.json()
     const {
@@ -65,6 +66,13 @@ export async function PUT(request: NextRequest) {
     if (maxRecordingMins !== undefined) updates.maxRecordingMins = parseInt(maxRecordingMins) || 25
 
     await updateSettings(updates)
+
+    // Audit log (mask sensitive fields)
+    const safeChanges = Object.keys(updates).reduce((acc, key) => {
+      acc[key] = ['openaiApiKey', 'awsAccessKeyId', 'awsSecretKey'].includes(key) ? '***updated***' : updates[key]
+      return acc
+    }, {} as Record<string, string | number | null>)
+    await logSettingsChanged(user.id, safeChanges)
 
     // Return updated settings (masked)
     const settings = await getSettings()

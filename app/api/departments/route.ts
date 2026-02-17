@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, handleApiError } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
+import { logDepartmentCreated } from '@/lib/audit'
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,13 +22,16 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    await requireAdmin()
+    const admin = await requireAdmin()
     const body = await request.json()
     const { name } = body
 
     const department = await prisma.department.create({
       data: { name },
     })
+
+    // Audit log
+    await logDepartmentCreated(admin.id, department.id, { name })
 
     return NextResponse.json(department)
   } catch (error: unknown) {

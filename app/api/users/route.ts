@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, handleApiError } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
+import { logUserCreated } from '@/lib/audit'
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    await requireAdmin()
+    const admin = await requireAdmin()
     const body = await request.json()
     const { email, name, role, departmentId, reportsToId } = body
 
@@ -34,6 +35,9 @@ export async function POST(request: NextRequest) {
         reportsToId: reportsToId || null,
       },
     })
+
+    // Audit log
+    await logUserCreated(admin.id, user.id, { email, name, role: role || 'EMPLOYEE' })
 
     return NextResponse.json(user)
   } catch (error: unknown) {

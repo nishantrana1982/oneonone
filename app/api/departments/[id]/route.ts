@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, handleApiError } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
+import { logDepartmentUpdated, logDepartmentDeleted } from '@/lib/audit'
 
 export async function GET(
   request: NextRequest,
@@ -41,7 +42,7 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    await requireAdmin()
+    const admin = await requireAdmin()
     const body = await request.json()
     const { name } = body
 
@@ -53,6 +54,9 @@ export async function PATCH(
       where: { id: params.id },
       data: { name: name.trim() },
     })
+
+    // Audit log
+    await logDepartmentUpdated(admin.id, params.id, { name: name.trim() })
 
     return NextResponse.json(department)
   } catch (error: unknown) {
@@ -73,7 +77,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    await requireAdmin()
+    const admin = await requireAdmin()
 
     // First, remove department from all users
     await prisma.user.updateMany({
@@ -85,6 +89,9 @@ export async function DELETE(
     await prisma.department.delete({
       where: { id: params.id },
     })
+
+    // Audit log
+    await logDepartmentDeleted(admin.id, params.id)
 
     return NextResponse.json({ success: true })
   } catch (error: unknown) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
+import { logMeetingUpdated, logMeetingDeleted } from '@/lib/audit'
 
 export async function PATCH(
   request: NextRequest,
@@ -40,6 +41,12 @@ export async function PATCH(
         employee: { select: { name: true, email: true } },
         reporter: { select: { name: true, email: true } },
       },
+    })
+
+    // Audit log
+    await logMeetingUpdated(user.id, params.id, {
+      changes: updateData,
+      employeeName: meeting.employee.name,
     })
 
     // Update Google Calendar event if it exists
@@ -132,6 +139,11 @@ export async function DELETE(
 
     await prisma.meeting.delete({
       where: { id: params.id },
+    })
+
+    // Audit log
+    await logMeetingDeleted(user.id, params.id, {
+      meetingDate: meeting.meetingDate,
     })
 
     return NextResponse.json({ success: true })

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, handleApiError } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
+import { logUserUpdated, logUserDeleted } from '@/lib/audit'
 
 export async function GET(
   request: NextRequest,
@@ -33,7 +34,7 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    await requireAdmin()
+    const admin = await requireAdmin()
     const body = await request.json()
     const { name, email, role, departmentId, reportsToId, isActive } = body
 
@@ -86,6 +87,11 @@ export async function PATCH(
       },
     })
 
+    // Audit log
+    await logUserUpdated(admin.id, params.id, {
+      changes: { name, email, role, departmentId, reportsToId, isActive },
+    })
+
     return NextResponse.json(updatedUser)
   } catch (error) {
     console.error('Error updating user:', error)
@@ -98,13 +104,16 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    await requireAdmin()
+    const admin = await requireAdmin()
 
     // Soft delete by setting isActive to false
     const user = await prisma.user.update({
       where: { id: params.id },
       data: { isActive: false },
     })
+
+    // Audit log
+    await logUserDeleted(admin.id, params.id, user.email)
 
     return NextResponse.json({ success: true, user })
   } catch (error) {

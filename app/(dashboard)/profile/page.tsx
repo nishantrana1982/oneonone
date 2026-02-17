@@ -17,9 +17,20 @@ export default async function ProfilePage() {
 
   if (!user) redirect('/auth/signin')
 
-  const departments = await prisma.department.findMany({
-    orderBy: { name: 'asc' },
-  })
+  const [departments, managers] = await Promise.all([
+    prisma.department.findMany({
+      orderBy: { name: 'asc' },
+    }),
+    prisma.user.findMany({
+      where: {
+        isActive: true,
+        id: { not: currentUser.id },
+        role: { in: ['REPORTER', 'SUPER_ADMIN'] },
+      },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: 'asc' },
+    }),
+  ])
 
   return (
     <ProfileClient 
@@ -30,13 +41,15 @@ export default async function ProfilePage() {
         avatar: user.avatar,
         phone: user.phone,
         title: user.title,
-        bio: user.bio,
         role: user.role,
+        departmentId: user.departmentId,
+        reportsToId: user.reportsToId,
         department: user.department,
         reportsTo: user.reportsTo,
         createdAt: user.createdAt.toISOString(),
       }}
       departments={departments}
+      managers={managers}
     />
   )
 }

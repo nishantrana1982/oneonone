@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCurrentUser } from '@/lib/auth-helpers'
+import { requireAuth } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const currentUser = await getCurrentUser()
-    if (!currentUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const currentUser = await requireAuth()
 
     const user = await prisma.user.findUnique({
       where: { id: currentUser.id },
@@ -20,6 +17,8 @@ export async function GET(request: NextRequest) {
         title: true,
         bio: true,
         role: true,
+        departmentId: true,
+        reportsToId: true,
         department: { select: { id: true, name: true } },
         reportsTo: { select: { id: true, name: true, email: true } },
         createdAt: true,
@@ -39,28 +38,57 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const currentUser = await getCurrentUser()
-    if (!currentUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const currentUser = await requireAuth()
 
     const body = await request.json()
-    const { name, phone, title, bio } = body
+    const { name, phone, title, bio, departmentId, reportsToId } = body
 
     // Validate name
     if (name !== undefined && (!name || name.trim().length < 2)) {
       return NextResponse.json({ error: 'Name must be at least 2 characters' }, { status: 400 })
     }
 
-    // Update user
+    // Prevent self-reporting
+    if (reportsToId !== undefined && reportsToId === currentUser.id) {
+      return NextResponse.json({ error: 'You cannot report to yourself' }, { status: 400 })
+    }
+
+    // Validate reportsToId if provided
+    if (reportsToId !== undefined && reportsToId !== '' && reportsToId !== null) {
+      const manager = await prisma.user.findUnique({
+        where: { id: reportsToId },
+      })
+      if (!manager) {
+        return NextResponse.json({ error: 'Selected manager not found' }, { status: 400 })
+      }
+      // Prevent circular: if the selected manager reports to you
+      if (manager.reportsToId === currentUser.id) {
+        return NextResponse.json({ error: 'Cannot select a manager who reports to you' }, { status: 400 })
+      }
+    }
+
+    // Validate departmentId if provided
+    if (departmentId !== undefined && departmentId !== '' && departmentId !== null) {
+      const dept = await prisma.department.findUnique({
+        where: { id: departmentId },
+      })
+      if (!dept) {
+        return NextResponse.json({ error: 'Selected department not found' }, { status: 400 })
+      }
+    }
+
+    // Build update data
+    const updateData: Record<string, string | null> = {}
+    if (name !== undefined) updateData.name = name.trim()
+    if (phone !== undefined) updateData.phone = phone.trim() || null
+    if (title !== undefined) updateData.title = title.trim() || null
+    if (bio !== undefined) updateData.bio = bio.trim() || null
+    if (departmentId !== undefined) updateData.departmentId = departmentId || null
+    if (reportsToId !== undefined) updateData.reportsToId = reportsToId || null
+
     const updatedUser = await prisma.user.update({
       where: { id: currentUser.id },
-      data: {
-        ...(name !== undefined && { name: name.trim() }),
-        ...(phone !== undefined && { phone: phone.trim() || null }),
-        ...(title !== undefined && { title: title.trim() || null }),
-        ...(bio !== undefined && { bio: bio.trim() || null }),
-      },
+      data: updateData,
       select: {
         id: true,
         name: true,
@@ -69,6 +97,11 @@ export async function PATCH(request: NextRequest) {
         phone: true,
         title: true,
         bio: true,
+        role: true,
+        departmentId: true,
+        reportsToId: true,
+        department: { select: { id: true, name: true } },
+        reportsTo: { select: { id: true, name: true, email: true } },
       },
     })
 

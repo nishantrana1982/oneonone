@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, handleApiError } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { TodoPriority, TodoStatus } from '@prisma/client'
+import { logTodoCreated } from '@/lib/audit'
 
 export async function GET(request: NextRequest) {
   try {
@@ -58,6 +59,13 @@ export async function POST(request: NextRequest) {
         createdBy: { select: { name: true, email: true } },
         meeting: { select: { id: true, meetingDate: true } },
       },
+    })
+
+    // Audit log
+    await logTodoCreated(user.id, todo.id, {
+      title: todo.title,
+      assignedTo: todo.assignedTo?.name,
+      priority: todo.priority,
     })
 
     // Send email + in-app notification if assigned to someone else

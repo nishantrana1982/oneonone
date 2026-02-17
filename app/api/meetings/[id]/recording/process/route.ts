@@ -11,6 +11,7 @@ import {
 import { transcribeAudio, analyzeTranscript } from '@/lib/openai'
 import { UserRole } from '@prisma/client'
 import { getSettings } from '@/lib/settings'
+import { logRecordingProcessed } from '@/lib/audit'
 
 export const maxDuration = 900
 
@@ -76,6 +77,13 @@ export async function POST(
       meeting.reporter.name,
       language
     ).catch((err) => console.error('[Recording] Background processing error:', err))
+
+    // Audit log
+    await logRecordingProcessed(user.id, params.id, {
+      recordingId: recording.id,
+      language,
+      totalChunks,
+    })
 
     return NextResponse.json({ message: 'Processing started', recordingId: recording.id })
   } catch (error) {

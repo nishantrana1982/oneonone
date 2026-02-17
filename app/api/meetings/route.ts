@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
+import { logMeetingCreated } from '@/lib/audit'
 
 export async function GET(request: NextRequest) {
   try {
@@ -75,6 +76,14 @@ export async function POST(request: NextRequest) {
         employee: { select: { name: true, email: true } },
         reporter: { select: { name: true, email: true } },
       },
+    })
+
+    // Audit log
+    await logMeetingCreated(user.id, meeting.id, {
+      employeeId,
+      employeeName: meeting.employee.name,
+      reporterName: meeting.reporter.name,
+      meetingDate,
     })
 
     // Create Google Calendar event
