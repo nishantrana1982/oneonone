@@ -39,6 +39,14 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
   const [calendarUnavailable, setCalendarUnavailable] = useState(false)
   const [calendarMessage, setCalendarMessage] = useState('')
   const [slotsFetched, setSlotsFetched] = useState(false)
+  // Calendar status when an employee is selected (before date)
+  const [calendarStatusLoading, setCalendarStatusLoading] = useState(false)
+  const [calendarStatus, setCalendarStatus] = useState<{
+    yourCalendarConnected: boolean
+    employeeCalendarConnected: boolean
+    employeeName: string | null
+    message: string
+  } | null>(null)
 
   const {
     register,
@@ -54,6 +62,17 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
   const watchedDate = watch('meetingDate')
   const watchedTime = watch('meetingTime')
 
+  const selectedEmployee = useMemo(
+    () => (watchedEmployee ? employees.find((e) => e.id === watchedEmployee) : null),
+    [employees, watchedEmployee]
+  )
+
+  const formattedDateForSlots = useMemo(() => {
+    if (!watchedDate) return ''
+    const [y, m, d] = watchedDate.split('-').map(Number)
+    return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+  }, [watchedDate])
+
   const filteredEmployees = useMemo(() => {
     const q = employeeSearch.trim().toLowerCase()
     if (!q) return employees
@@ -62,6 +81,37 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
         e.name.toLowerCase().includes(q) || e.email.toLowerCase().includes(q)
     )
   }, [employees, employeeSearch])
+
+  // When user selects an employee, check that person's calendar connection status
+  const fetchCalendarStatus = useCallback(async (employeeId: string) => {
+    setCalendarStatusLoading(true)
+    setCalendarStatus(null)
+    try {
+      const res = await fetch(`/api/meetings/availability?employeeId=${encodeURIComponent(employeeId)}`)
+      const data = await res.json()
+      if (res.ok) {
+        setCalendarStatus({
+          yourCalendarConnected: data.yourCalendarConnected ?? false,
+          employeeCalendarConnected: data.employeeCalendarConnected ?? false,
+          employeeName: data.employeeName ?? null,
+          message: data.message ?? '',
+        })
+      }
+    } catch {
+      setCalendarStatus(null)
+    } finally {
+      setCalendarStatusLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (watchedEmployee) {
+      fetchCalendarStatus(watchedEmployee)
+    } else {
+      setCalendarStatus(null)
+      setCalendarStatusLoading(false)
+    }
+  }, [watchedEmployee, fetchCalendarStatus])
 
   // Fetch availability when both employee and date are selected
   const fetchAvailability = useCallback(async (employeeId: string, date: string) => {
@@ -73,7 +123,7 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
     setValue('meetingTime', '')
 
     try {
-      const res = await fetch(`/api/meetings/availability?employeeId=${employeeId}&date=${date}`)
+      const res = await fetch(`/api/meetings/availability?employeeId=${encodeURIComponent(employeeId)}&date=${encodeURIComponent(date)}`)
       const data = await res.json()
 
       if (data.calendarUnavailable) {
@@ -225,6 +275,33 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
 
           {/* Right: Date, Available Slots, Submit */}
           <div className="space-y-6">
+            {/* Calendar check: shown as soon as an employee is selected */}
+            {watchedEmployee && (
+              <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-hidden">
+                <div className="px-4 py-3 border-b border-off-white dark:border-medium-gray/20 flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-blue-500 shrink-0" />
+                  <span className="text-sm font-medium text-dark-gray dark:text-white">Calendar check</span>
+                </div>
+                <div className="p-4">
+                  {calendarStatusLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-medium-gray">
+                      <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                      <span>Checking {selectedEmployee?.name ?? 'their'} calendar connection...</span>
+                    </div>
+                  ) : calendarStatus ? (
+                    <div className="flex items-start gap-3">
+                      {calendarStatus.yourCalendarConnected && calendarStatus.employeeCalendarConnected ? (
+                        <Check className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
+                      ) : (
+                        <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                      )}
+                      <p className="text-sm text-dark-gray dark:text-white">{calendarStatus.message}</p>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            )}
+
             {/* Date picker card */}
             <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-visible flex flex-col">
               <div className="px-6 py-4 border-b border-off-white dark:border-medium-gray/20 flex items-center gap-3">
@@ -266,7 +343,9 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
                   {slotsLoading ? (
                     <div className="flex items-center justify-center gap-2 py-8 text-medium-gray">
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      <span className="text-sm">Checking calendars...</span>
+                      <span className="text-sm">
+                        Checking {selectedEmployee?.name ?? 'their'} and your calendar for {formattedDateForSlots || 'this date'}...
+                      </span>
                     </div>
                   ) : calendarUnavailable ? (
                     <div className="flex items-start gap-3 py-4 px-2">

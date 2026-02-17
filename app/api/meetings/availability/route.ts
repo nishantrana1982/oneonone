@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth-helpers'
 import { UserRole } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,11 +11,37 @@ export async function GET(request: NextRequest) {
     const employeeId = searchParams.get('employeeId')
     const date = searchParams.get('date')
 
-    if (!employeeId || !date) {
+    if (!employeeId) {
       return NextResponse.json(
-        { error: 'employeeId and date query params are required' },
+        { error: 'employeeId query param is required' },
         { status: 400 }
       )
+    }
+
+    const { getMutualFreeSlots, isCalendarEnabled } = await import('@/lib/google-calendar')
+
+    const [yourCalendarConnected, employeeCalendarConnected] = await Promise.all([
+      isCalendarEnabled(user.id),
+      isCalendarEnabled(employeeId),
+    ])
+
+    // Calendar status only (no date): when adding/selecting an employee, show if their calendar is connected
+    if (!date) {
+      const employee = await prisma.user.findUnique({
+        where: { id: employeeId },
+        select: { name: true },
+      })
+      return NextResponse.json({
+        yourCalendarConnected,
+        employeeCalendarConnected,
+        employeeName: employee?.name ?? null,
+        message:
+          !yourCalendarConnected
+            ? 'Your Google Calendar is not connected. Sign out and sign in again with Google to see mutual availability.'
+            : !employeeCalendarConnected
+              ? `${employee?.name ?? 'This person'}'s Google Calendar is not connected. You can still propose a time; they can accept or suggest another.`
+              : `Both calendars connected. Pick a date to see free slots.`,
+      })
     }
 
     const parsedDate = new Date(date)
@@ -22,18 +49,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid date format' }, { status: 400 })
     }
 
-    const { getMutualFreeSlots, isCalendarEnabled } = await import('@/lib/google-calendar')
-
-    const [reporterCalendar, employeeCalendar] = await Promise.all([
-      isCalendarEnabled(user.id),
-      isCalendarEnabled(employeeId),
-    ])
-
-    if (!reporterCalendar || !employeeCalendar) {
+    if (!yourCalendarConnected || !employeeCalendarConnected) {
       return NextResponse.json({
         slots: [],
         calendarUnavailable: true,
-        message: !reporterCalendar
+        message: !yourCalendarConnected
           ? 'Your Google Calendar is not connected. Please sign out and sign in again to grant calendar access.'
           : 'The selected employee has not connected their Google Calendar.',
       })
