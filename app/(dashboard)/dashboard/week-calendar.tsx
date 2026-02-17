@@ -1,7 +1,8 @@
 'use client'
 
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { Calendar, Clock } from 'lucide-react'
+import { Calendar, Clock, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 
 interface WeekMeeting {
   id: string
@@ -12,17 +13,26 @@ interface WeekMeeting {
 }
 
 interface WeekCalendarProps {
-  meetings: WeekMeeting[]
-  weekStart: string
+  initialMeetings: WeekMeeting[]
+  initialWeekStart: string
   userRole: string
 }
 
 const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-function getWeekDays(weekStartStr: string): Date[] {
-  const start = new Date(weekStartStr)
+function getMonday(date: Date): Date {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+  const day = d.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  d.setDate(d.getDate() + diff)
+  return d
+}
+
+function getWeekDays(weekStart: Date): Date[] {
   return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(start)
+    const d = new Date(weekStart)
     d.setDate(d.getDate() + i)
     return d
   })
@@ -32,6 +42,26 @@ function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 }
 
+function isSameWeek(a: Date, b: Date) {
+  const mondayA = getMonday(a)
+  const mondayB = getMonday(b)
+  return isSameDay(mondayA, mondayB)
+}
+
+function weekLabel(weekStart: Date): string {
+  const weekEnd = new Date(weekStart)
+  weekEnd.setDate(weekEnd.getDate() + 6)
+  const startMonth = monthNames[weekStart.getMonth()]
+  const endMonth = monthNames[weekEnd.getMonth()]
+  if (weekStart.getMonth() === weekEnd.getMonth()) {
+    return `${startMonth} ${weekStart.getDate()} – ${weekEnd.getDate()}, ${weekStart.getFullYear()}`
+  }
+  if (weekStart.getFullYear() === weekEnd.getFullYear()) {
+    return `${startMonth} ${weekStart.getDate()} – ${endMonth} ${weekEnd.getDate()}, ${weekStart.getFullYear()}`
+  }
+  return `${startMonth} ${weekStart.getDate()}, ${weekStart.getFullYear()} – ${endMonth} ${weekEnd.getDate()}, ${weekEnd.getFullYear()}`
+}
+
 const statusBadge: Record<string, { label: string; classes: string }> = {
   PROPOSED: { label: 'Proposed', classes: 'bg-amber-500/10 text-amber-600 dark:text-amber-400' },
   SCHEDULED: { label: 'Scheduled', classes: 'bg-blue-500/10 text-blue-600 dark:text-blue-400' },
@@ -39,20 +69,95 @@ const statusBadge: Record<string, { label: string; classes: string }> = {
   CANCELLED: { label: 'Cancelled', classes: 'bg-red-500/10 text-red-600 dark:text-red-400' },
 }
 
-export function WeekCalendar({ meetings, weekStart, userRole }: WeekCalendarProps) {
+export function WeekCalendar({ initialMeetings, initialWeekStart, userRole }: WeekCalendarProps) {
+  const todayMonday = getMonday(new Date())
+  const [weekStart, setWeekStart] = useState<Date>(new Date(initialWeekStart))
+  const [meetings, setMeetings] = useState<WeekMeeting[]>(initialMeetings)
+  const [loading, setLoading] = useState(false)
+
+  const isCurrentWeek = isSameWeek(weekStart, todayMonday)
   const days = getWeekDays(weekStart)
   const today = new Date()
 
+  const fetchWeek = useCallback(async (start: Date) => {
+    setLoading(true)
+    try {
+      const end = new Date(start)
+      end.setDate(end.getDate() + 7)
+      const res = await fetch(`/api/meetings?start=${start.toISOString()}&end=${end.toISOString()}`)
+      if (res.ok) {
+        const data = await res.json()
+        setMeetings(
+          (data as WeekMeeting[]).filter((m) => m.status !== 'CANCELLED')
+        )
+      }
+    } catch {
+      // keep old meetings on error
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const goToPreviousWeek = () => {
+    const prev = new Date(weekStart)
+    prev.setDate(prev.getDate() - 7)
+    setWeekStart(prev)
+  }
+
+  const goToNextWeek = () => {
+    const next = new Date(weekStart)
+    next.setDate(next.getDate() + 7)
+    setWeekStart(next)
+  }
+
+  const goToToday = () => {
+    setWeekStart(todayMonday)
+  }
+
+  // Fetch meetings when week changes (skip initial load since we have server data)
+  useEffect(() => {
+    if (!isSameWeek(weekStart, new Date(initialWeekStart))) {
+      fetchWeek(weekStart)
+    } else {
+      setMeetings(initialMeetings)
+    }
+  }, [weekStart, initialWeekStart, initialMeetings, fetchWeek])
+
   return (
     <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-hidden">
-      <div className="px-5 sm:px-6 py-4 border-b border-off-white dark:border-medium-gray/20 flex items-center justify-between">
-        <h2 className="font-semibold text-dark-gray dark:text-white flex items-center gap-2">
-          <Calendar className="w-5 h-5" />
-          This Week
-        </h2>
-        <Link href="/meetings" className="text-sm text-medium-gray hover:text-dark-gray dark:hover:text-white transition-colors">
-          View all
-        </Link>
+      {/* Header with navigation */}
+      <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-off-white dark:border-medium-gray/20 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <Calendar className="w-5 h-5 text-dark-gray dark:text-white flex-shrink-0" />
+          <h2 className="font-semibold text-dark-gray dark:text-white text-sm sm:text-base truncate">
+            {weekLabel(weekStart)}
+          </h2>
+          {loading && <Loader2 className="w-4 h-4 animate-spin text-medium-gray flex-shrink-0" />}
+        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {!isCurrentWeek && (
+            <button
+              onClick={goToToday}
+              className="px-2.5 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-500/10 rounded-lg hover:bg-blue-500/20 transition-colors min-h-[36px]"
+            >
+              Today
+            </button>
+          )}
+          <button
+            onClick={goToPreviousWeek}
+            className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-off-white dark:hover:bg-dark-gray transition-colors"
+            aria-label="Previous week"
+          >
+            <ChevronLeft className="w-5 h-5 text-medium-gray" />
+          </button>
+          <button
+            onClick={goToNextWeek}
+            className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-off-white dark:hover:bg-dark-gray transition-colors"
+            aria-label="Next week"
+          >
+            <ChevronRight className="w-5 h-5 text-medium-gray" />
+          </button>
+        </div>
       </div>
 
       {/* Desktop: 7-column grid */}
@@ -158,6 +263,14 @@ export function WeekCalendar({ meetings, weekStart, userRole }: WeekCalendarProp
             </div>
           )
         })}
+        {days.every((day) => {
+          const dayMeetings = meetings.filter((m) => isSameDay(new Date(m.meetingDate), day))
+          return dayMeetings.length === 0 && !isSameDay(day, today)
+        }) && (
+          <div className="px-4 py-8 text-center">
+            <p className="text-sm text-medium-gray">No meetings this week</p>
+          </div>
+        )}
       </div>
     </div>
   )

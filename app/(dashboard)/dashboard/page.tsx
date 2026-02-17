@@ -26,7 +26,7 @@ export default async function DashboardPage() {
       prisma.meeting.count({
         where: {
           employeeId: user.id,
-          status: { in: ['SCHEDULED', 'PROPOSED'] },
+          status: 'SCHEDULED',
           meetingDate: { gte: now },
         },
       }),
@@ -43,7 +43,14 @@ export default async function DashboardPage() {
         },
       }),
     ])
-    stats.upcomingMeetings = meetings
+    // Also count PROPOSED meetings (may fail if enum not yet migrated)
+    let proposedCount = 0
+    try {
+      proposedCount = await prisma.meeting.count({
+        where: { employeeId: user.id, status: 'PROPOSED', meetingDate: { gte: now } },
+      })
+    } catch { /* PROPOSED enum not yet in DB */ }
+    stats.upcomingMeetings = meetings + proposedCount
     stats.pendingTodos = todos.length
     stats.overdueTodos = todos.filter(t => t.dueDate && new Date(t.dueDate) < now).length
     stats.completedMeetings = completedMeetings
@@ -52,16 +59,15 @@ export default async function DashboardPage() {
       ? await prisma.user.count({ where: { isActive: true } })
       : await prisma.user.count({ where: { reportsToId: user.id, isActive: true } })
 
-    const statuses: ('SCHEDULED' | 'PROPOSED')[] = ['SCHEDULED', 'PROPOSED']
-    const meetingFilter = user.role === UserRole.SUPER_ADMIN
-      ? { status: { in: statuses }, meetingDate: { gte: now } }
+    const baseMeetingFilter = user.role === UserRole.SUPER_ADMIN
+      ? { status: 'SCHEDULED' as const, meetingDate: { gte: now } }
       : { OR: [
-          { employeeId: user.id, status: { in: statuses }, meetingDate: { gte: now } },
-          { reporterId: user.id, status: { in: statuses }, meetingDate: { gte: now } },
+          { employeeId: user.id, status: 'SCHEDULED' as const, meetingDate: { gte: now } },
+          { reporterId: user.id, status: 'SCHEDULED' as const, meetingDate: { gte: now } },
         ] }
 
     const [meetings, todos, completedMeetings] = await Promise.all([
-      prisma.meeting.count({ where: meetingFilter }),
+      prisma.meeting.count({ where: baseMeetingFilter }),
       prisma.todo.findMany({
         where: {
           assignedToId: user.id,
@@ -74,7 +80,17 @@ export default async function DashboardPage() {
           : { reporterId: user.id, status: 'COMPLETED' },
       }),
     ])
-    stats.upcomingMeetings = meetings
+    let proposedCount = 0
+    try {
+      const proposedFilter = user.role === UserRole.SUPER_ADMIN
+        ? { status: 'PROPOSED' as const, meetingDate: { gte: now } }
+        : { OR: [
+            { employeeId: user.id, status: 'PROPOSED' as const, meetingDate: { gte: now } },
+            { reporterId: user.id, status: 'PROPOSED' as const, meetingDate: { gte: now } },
+          ] }
+      proposedCount = await prisma.meeting.count({ where: proposedFilter })
+    } catch { /* PROPOSED enum not yet in DB */ }
+    stats.upcomingMeetings = meetings + proposedCount
     stats.pendingTodos = todos.length
     stats.overdueTodos = todos.filter(t => t.dueDate && new Date(t.dueDate) < now).length
     stats.directReports = directReports
@@ -82,33 +98,47 @@ export default async function DashboardPage() {
   }
 
   // ── Pending proposal requests (where user is receiver) ──────────
-  const pendingRequestsForMe = await prisma.meeting.findMany({
-    where: {
-      status: 'PROPOSED',
-      OR: [
-        { employeeId: user.id, proposedById: { not: user.id } },
-        { reporterId: user.id, proposedById: { not: user.id } },
-      ],
-    },
-    include: {
-      employee: { select: { id: true, name: true } },
-      reporter: { select: { id: true, name: true } },
-    },
-    orderBy: { meetingDate: 'asc' },
-  })
+  type ProposalMeeting = {
+    id: string
+    meetingDate: Date
+    proposedById: string | null
+    employeeId: string
+    reporterId: string
+    employee: { id: string; name: string | null }
+    reporter: { id: string; name: string | null }
+  }
+  let pendingRequestsForMe: ProposalMeeting[] = []
+  let awaitingAcceptance: ProposalMeeting[] = []
+  try {
+    pendingRequestsForMe = await prisma.meeting.findMany({
+      where: {
+        status: 'PROPOSED',
+        OR: [
+          { employeeId: user.id, proposedById: { not: user.id } },
+          { reporterId: user.id, proposedById: { not: user.id } },
+        ],
+      },
+      include: {
+        employee: { select: { id: true, name: true } },
+        reporter: { select: { id: true, name: true } },
+      },
+      orderBy: { meetingDate: 'asc' },
+    })
 
-  // ── Proposals I sent that are awaiting acceptance ───────────────
-  const awaitingAcceptance = await prisma.meeting.findMany({
-    where: {
-      status: 'PROPOSED',
-      proposedById: user.id,
-    },
-    include: {
-      employee: { select: { id: true, name: true } },
-      reporter: { select: { id: true, name: true } },
-    },
-    orderBy: { meetingDate: 'asc' },
-  })
+    awaitingAcceptance = await prisma.meeting.findMany({
+      where: {
+        status: 'PROPOSED',
+        proposedById: user.id,
+      },
+      include: {
+        employee: { select: { id: true, name: true } },
+        reporter: { select: { id: true, name: true } },
+      },
+      orderBy: { meetingDate: 'asc' },
+    })
+  } catch {
+    // proposedById column may not exist yet if migration hasn't run
+  }
 
   // ── Week calendar meetings ─────────────────────────────────────
   const dayOfWeek = now.getDay()
@@ -120,19 +150,37 @@ export default async function DashboardPage() {
   weekEnd.setDate(weekEnd.getDate() + 7)
 
   const weekMeetingsWhere = user.role === UserRole.EMPLOYEE
-    ? { employeeId: user.id, meetingDate: { gte: weekStart, lt: weekEnd }, status: { not: 'CANCELLED' as const } }
+    ? { employeeId: user.id, meetingDate: { gte: weekStart, lt: weekEnd }, status: { in: ['SCHEDULED', 'PROPOSED', 'COMPLETED'] as ('SCHEDULED' | 'PROPOSED' | 'COMPLETED')[] } }
     : user.role === UserRole.REPORTER
-      ? { OR: [{ employeeId: user.id }, { reporterId: user.id }], meetingDate: { gte: weekStart, lt: weekEnd }, status: { not: 'CANCELLED' as const } }
-      : { meetingDate: { gte: weekStart, lt: weekEnd }, status: { not: 'CANCELLED' as const } }
+      ? { OR: [{ employeeId: user.id }, { reporterId: user.id }], meetingDate: { gte: weekStart, lt: weekEnd }, status: { in: ['SCHEDULED', 'PROPOSED', 'COMPLETED'] as ('SCHEDULED' | 'PROPOSED' | 'COMPLETED')[] } }
+      : { meetingDate: { gte: weekStart, lt: weekEnd }, status: { in: ['SCHEDULED', 'PROPOSED', 'COMPLETED'] as ('SCHEDULED' | 'PROPOSED' | 'COMPLETED')[] } }
 
-  const weekMeetings = await prisma.meeting.findMany({
-    where: weekMeetingsWhere,
-    include: {
-      employee: { select: { name: true } },
-      reporter: { select: { name: true } },
-    },
-    orderBy: { meetingDate: 'asc' },
-  })
+  let weekMeetings: { id: string; meetingDate: Date; status: string; employee: { name: string | null }; reporter: { name: string | null } }[] = []
+  try {
+    weekMeetings = await prisma.meeting.findMany({
+      where: weekMeetingsWhere,
+      include: {
+        employee: { select: { name: true } },
+        reporter: { select: { name: true } },
+      },
+      orderBy: { meetingDate: 'asc' },
+    })
+  } catch {
+    // PROPOSED status may not exist yet; fallback to simpler query
+    const fallbackWhere = user.role === UserRole.EMPLOYEE
+      ? { employeeId: user.id, meetingDate: { gte: weekStart, lt: weekEnd } }
+      : user.role === UserRole.REPORTER
+        ? { OR: [{ employeeId: user.id }, { reporterId: user.id }], meetingDate: { gte: weekStart, lt: weekEnd } }
+        : { meetingDate: { gte: weekStart, lt: weekEnd } }
+    weekMeetings = await prisma.meeting.findMany({
+      where: fallbackWhere,
+      include: {
+        employee: { select: { name: true } },
+        reporter: { select: { name: true } },
+      },
+      orderBy: { meetingDate: 'asc' },
+    })
+  }
 
   // Get recent meetings
   const recentMeetings = await prisma.meeting.findMany({
@@ -256,14 +304,14 @@ export default async function DashboardPage() {
 
       {/* (3) Week Calendar */}
       <WeekCalendar
-        meetings={weekMeetings.map((m) => ({
+        initialMeetings={weekMeetings.map((m) => ({
           id: m.id,
           meetingDate: m.meetingDate.toISOString(),
           status: m.status,
           employee: m.employee,
           reporter: m.reporter,
         }))}
-        weekStart={weekStart.toISOString()}
+        initialWeekStart={weekStart.toISOString()}
         userRole={user.role}
       />
 
