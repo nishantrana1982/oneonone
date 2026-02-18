@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
-import { UserRole, Prisma } from '@prisma/client'
+import { UserRole, Prisma, MeetingStatus } from '@prisma/client'
 import { logMeetingCreated } from '@/lib/audit'
 
 export async function GET(request: NextRequest) {
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     const proposedTime = new Date(meetingDate)
     const windowStart = new Date(proposedTime.getTime() - 29 * 60 * 1000)
     const windowEnd = new Date(proposedTime.getTime() + 29 * 60 * 1000)
-    const activeStatuses = ['PROPOSED', 'SCHEDULED']
+    const activeStatuses: MeetingStatus[] = [MeetingStatus.PROPOSED, MeetingStatus.SCHEDULED]
 
     const conflictingMeeting = await prisma.meeting.findFirst({
       where: {
