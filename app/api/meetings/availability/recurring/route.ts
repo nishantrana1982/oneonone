@@ -123,6 +123,7 @@ export async function GET(request: NextRequest) {
       year: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
+      timeZone: reporterTz,
     })
 
     return NextResponse.json({

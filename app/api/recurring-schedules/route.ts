@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { fromZonedTime, toZonedTime } from 'date-fns-tz'
+import { addDays, addWeeks, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns'
 import { requireRole, getCurrentUser } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { UserRole, RecurringFrequency } from '@prisma/client'
 import { createAuditLog } from '@/lib/audit'
+import { DEFAULT_WORK_END, DEFAULT_WORK_START } from '@/lib/timezones'
+
+const FALLBACK_TZ = 'Asia/Kolkata'
 
 // Get all recurring schedules for the current user
 export async function GET(request: NextRequest) {
@@ -116,11 +121,26 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Calculate next meeting date
+    // Load reporter and employee timezone / work hours
+    const [reporterProfile, employeeProfile] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: user.id },
+        select: { timeZone: true, workDayStart: true, workDayEnd: true },
+      }),
+      prisma.user.findUnique({
+        where: { id: employeeId },
+        select: { timeZone: true, workDayStart: true, workDayEnd: true },
+      }),
+    ])
+
+    const reporterTz = reporterProfile?.timeZone ?? FALLBACK_TZ
+
+    // Calculate next meeting date in the reporter's timezone
     const nextMeetingDate = calculateNextMeetingDate(
       dayOfWeek,
       timeOfDay,
-      frequency || 'BIWEEKLY'
+      frequency || 'BIWEEKLY',
+      reporterTz
     )
 
     // Check both calendars for the first occurrence (if both connected)
@@ -131,7 +151,15 @@ export async function POST(request: NextRequest) {
         isCalendarEnabled(employeeId),
       ])
       if (reporterConnected && employeeConnected) {
-        const free = await isDateTimeFreeForBoth(user.id, employeeId, nextMeetingDate)
+        const availabilityOptions = {
+          reporterTimeZone: reporterTz,
+          reporterWorkStart: reporterProfile?.workDayStart ?? DEFAULT_WORK_START,
+          reporterWorkEnd: reporterProfile?.workDayEnd ?? DEFAULT_WORK_END,
+          employeeTimeZone: employeeProfile?.timeZone ?? FALLBACK_TZ,
+          employeeWorkStart: employeeProfile?.workDayStart ?? DEFAULT_WORK_START,
+          employeeWorkEnd: employeeProfile?.workDayEnd ?? DEFAULT_WORK_END,
+        }
+        const free = await isDateTimeFreeForBoth(user.id, employeeId, nextMeetingDate, 30, availabilityOptions)
         if (!free) {
           const formatted = nextMeetingDate.toLocaleDateString('en-US', {
             weekday: 'short',
@@ -140,6 +168,7 @@ export async function POST(request: NextRequest) {
             year: 'numeric',
             hour: 'numeric',
             minute: '2-digit',
+            timeZone: reporterTz,
           })
           return NextResponse.json(
             { error: `One or both of you have a calendar conflict on the first occurrence (${formatted}). Please choose a different day or time.` },
@@ -149,7 +178,6 @@ export async function POST(request: NextRequest) {
       }
     } catch (err) {
       console.error('Recurring schedule calendar check:', err)
-      // Allow creation if calendar check fails (e.g. API error)
     }
 
     // Create the recurring schedule
@@ -225,32 +253,27 @@ export async function POST(request: NextRequest) {
 function calculateNextMeetingDate(
   dayOfWeek: number,
   timeOfDay: string,
-  frequency: RecurringFrequency
+  frequency: RecurringFrequency,
+  timeZone = FALLBACK_TZ
 ): Date {
   const [hours, minutes] = timeOfDay.split(':').map(Number)
-  const IST_OFFSET = 5 * 60 + 30 // IST is UTC+5:30
-
-  // Work in IST by shifting the current UTC time
-  const nowUtc = new Date()
-  const nowIst = new Date(nowUtc.getTime() + IST_OFFSET * 60 * 1000)
-
-  // Build "today at the desired IST time" using UTC methods on the shifted date
-  const todayIst = new Date(nowIst)
-  todayIst.setUTCHours(hours, minutes, 0, 0)
-
-  const currentDay = nowIst.getUTCDay()
+  const now = new Date()
+  const zoned = toZonedTime(now, timeZone)
+  const currentDay = zoned.getDay()
   let daysUntil = dayOfWeek - currentDay
-  if (daysUntil < 0 || (daysUntil === 0 && nowIst >= todayIst)) {
-    daysUntil += 7
+  if (daysUntil < 0) daysUntil += 7
+  else if (daysUntil === 0) {
+    if (zoned.getHours() > hours || (zoned.getHours() === hours && zoned.getMinutes() >= minutes)) {
+      daysUntil += 7
+    }
   }
-
-  const nextIst = new Date(todayIst)
-  nextIst.setUTCDate(todayIst.getUTCDate() + daysUntil)
-
+  let nextLocal = addDays(zoned, daysUntil)
+  nextLocal = setHours(nextLocal, hours)
+  nextLocal = setMinutes(nextLocal, minutes)
+  nextLocal = setSeconds(nextLocal, 0)
+  nextLocal = setMilliseconds(nextLocal, 0)
   if (frequency === 'BIWEEKLY' && daysUntil < 7) {
-    nextIst.setUTCDate(nextIst.getUTCDate() + 7)
+    nextLocal = addWeeks(nextLocal, 1)
   }
-
-  // Convert back from IST to UTC for storage
-  return new Date(nextIst.getTime() - IST_OFFSET * 60 * 1000)
+  return fromZonedTime(nextLocal, timeZone)
 }
