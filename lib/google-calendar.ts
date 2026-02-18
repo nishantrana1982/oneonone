@@ -1,5 +1,7 @@
 import { google } from 'googleapis'
+import { fromZonedTime, toZonedTime } from 'date-fns-tz'
 import { prisma } from './prisma'
+import { DEFAULT_WORK_END, DEFAULT_WORK_START } from './timezones'
 
 // Create OAuth2 client
 function createOAuth2Client() {
@@ -253,42 +255,114 @@ interface FreeSlot {
 }
 
 /**
- * Business-hours window (9 AM – 7 PM IST).
- * These are used to constrain free-slot generation.
+ * Business-hours window (9 AM – 7 PM IST) when no user prefs are provided.
  */
 const BUSINESS_START_HOUR = 9
 const BUSINESS_END_HOUR = 19
+const FALLBACK_TZ = 'Asia/Kolkata'
+
+function parseHHmm(hhmm: string): { hours: number; minutes: number } {
+  const [h, m] = hhmm.split(':').map(Number)
+  return { hours: h ?? 0, minutes: m ?? 0 }
+}
+
+/**
+ * Get the UTC range for a calendar date in a timezone with local work start/end (HH:mm).
+ */
+function getWorkWindowUtc(
+  date: Date,
+  timeZone: string,
+  workStart: string,
+  workEnd: string
+): { start: Date; end: Date } {
+  const zoned = toZonedTime(date, timeZone)
+  const y = zoned.getFullYear()
+  const mo = zoned.getMonth()
+  const d = zoned.getDate()
+  const start = parseHHmm(workStart)
+  const end = parseHHmm(workEnd)
+  const windowStart = fromZonedTime(
+    new Date(y, mo, d, start.hours, start.minutes, 0, 0),
+    timeZone
+  )
+  const windowEnd = fromZonedTime(
+    new Date(y, mo, d, end.hours, end.minutes, 0, 0),
+    timeZone
+  )
+  return { start: windowStart, end: windowEnd }
+}
+
+/**
+ * Check if a UTC moment falls within a user's work hours on that day in their timezone.
+ */
+function isWithinWorkHours(utcDate: Date, timeZone: string, workStart: string, workEnd: string): boolean {
+  const zoned = toZonedTime(utcDate, timeZone)
+  const y = zoned.getFullYear()
+  const mo = zoned.getMonth()
+  const day = zoned.getDate()
+  const h = zoned.getHours()
+  const m = zoned.getMinutes()
+  const start = parseHHmm(workStart)
+  const end = parseHHmm(workEnd)
+  const localMins = h * 60 + m
+  const startMins = start.hours * 60 + start.minutes
+  const endMins = end.hours * 60 + end.minutes
+  return localMins >= startMins && localMins < endMins
+}
+
+export interface MutualFreeSlotsOptions {
+  reporterTimeZone?: string | null
+  reporterWorkStart?: string | null
+  reporterWorkEnd?: string | null
+  employeeTimeZone?: string | null
+  employeeWorkStart?: string | null
+  employeeWorkEnd?: string | null
+}
 
 /**
  * Given busy ranges from both users, compute mutually free slots of
- * `slotMinutes` duration within business hours of the given date (IST).
+ * `slotMinutes` duration. Uses reporter's date; when options are provided,
+ * only slots where both users are within their working hours (in their TZ) are returned.
  */
 export async function getMutualFreeSlots(
   reporterId: string,
   employeeId: string,
   date: Date,
-  slotMinutes = 30
+  slotMinutes = 30,
+  options?: MutualFreeSlotsOptions
 ): Promise<FreeSlot[]> {
-  // Build day window in IST (UTC+5:30)
-  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000
-  const dayStart = new Date(date)
-  dayStart.setHours(0, 0, 0, 0)
-  // Convert IST business hours to UTC for the API
-  const windowStart = new Date(dayStart.getTime() + BUSINESS_START_HOUR * 3600000 - IST_OFFSET_MS)
-  const windowEnd = new Date(dayStart.getTime() + BUSINESS_END_HOUR * 3600000 - IST_OFFSET_MS)
+  const reporterTz = options?.reporterTimeZone ?? FALLBACK_TZ
+  const reporterStart = options?.reporterWorkStart ?? DEFAULT_WORK_START
+  const reporterEnd = options?.reporterWorkEnd ?? DEFAULT_WORK_END
+  const employeeTz = options?.employeeTimeZone ?? FALLBACK_TZ
+  const employeeStart = options?.employeeWorkStart ?? DEFAULT_WORK_START
+  const employeeEnd = options?.employeeWorkEnd ?? DEFAULT_WORK_END
 
-  // Fetch busy ranges for both users in parallel
+  let windowStart: Date
+  let windowEnd: Date
+
+  if (options && (options.reporterTimeZone ?? options.employeeTimeZone)) {
+    const reporterWindow = getWorkWindowUtc(date, reporterTz, reporterStart, reporterEnd)
+    windowStart = reporterWindow.start
+    windowEnd = reporterWindow.end
+  } else {
+    // Legacy: IST 9–19
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000
+    const dayStart = new Date(date)
+    dayStart.setUTCHours(0, 0, 0, 0)
+    windowStart = new Date(dayStart.getTime() + BUSINESS_START_HOUR * 3600000 - IST_OFFSET_MS)
+    windowEnd = new Date(dayStart.getTime() + BUSINESS_END_HOUR * 3600000 - IST_OFFSET_MS)
+  }
+
   const [reporterBusy, employeeBusy] = await Promise.all([
     getFreeBusy(reporterId, windowStart, windowEnd),
     getFreeBusy(employeeId, windowStart, windowEnd),
   ])
 
-  // Merge all busy ranges into a single sorted list
   const allBusy = [...reporterBusy, ...employeeBusy]
     .map((b) => ({ start: new Date(b.start).getTime(), end: new Date(b.end).getTime() }))
     .sort((a, b) => a.start - b.start)
 
-  // Flatten overlapping busy ranges
   const merged: { start: number; end: number }[] = []
   for (const range of allBusy) {
     const last = merged[merged.length - 1]
@@ -299,28 +373,37 @@ export async function getMutualFreeSlots(
     }
   }
 
-  // Generate free slots in the gaps
   const slotMs = slotMinutes * 60 * 1000
   const slots: FreeSlot[] = []
   let cursor = windowStart.getTime()
 
+  const considerSlot = (slotStartMs: number): boolean => {
+    const slotStart = new Date(slotStartMs)
+    if (!isWithinWorkHours(slotStart, reporterTz, reporterStart, reporterEnd)) return false
+    if (!isWithinWorkHours(slotStart, employeeTz, employeeStart, employeeEnd)) return false
+    return true
+  }
+
   for (const busy of merged) {
     while (cursor + slotMs <= busy.start) {
-      slots.push({
-        start: new Date(cursor).toISOString(),
-        end: new Date(cursor + slotMs).toISOString(),
-      })
+      if (considerSlot(cursor)) {
+        slots.push({
+          start: new Date(cursor).toISOString(),
+          end: new Date(cursor + slotMs).toISOString(),
+        })
+      }
       cursor += slotMs
     }
     cursor = Math.max(cursor, busy.end)
   }
 
-  // After all busy ranges, fill remaining window
   while (cursor + slotMs <= windowEnd.getTime()) {
-    slots.push({
-      start: new Date(cursor).toISOString(),
-      end: new Date(cursor + slotMs).toISOString(),
-    })
+    if (considerSlot(cursor)) {
+      slots.push({
+        start: new Date(cursor).toISOString(),
+        end: new Date(cursor + slotMs).toISOString(),
+      })
+    }
     cursor += slotMs
   }
 
@@ -337,11 +420,12 @@ export async function isDateTimeFreeForBoth(
   reporterId: string,
   employeeId: string,
   dateTime: Date,
-  durationMinutes = SLOT_DURATION_MINUTES
+  durationMinutes = SLOT_DURATION_MINUTES,
+  options?: MutualFreeSlotsOptions
 ): Promise<boolean> {
   const day = new Date(dateTime)
-  day.setHours(0, 0, 0, 0)
-  const slots = await getMutualFreeSlots(reporterId, employeeId, day, 30)
+  day.setUTCHours(0, 0, 0, 0)
+  const slots = await getMutualFreeSlots(reporterId, employeeId, day, 30, options)
   const startMs = dateTime.getTime()
   const endMs = startMs + durationMinutes * 60 * 1000
   return slots.some((slot) => {

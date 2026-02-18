@@ -1,36 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { fromZonedTime, toZonedTime } from 'date-fns-tz'
+import { addDays, addWeeks, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns'
 import { requireRole } from '@/lib/auth-helpers'
 import { UserRole } from '@prisma/client'
 import { RecurringFrequency } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
+import { DEFAULT_WORK_END, DEFAULT_WORK_START } from '@/lib/timezones'
 
+const FALLBACK_TZ = 'Asia/Kolkata'
+
+/**
+ * Compute next occurrence of (dayOfWeek, timeOfDay) in the given timezone.
+ * timeOfDay is "HH:mm" in that timezone.
+ */
 function calculateNextMeetingDate(
   dayOfWeek: number,
   timeOfDay: string,
-  frequency: RecurringFrequency
+  frequency: RecurringFrequency,
+  timeZone: string
 ): Date {
   const [hours, minutes] = timeOfDay.split(':').map(Number)
-  const IST_OFFSET = 5 * 60 + 30 // IST is UTC+5:30
-
-  const nowUtc = new Date()
-  const nowIst = new Date(nowUtc.getTime() + IST_OFFSET * 60 * 1000)
-
-  const todayIst = new Date(nowIst)
-  todayIst.setUTCHours(hours, minutes, 0, 0)
-
-  const currentDay = nowIst.getUTCDay()
+  const now = new Date()
+  const zoned = toZonedTime(now, timeZone)
+  const currentDay = zoned.getDay()
   let daysUntil = dayOfWeek - currentDay
-  if (daysUntil < 0 || (daysUntil === 0 && nowIst >= todayIst)) {
-    daysUntil += 7
+  if (daysUntil < 0) daysUntil += 7
+  else if (daysUntil === 0) {
+    const localHour = zoned.getHours()
+    const localMin = zoned.getMinutes()
+    if (localHour > hours || (localHour === hours && localMin >= minutes)) daysUntil += 7
   }
-
-  const nextIst = new Date(todayIst)
-  nextIst.setUTCDate(todayIst.getUTCDate() + daysUntil)
-
+  let nextLocal = addDays(zoned, daysUntil)
+  nextLocal = setHours(nextLocal, hours)
+  nextLocal = setMinutes(nextLocal, minutes)
+  nextLocal = setSeconds(nextLocal, 0)
+  nextLocal = setMilliseconds(nextLocal, 0)
   if (frequency === 'BIWEEKLY' && daysUntil < 7) {
-    nextIst.setUTCDate(nextIst.getUTCDate() + 7)
+    nextLocal = addWeeks(nextLocal, 1)
   }
-
-  return new Date(nextIst.getTime() - IST_OFFSET * 60 * 1000)
+  return fromZonedTime(nextLocal, timeZone)
 }
 
 /**
@@ -79,8 +87,34 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const firstDate = calculateNextMeetingDate(dayOfWeek, timeOfDay, frequency)
-    const available = await isDateTimeFreeForBoth(user.id, employeeId, firstDate)
+    const [reporter, employee] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: user.id },
+        select: { timeZone: true, workDayStart: true, workDayEnd: true },
+      }),
+      prisma.user.findUnique({
+        where: { id: employeeId },
+        select: { timeZone: true, workDayStart: true, workDayEnd: true },
+      }),
+    ])
+
+    const reporterTz = reporter?.timeZone ?? FALLBACK_TZ
+    const reporterStart = reporter?.workDayStart ?? DEFAULT_WORK_START
+    const reporterEnd = reporter?.workDayEnd ?? DEFAULT_WORK_END
+    const employeeTz = employee?.timeZone ?? FALLBACK_TZ
+    const employeeStart = employee?.workDayStart ?? DEFAULT_WORK_START
+    const employeeEnd = employee?.workDayEnd ?? DEFAULT_WORK_END
+
+    const firstDate = calculateNextMeetingDate(dayOfWeek, timeOfDay, frequency, reporterTz)
+    const availabilityOptions = {
+      reporterTimeZone: reporterTz,
+      reporterWorkStart: reporterStart,
+      reporterWorkEnd: reporterEnd,
+      employeeTimeZone: employeeTz,
+      employeeWorkStart: employeeStart,
+      employeeWorkEnd: employeeEnd,
+    }
+    const available = await isDateTimeFreeForBoth(user.id, employeeId, firstDate, 30, availabilityOptions)
 
     const formatted = firstDate.toLocaleDateString('en-US', {
       weekday: 'short',

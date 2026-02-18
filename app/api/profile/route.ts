@@ -19,6 +19,10 @@ export async function GET() {
         role: true,
         departmentId: true,
         reportsToId: true,
+        country: true,
+        timeZone: true,
+        workDayStart: true,
+        workDayEnd: true,
         department: { select: { id: true, name: true } },
         reportsTo: { select: { id: true, name: true, email: true } },
         createdAt: true,
@@ -41,7 +45,7 @@ export async function PATCH(request: NextRequest) {
     const currentUser = await requireAuth()
 
     const body = await request.json()
-    const { name, phone, title, bio, departmentId, reportsToId } = body
+    const { name, phone, title, bio, departmentId, reportsToId, country, timeZone, workDayStart, workDayEnd } = body
 
     // Validate name
     if (name !== undefined && (!name || name.trim().length < 2)) {
@@ -82,6 +86,19 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    // Validate work hours (HH:mm 24h)
+    const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/
+    if (workDayStart !== undefined && workDayStart !== null && workDayStart !== '') {
+      if (!timeRegex.test(workDayStart.trim())) {
+        return NextResponse.json({ error: 'Work day start must be HH:mm (24h)' }, { status: 400 })
+      }
+    }
+    if (workDayEnd !== undefined && workDayEnd !== null && workDayEnd !== '') {
+      if (!timeRegex.test(workDayEnd.trim())) {
+        return NextResponse.json({ error: 'Work day end must be HH:mm (24h)' }, { status: 400 })
+      }
+    }
+
     // Build update data
     const updateData: Record<string, string | null> = {}
     if (name !== undefined) updateData.name = name.trim()
@@ -90,6 +107,10 @@ export async function PATCH(request: NextRequest) {
     if (bio !== undefined) updateData.bio = bio.trim() || null
     if (departmentId !== undefined) updateData.departmentId = departmentId || null
     if (reportsToId !== undefined) updateData.reportsToId = reportsToId || null
+    if (country !== undefined) updateData.country = country?.trim() || null
+    if (timeZone !== undefined) updateData.timeZone = timeZone?.trim() || null
+    if (workDayStart !== undefined) updateData.workDayStart = workDayStart?.trim() || null
+    if (workDayEnd !== undefined) updateData.workDayEnd = workDayEnd?.trim() || null
 
     const updatedUser = await prisma.user.update({
       where: { id: currentUser.id },
@@ -105,6 +126,10 @@ export async function PATCH(request: NextRequest) {
         role: true,
         departmentId: true,
         reportsToId: true,
+        country: true,
+        timeZone: true,
+        workDayStart: true,
+        workDayEnd: true,
         department: { select: { id: true, name: true } },
         reportsTo: { select: { id: true, name: true, email: true } },
       },

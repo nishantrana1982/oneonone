@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth-helpers'
 import { UserRole } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { DEFAULT_WORK_END, DEFAULT_WORK_START, formatWorkHoursLabel } from '@/lib/timezones'
 
 export async function GET(request: NextRequest) {
   try {
@@ -53,15 +54,56 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         slots: [],
         calendarUnavailable: true,
+        workingHoursLabel: null,
         message: !yourCalendarConnected
           ? 'Your Google Calendar is not connected. Please sign out and sign in again to grant calendar access.'
           : 'The selected employee has not connected their Google Calendar.',
       })
     }
 
-    const slots = await getMutualFreeSlots(user.id, employeeId, parsedDate)
+    const [reporter, employee] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: user.id },
+        select: { timeZone: true, workDayStart: true, workDayEnd: true },
+      }),
+      prisma.user.findUnique({
+        where: { id: employeeId },
+        select: { timeZone: true, workDayStart: true, workDayEnd: true },
+      }),
+    ])
 
-    return NextResponse.json({ slots, calendarUnavailable: false })
+    const reporterTz = reporter?.timeZone ?? 'Asia/Kolkata'
+    const reporterStart = reporter?.workDayStart ?? DEFAULT_WORK_START
+    const reporterEnd = reporter?.workDayEnd ?? DEFAULT_WORK_END
+    const employeeTz = employee?.timeZone ?? 'Asia/Kolkata'
+    const employeeStart = employee?.workDayStart ?? DEFAULT_WORK_START
+    const employeeEnd = employee?.workDayEnd ?? DEFAULT_WORK_END
+
+    const slots = await getMutualFreeSlots(user.id, employeeId, parsedDate, 30, {
+      reporterTimeZone: reporterTz,
+      reporterWorkStart: reporterStart,
+      reporterWorkEnd: reporterEnd,
+      employeeTimeZone: employeeTz,
+      employeeWorkStart: employeeStart,
+      employeeWorkEnd: employeeEnd,
+    })
+
+    const workingHoursLabel =
+      reporterTz !== employeeTz || reporterStart !== employeeStart || reporterEnd !== employeeEnd
+        ? formatWorkHoursLabel(
+            { start: reporterStart, end: reporterEnd },
+            reporterTz,
+            { start: employeeStart, end: employeeEnd },
+            employeeTz
+          )
+        : `Free on both calendars (${reporterStart} – ${reporterEnd} your time)`
+
+    return NextResponse.json({
+      slots,
+      calendarUnavailable: false,
+      workingHoursLabel,
+      reporterTimeZone: reporterTz,
+    })
   } catch (error) {
     console.error('Error fetching availability:', error)
     return NextResponse.json(

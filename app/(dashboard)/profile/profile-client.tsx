@@ -2,9 +2,17 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { User, Mail, Phone, Briefcase, Building2, Calendar, Save, Loader2, Users, ChevronDown } from 'lucide-react'
+import { User, Mail, Phone, Briefcase, Building2, Calendar, Save, Loader2, Users, ChevronDown, Globe, Clock } from 'lucide-react'
 import { UserRole } from '@prisma/client'
 import { useToast } from '@/components/ui/toast'
+import {
+  COUNTRY_OPTIONS,
+  TIMEZONE_OPTIONS,
+  getDefaultWorkHoursForCountry,
+  getDefaultTimeZoneForCountry,
+  DEFAULT_WORK_START,
+  DEFAULT_WORK_END,
+} from '@/lib/timezones'
 
 interface ProfileUser {
   id: string
@@ -16,6 +24,10 @@ interface ProfileUser {
   role: UserRole
   departmentId: string | null
   reportsToId: string | null
+  country: string | null
+  timeZone: string | null
+  workDayStart: string | null
+  workDayEnd: string | null
   department: { id: string; name: string } | null
   reportsTo: { id: string; name: string; email: string } | null
   createdAt: string
@@ -63,6 +75,10 @@ export function ProfileClient({ user, departments, managers }: ProfileClientProp
     title: user.title || '',
     departmentId: user.departmentId || '',
     reportsToId: user.reportsToId || '',
+    country: user.country || '',
+    timeZone: user.timeZone || '',
+    workDayStart: user.workDayStart || DEFAULT_WORK_START,
+    workDayEnd: user.workDayEnd || DEFAULT_WORK_END,
   })
 
   const handleSave = async () => {
@@ -106,7 +122,27 @@ export function ProfileClient({ user, departments, managers }: ProfileClientProp
     combinedPhone !== (user.phone || '') ||
     formData.title !== (user.title || '') ||
     formData.departmentId !== (user.departmentId || '') ||
-    formData.reportsToId !== (user.reportsToId || '')
+    formData.reportsToId !== (user.reportsToId || '') ||
+    formData.country !== (user.country || '') ||
+    formData.timeZone !== (user.timeZone || '') ||
+    formData.workDayStart !== (user.workDayStart || DEFAULT_WORK_START) ||
+    formData.workDayEnd !== (user.workDayEnd || DEFAULT_WORK_END)
+
+  const handleCountryChange = (value: string) => {
+    const next = { ...formData, country: value }
+    if (!formData.timeZone || formData.timeZone === getDefaultTimeZoneForCountry(formData.country || null)) {
+      next.timeZone = getDefaultTimeZoneForCountry(value || null)
+    }
+    if (
+      (formData.workDayStart === (user.workDayStart || DEFAULT_WORK_START) || formData.workDayStart === getDefaultWorkHoursForCountry(formData.country || null).start) &&
+      (formData.workDayEnd === (user.workDayEnd || DEFAULT_WORK_END) || formData.workDayEnd === getDefaultWorkHoursForCountry(formData.country || null).end)
+    ) {
+      const def = getDefaultWorkHoursForCountry(value || null)
+      next.workDayStart = def.start
+      next.workDayEnd = def.end
+    }
+    setFormData(next)
+  }
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -290,6 +326,82 @@ export function ProfileClient({ user, departments, managers }: ProfileClientProp
                     ))}
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-medium-gray pointer-events-none" />
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-off-white dark:border-medium-gray/20 pt-4 mt-4">
+              <h3 className="font-semibold text-dark-gray dark:text-white mb-3 flex items-center gap-2">
+                <Globe className="w-4 h-4 text-medium-gray" />
+                Location & working hours
+              </h3>
+              <p className="text-sm text-medium-gray mb-4">
+                Used so others can see when you’re available for meetings (e.g. 1:1s) in your timezone.
+              </p>
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-dark-gray dark:text-white mb-2">Country</label>
+                  <div className="relative">
+                    <select
+                      value={formData.country}
+                      onChange={(e) => handleCountryChange(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border border-off-white dark:border-medium-gray/20 bg-white dark:bg-dark-gray text-dark-gray dark:text-white focus:outline-none focus:ring-2 focus:ring-orange/50 transition-shadow appearance-none pr-10"
+                      aria-label="Country"
+                    >
+                      <option value="">Select country</option>
+                      {COUNTRY_OPTIONS.map((c) => (
+                        <option key={c.value} value={c.value}>
+                          {c.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-medium-gray pointer-events-none" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-dark-gray dark:text-white mb-2">Time zone</label>
+                  <div className="relative">
+                    <select
+                      value={formData.timeZone}
+                      onChange={(e) => setFormData({ ...formData, timeZone: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl border border-off-white dark:border-medium-gray/20 bg-white dark:bg-dark-gray text-dark-gray dark:text-white focus:outline-none focus:ring-2 focus:ring-orange/50 transition-shadow appearance-none pr-10"
+                      aria-label="Time zone"
+                    >
+                      <option value="">Select time zone</option>
+                      {TIMEZONE_OPTIONS.map((tz) => (
+                        <option key={tz.value} value={tz.value}>
+                          {tz.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-medium-gray pointer-events-none" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-dark-gray dark:text-white mb-2 flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-medium-gray" />
+                    Work day start (your local time)
+                  </label>
+                  <input
+                    type="time"
+                    value={formData.workDayStart}
+                    onChange={(e) => setFormData({ ...formData, workDayStart: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl border border-off-white dark:border-medium-gray/20 bg-white dark:bg-dark-gray text-dark-gray dark:text-white focus:outline-none focus:ring-2 focus:ring-orange/50 transition-shadow"
+                    aria-label="Work day start"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-dark-gray dark:text-white mb-2 flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-medium-gray" />
+                    Work day end (your local time)
+                  </label>
+                  <input
+                    type="time"
+                    value={formData.workDayEnd}
+                    onChange={(e) => setFormData({ ...formData, workDayEnd: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl border border-off-white dark:border-medium-gray/20 bg-white dark:bg-dark-gray text-dark-gray dark:text-white focus:outline-none focus:ring-2 focus:ring-orange/50 transition-shadow"
+                    aria-label="Work day end"
+                  />
                 </div>
               </div>
             </div>

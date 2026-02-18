@@ -23,6 +23,10 @@ model User {
   bio                String?
   phone              String?
   title              String?
+  country            String?
+  timeZone           String?
+  workDayStart       String?
+  workDayEnd         String?
   accounts           Account[]
   auditLogs          AuditLog[]
   dashboardWidgets   DashboardWidget[]

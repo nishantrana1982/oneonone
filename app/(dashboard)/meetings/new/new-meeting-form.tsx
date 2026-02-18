@@ -38,6 +38,7 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
   const [slotsLoading, setSlotsLoading] = useState(false)
   const [calendarUnavailable, setCalendarUnavailable] = useState(false)
   const [calendarMessage, setCalendarMessage] = useState('')
+  const [workingHoursLabel, setWorkingHoursLabel] = useState<string | null>(null)
   const [slotsFetched, setSlotsFetched] = useState(false)
   // Calendar status when an employee is selected (before date)
   const [calendarStatusLoading, setCalendarStatusLoading] = useState(false)
@@ -129,8 +130,10 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
       if (data.calendarUnavailable) {
         setCalendarUnavailable(true)
         setCalendarMessage(data.message || 'Calendar not connected.')
+        setWorkingHoursLabel(null)
       } else {
         setSlots(data.slots ?? [])
+        setWorkingHoursLabel(data.workingHoursLabel ?? null)
       }
       setSlotsFetched(true)
     } catch {
@@ -147,6 +150,7 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
       setSlots([])
       setSlotsFetched(false)
       setCalendarUnavailable(false)
+      setWorkingHoursLabel(null)
     }
   }, [watchedEmployee, watchedDate, fetchAvailability])
 
@@ -342,7 +346,9 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
                   </div>
                   <div>
                     <h2 className="font-semibold text-dark-gray dark:text-white">Available time slots</h2>
-                    <p className="text-sm text-medium-gray">Free on both calendars (9 AM – 7 PM)</p>
+                    <p className="text-sm text-medium-gray">
+                      {workingHoursLabel ?? 'Free on both calendars'}
+                    </p>
                   </div>
                 </div>
                 <div className="p-4">
