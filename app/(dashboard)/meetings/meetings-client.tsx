@@ -103,10 +103,24 @@ export function MeetingsClient({
       !m.checkInPersonal
   )
 
-  const totalPages = Math.ceil(meetings.length / ITEMS_PER_PAGE)
+  // Sort: upcoming/active meetings first (nearest date first), then past meetings (most recent first)
+  const sortedMeetings = [...meetings].sort((a, b) => {
+    const dateA = new Date(a.meetingDate).getTime()
+    const dateB = new Date(b.meetingDate).getTime()
+    const nowMs = now.getTime()
+    const aIsUpcoming = dateA >= nowMs && (a.status === 'SCHEDULED' || a.status === 'PROPOSED')
+    const bIsUpcoming = dateB >= nowMs && (b.status === 'SCHEDULED' || b.status === 'PROPOSED')
+
+    if (aIsUpcoming && !bIsUpcoming) return -1
+    if (!aIsUpcoming && bIsUpcoming) return 1
+    if (aIsUpcoming && bIsUpcoming) return dateA - dateB
+    return dateB - dateA
+  })
+
+  const totalPages = Math.ceil(sortedMeetings.length / ITEMS_PER_PAGE)
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
   const endIndex = startIndex + ITEMS_PER_PAGE
-  const paginatedMeetings = meetings.slice(startIndex, endIndex)
+  const paginatedMeetings = sortedMeetings.slice(startIndex, endIndex)
 
   const handleDeleteRecurring = async (id: string) => {
     if (!await confirm('Are you sure you want to delete this recurring schedule?', { variant: 'danger' })) {
@@ -254,8 +268,10 @@ export function MeetingsClient({
     </div>
   )
 
+  const hasNoData = meetings.length === 0 && visibleRecurring.length === 0
+
   return (
-    <div className="space-y-8">
+    <div className={hasNoData ? 'space-y-3 sm:space-y-5' : 'space-y-4 sm:space-y-5'}>
       {/* Message banner */}
       {message && (
         <div
@@ -297,67 +313,70 @@ export function MeetingsClient({
         )}
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-3 sm:gap-4">
-        <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-3 sm:p-5">
-          <div className="flex items-center gap-2 sm:gap-4">
-            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-              <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-blue-500" />
-            </div>
-            <div>
-              <p className="text-lg sm:text-2xl font-bold text-dark-gray dark:text-white">
-                {upcomingMeetings.length}
-              </p>
-              <p className="text-xs sm:text-sm text-medium-gray">Upcoming</p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-3 sm:p-5">
-          <div className="flex items-center gap-2 sm:gap-4">
-            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-green-500/10 flex items-center justify-center flex-shrink-0">
-              <CheckCircle2 className="w-4 h-4 sm:w-6 sm:h-6 text-green-500" />
-            </div>
-            <div>
-              <p className="text-lg sm:text-2xl font-bold text-dark-gray dark:text-white">
-                {completedMeetings.length}
-              </p>
-              <p className="text-xs sm:text-sm text-medium-gray">Completed</p>
-            </div>
-          </div>
-        </div>
-        {pendingFormMeetings.length > 0 ? (
-          <div className="rounded-2xl bg-amber-500/5 border border-amber-500/20 p-3 sm:p-5">
+      {/* Stats — hidden when there's absolutely no data to keep page compact */}
+      {!hasNoData && (
+        <div className="grid grid-cols-3 gap-2 sm:gap-4">
+          <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-2.5 sm:p-5">
             <div className="flex items-center gap-2 sm:gap-4">
-              <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-                <AlertCircle className="w-4 h-4 sm:w-6 sm:h-6 text-amber-500" />
+              <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-blue-500" />
               </div>
-              <div className="min-w-0">
-                <p className="text-lg sm:text-2xl font-bold text-amber-600 dark:text-amber-400">
-                  {pendingFormMeetings.length}
-                </p>
-                <p className="text-xs sm:text-sm text-medium-gray">Pending Form</p>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-3 sm:p-5">
-            <div className="flex items-center gap-2 sm:gap-4">
-              <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-off-white dark:bg-dark-gray flex items-center justify-center flex-shrink-0">
-                <Repeat className="w-4 h-4 sm:w-6 sm:h-6 text-dark-gray dark:text-white" />
-              </div>
-              <div className="min-w-0">
+              <div>
                 <p className="text-lg sm:text-2xl font-bold text-dark-gray dark:text-white">
-                  {recurringSchedules.length}
+                  {upcomingMeetings.length}
                 </p>
-                <p className="text-xs sm:text-sm text-medium-gray">Recurring</p>
+                <p className="text-xs sm:text-sm text-medium-gray">Upcoming</p>
               </div>
             </div>
           </div>
-        )}
-      </div>
+          <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-2.5 sm:p-5">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                <CheckCircle2 className="w-4 h-4 sm:w-6 sm:h-6 text-green-500" />
+              </div>
+              <div>
+                <p className="text-lg sm:text-2xl font-bold text-dark-gray dark:text-white">
+                  {completedMeetings.length}
+                </p>
+                <p className="text-xs sm:text-sm text-medium-gray">Completed</p>
+              </div>
+            </div>
+          </div>
+          {pendingFormMeetings.length > 0 ? (
+            <div className="rounded-2xl bg-amber-500/5 border border-amber-500/20 p-2.5 sm:p-5">
+              <div className="flex items-center gap-2 sm:gap-4">
+                <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                  <AlertCircle className="w-4 h-4 sm:w-6 sm:h-6 text-amber-500" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-lg sm:text-2xl font-bold text-amber-600 dark:text-amber-400">
+                    {pendingFormMeetings.length}
+                  </p>
+                  <p className="text-xs sm:text-sm text-medium-gray">Pending Form</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-2.5 sm:p-5">
+              <div className="flex items-center gap-2 sm:gap-4">
+                <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-off-white dark:bg-dark-gray flex items-center justify-center flex-shrink-0">
+                  <Repeat className="w-4 h-4 sm:w-6 sm:h-6 text-dark-gray dark:text-white" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-lg sm:text-2xl font-bold text-dark-gray dark:text-white">
+                    {recurringSchedules.length}
+                  </p>
+                  <p className="text-xs sm:text-sm text-medium-gray">Recurring</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* Tabs */}
-      {canSchedule && (
+
+      {/* Tabs — hidden when there's no data at all */}
+      {canSchedule && !hasNoData && (
         <div className="overflow-x-auto">
           <div className="flex gap-1 p-1 bg-off-white dark:bg-charcoal rounded-xl w-fit min-w-0">
           <button
@@ -392,7 +411,7 @@ export function MeetingsClient({
       {activeTab === 'all' && (
         <>
           {visibleRecurring.length > 0 && (
-            <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-hidden mb-6">
+            <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-hidden">
               <div className="px-6 py-3 border-b border-off-white dark:border-medium-gray/20 flex items-center justify-between">
                 <h3 className="font-semibold text-dark-gray dark:text-white">
                   Recurring schedules
@@ -410,12 +429,12 @@ export function MeetingsClient({
           )}
 
           {meetings.length === 0 && visibleRecurring.length === 0 ? (
-            <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-12 text-center">
-              <Calendar className="w-16 h-16 text-light-gray mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-dark-gray dark:text-white mb-2">
+            <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-6 sm:p-8 text-center">
+              <Calendar className="w-10 h-10 sm:w-12 sm:h-12 text-light-gray mx-auto mb-2 sm:mb-3" />
+              <h3 className="text-base sm:text-lg font-semibold text-dark-gray dark:text-white mb-1">
                 No meetings yet
               </h3>
-              <p className="text-medium-gray max-w-md mx-auto mb-6">
+              <p className="text-sm text-medium-gray max-w-md mx-auto mb-3 sm:mb-4">
                 {canSchedule
                   ? 'Get started by scheduling your first one-on-one meeting or a recurring schedule.'
                   : 'Your manager will schedule one-on-one meetings with you.'}
@@ -423,9 +442,9 @@ export function MeetingsClient({
               {canSchedule && (
                 <Link
                   href="/meetings/new"
-                  className="inline-flex items-center gap-2 px-5 py-3 bg-dark-gray dark:bg-white text-white dark:text-dark-gray rounded-xl font-medium hover:bg-charcoal dark:hover:bg-off-white transition-colors"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-dark-gray dark:bg-white text-white dark:text-dark-gray rounded-xl font-medium hover:bg-charcoal dark:hover:bg-off-white transition-colors text-sm"
                 >
-                  <Plus className="w-5 h-5" />
+                  <Plus className="w-4 h-4" />
                   Schedule Meeting
                 </Link>
               )}
@@ -522,7 +541,7 @@ export function MeetingsClient({
               {totalPages > 1 && (
                 <div className="flex items-center justify-between px-4 py-3 border-t border-off-white dark:border-medium-gray/20">
                   <p className="text-sm text-medium-gray">
-                    Showing {startIndex + 1}-{Math.min(endIndex, meetings.length)} of {meetings.length} meetings
+                    Showing {startIndex + 1}-{Math.min(endIndex, sortedMeetings.length)} of {sortedMeetings.length} meetings
                   </p>
                   <div className="flex items-center gap-2">
                     <button
@@ -553,7 +572,7 @@ export function MeetingsClient({
       {/* Content: Recurring only */}
       {activeTab === 'recurring' && (
         <>
-          <div className="flex justify-end mb-4">
+          <div className="flex justify-end">
             <Link
               href="/meetings/recurring"
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-dark-gray dark:bg-white text-white dark:text-dark-gray rounded-xl hover:bg-charcoal dark:hover:bg-off-white transition-colors"
@@ -564,20 +583,20 @@ export function MeetingsClient({
           </div>
 
           {visibleRecurring.length === 0 ? (
-            <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-12 text-center">
-              <Repeat className="w-16 h-16 text-light-gray mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-dark-gray dark:text-white mb-2">
+            <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-6 sm:p-8 text-center">
+              <Repeat className="w-10 h-10 sm:w-12 sm:h-12 text-light-gray mx-auto mb-2 sm:mb-3" />
+              <h3 className="text-base sm:text-lg font-semibold text-dark-gray dark:text-white mb-1">
                 No recurring schedules
               </h3>
-              <p className="text-medium-gray max-w-md mx-auto mb-6">
+              <p className="text-sm text-medium-gray max-w-md mx-auto mb-3 sm:mb-4">
                 Set up recurring schedules to automatically create bi-weekly
                 one-on-one meetings.
               </p>
               <Link
                 href="/meetings/recurring"
-                className="inline-flex items-center gap-2 px-5 py-3 bg-dark-gray dark:bg-white text-white dark:text-dark-gray rounded-xl font-medium hover:bg-charcoal dark:hover:bg-off-white transition-colors"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-dark-gray dark:bg-white text-white dark:text-dark-gray rounded-xl font-medium hover:bg-charcoal dark:hover:bg-off-white transition-colors text-sm"
               >
-                <Plus className="w-5 h-5" />
+                <Plus className="w-4 h-4" />
                 Create Schedule
               </Link>
             </div>

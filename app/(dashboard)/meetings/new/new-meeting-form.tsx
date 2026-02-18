@@ -180,12 +180,18 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
   const today = new Date()
   const minDate = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0')
 
+  const isToday = watchedDate === minDate
+
   function formatSlotTime(isoString: string) {
     return new Date(isoString).toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
     })
+  }
+
+  function isSlotInPast(slotDate: Date) {
+    return slotDate.getTime() <= Date.now()
   }
 
   return (
@@ -364,15 +370,19 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
                             const dt = new Date(year, month - 1, day, hour, parseInt(min))
                             const iso = dt.toISOString()
                             const display = dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+                            const past = isToday && isSlotInPast(dt)
                             return (
                               <button
                                 key={time}
                                 type="button"
+                                disabled={past}
                                 onClick={() => setValue('meetingTime', iso, { shouldValidate: true })}
                                 className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                                  watchedTime === iso
-                                    ? 'bg-dark-gray dark:bg-white text-white dark:text-dark-gray'
-                                    : 'bg-off-white dark:bg-dark-gray text-dark-gray dark:text-white hover:bg-dark-gray/10 dark:hover:bg-white/10'
+                                  past
+                                    ? 'bg-off-white dark:bg-dark-gray text-light-gray dark:text-medium-gray/40 cursor-not-allowed line-through'
+                                    : watchedTime === iso
+                                      ? 'bg-dark-gray dark:bg-white text-white dark:text-dark-gray'
+                                      : 'bg-off-white dark:bg-dark-gray text-dark-gray dark:text-white hover:bg-dark-gray/10 dark:hover:bg-white/10'
                                 }`}
                               >
                                 {display}
@@ -390,20 +400,26 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
                     </div>
                   ) : (
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                      {slots.map((slot) => (
-                        <button
-                          key={slot.start}
-                          type="button"
-                          onClick={() => setValue('meetingTime', slot.start, { shouldValidate: true })}
-                          className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                            watchedTime === slot.start
-                              ? 'bg-dark-gray dark:bg-white text-white dark:text-dark-gray'
-                              : 'bg-off-white dark:bg-dark-gray text-dark-gray dark:text-white hover:bg-dark-gray/10 dark:hover:bg-white/10'
-                          }`}
-                        >
-                          {formatSlotTime(slot.start)}
-                        </button>
-                      ))}
+                      {slots.map((slot) => {
+                        const past = isToday && isSlotInPast(new Date(slot.start))
+                        return (
+                          <button
+                            key={slot.start}
+                            type="button"
+                            disabled={past}
+                            onClick={() => setValue('meetingTime', slot.start, { shouldValidate: true })}
+                            className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                              past
+                                ? 'bg-off-white dark:bg-dark-gray text-light-gray dark:text-medium-gray/40 cursor-not-allowed line-through'
+                                : watchedTime === slot.start
+                                  ? 'bg-dark-gray dark:bg-white text-white dark:text-dark-gray'
+                                  : 'bg-off-white dark:bg-dark-gray text-dark-gray dark:text-white hover:bg-dark-gray/10 dark:hover:bg-white/10'
+                            }`}
+                          >
+                            {formatSlotTime(slot.start)}
+                          </button>
+                        )
+                      })}
                     </div>
                   )}
                   {/* Hidden input for react-hook-form */}

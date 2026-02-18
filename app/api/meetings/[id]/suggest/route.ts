@@ -35,25 +35,27 @@ export async function POST(
       )
     }
 
-    // Only the receiver (not the proposer) can suggest a new time.
+    const isParticipant =
+      user.id === meeting.employeeId || user.id === meeting.reporterId
+    const isProposer = user.id === meeting.proposedById
     const isReceiver =
       (meeting.proposedById === meeting.reporterId && user.id === meeting.employeeId) ||
       (meeting.proposedById === meeting.employeeId && user.id === meeting.reporterId)
 
-    if (!isReceiver && user.role !== 'SUPER_ADMIN') {
+    if (!isParticipant && user.role !== 'SUPER_ADMIN') {
       return NextResponse.json(
-        { error: 'Only the meeting receiver can suggest a new time' },
+        { error: 'Only meeting participants can change the time' },
         { status: 403 }
       )
     }
 
-    // Update meeting date and flip proposedById to the current user
-    // so the *other* side now becomes the receiver who can accept.
+    // When the receiver suggests, flip proposedById so the other side can accept.
+    // When the proposer edits their own proposal, keep proposedById unchanged.
     const updated = await prisma.meeting.update({
       where: { id: params.id },
       data: {
         meetingDate: new Date(meetingDate),
-        proposedById: user.id,
+        ...(isReceiver ? { proposedById: user.id } : {}),
       },
       include: {
         employee: { select: { id: true, name: true, email: true } },
@@ -61,21 +63,31 @@ export async function POST(
       },
     })
 
-    // Determine the other party (original proposer) to notify
     const otherParty = user.id === meeting.employeeId ? meeting.reporter : meeting.employee
     const suggestor = user.id === meeting.employeeId ? meeting.employee : meeting.reporter
 
     try {
-      const { sendMeetingSuggestionEmail } = await import('@/lib/email')
-      await sendMeetingSuggestionEmail(
-        otherParty.email,
-        otherParty.name,
-        suggestor.name,
-        new Date(meetingDate),
-        meeting.id
-      )
+      if (isProposer) {
+        const { sendMeetingProposalEmail } = await import('@/lib/email')
+        await sendMeetingProposalEmail(
+          otherParty.email,
+          otherParty.name,
+          suggestor.name,
+          new Date(meetingDate),
+          meeting.id
+        )
+      } else {
+        const { sendMeetingSuggestionEmail } = await import('@/lib/email')
+        await sendMeetingSuggestionEmail(
+          otherParty.email,
+          otherParty.name,
+          suggestor.name,
+          new Date(meetingDate),
+          meeting.id
+        )
+      }
     } catch (error) {
-      console.error('Failed to send suggestion email:', error)
+      console.error('Failed to send time change email:', error)
     }
 
     try {
@@ -90,7 +102,8 @@ export async function POST(
       console.error('Failed to create suggestion notification:', error)
     }
 
-    await logMeetingUpdated(user.id, params.id, { action: 'suggested_new_time', newMeetingDate: meetingDate, suggestedBy: suggestor.name })
+    const action = isProposer ? 'updated_proposal' : 'suggested_new_time'
+    await logMeetingUpdated(user.id, params.id, { action, newMeetingDate: meetingDate, suggestedBy: suggestor.name })
 
     return NextResponse.json(updated)
   } catch (error) {

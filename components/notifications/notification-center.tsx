@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   Bell, 
@@ -49,6 +49,10 @@ const notificationColors: Record<string, string> = {
   SYSTEM: 'text-gray-500 bg-gray-500/10',
 }
 
+const DROPDOWN_WIDTH = 384
+const DROPDOWN_MAX_HEIGHT = 500
+const VIEWPORT_PADDING = 12
+
 export function NotificationCenter() {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
@@ -56,6 +60,65 @@ export function NotificationCenter() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({})
+
+  const computePosition = useCallback(() => {
+    if (!buttonRef.current) return
+    const rect = buttonRef.current.getBoundingClientRect()
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+
+    // On small screens, use a centered overlay near the bottom
+    if (vw < 640) {
+      setDropdownStyle({
+        position: 'fixed',
+        left: VIEWPORT_PADDING,
+        right: VIEWPORT_PADDING,
+        bottom: 80,
+        width: 'auto',
+        maxHeight: `${vh - 160}px`,
+      })
+      return
+    }
+
+    // Desktop: try to open above the bell, aligned to the left edge
+    let left = rect.left
+    let bottom = vh - rect.top + 8
+
+    // If the dropdown would overflow the right edge, shift left
+    if (left + DROPDOWN_WIDTH > vw - VIEWPORT_PADDING) {
+      left = vw - DROPDOWN_WIDTH - VIEWPORT_PADDING
+    }
+    // If it would overflow the left edge, shift right
+    if (left < VIEWPORT_PADDING) {
+      left = VIEWPORT_PADDING
+    }
+
+    // If not enough room above, open below the bell instead
+    const spaceAbove = rect.top
+    const spaceBelow = vh - rect.bottom
+    if (spaceAbove < 200 && spaceBelow > spaceAbove) {
+      bottom = vh - rect.bottom - 8
+      // This means top-positioned; we'll flip to using `top` instead
+      setDropdownStyle({
+        position: 'fixed',
+        left,
+        top: rect.bottom + 8,
+        width: DROPDOWN_WIDTH,
+        maxHeight: `${Math.min(DROPDOWN_MAX_HEIGHT, spaceBelow - VIEWPORT_PADDING)}px`,
+      })
+      return
+    }
+
+    setDropdownStyle({
+      position: 'fixed',
+      left,
+      bottom,
+      width: DROPDOWN_WIDTH,
+      maxHeight: `${Math.min(DROPDOWN_MAX_HEIGHT, spaceAbove - VIEWPORT_PADDING)}px`,
+    })
+  }, [])
 
   // Fetch notifications
   const fetchNotifications = async () => {
@@ -67,11 +130,10 @@ export function NotificationCenter() {
         setUnreadCount(data.unreadCount || 0)
       }
     } catch (error) {
-      // Error handled by toast
+      // silently fail
     }
   }
 
-  // Poll for new notifications every 30 seconds
   useEffect(() => {
     fetchNotifications()
     const interval = setInterval(fetchNotifications, 30000)
@@ -80,6 +142,7 @@ export function NotificationCenter() {
 
   // Close on click outside
   useEffect(() => {
+    if (!isOpen) return
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false)
@@ -87,7 +150,19 @@ export function NotificationCenter() {
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [isOpen])
+
+  // Recompute position on open, scroll, resize
+  useEffect(() => {
+    if (!isOpen) return
+    computePosition()
+    window.addEventListener('resize', computePosition)
+    window.addEventListener('scroll', computePosition, true)
+    return () => {
+      window.removeEventListener('resize', computePosition)
+      window.removeEventListener('scroll', computePosition, true)
+    }
+  }, [isOpen, computePosition])
 
   const handleMarkAllRead = async () => {
     setLoading(true)
@@ -102,14 +177,13 @@ export function NotificationCenter() {
         setUnreadCount(0)
       }
     } catch (error) {
-      // Error handled by toast
+      // silently fail
     } finally {
       setLoading(false)
     }
   }
 
   const handleNotificationClick = async (notification: Notification) => {
-    // Mark as read
     if (!notification.isRead) {
       try {
         await fetch(`/api/notifications/${notification.id}`, {
@@ -122,11 +196,10 @@ export function NotificationCenter() {
         ))
         setUnreadCount(Math.max(0, unreadCount - 1))
       } catch (error) {
-        // Error handled by toast
+        // silently fail
       }
     }
 
-    // Navigate if there's a link
     if (notification.link) {
       setIsOpen(false)
       router.push(notification.link)
@@ -152,6 +225,7 @@ export function NotificationCenter() {
     <div ref={containerRef} className="relative">
       {/* Bell Button */}
       <button
+        ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Notifications"
         aria-expanded={isOpen}
@@ -165,9 +239,14 @@ export function NotificationCenter() {
         )}
       </button>
 
-      {/* Dropdown - on mobile: fixed above bottom nav; on desktop: above bell, right-aligned so it stays in view */}
+      {/* Dropdown — always fixed, positioned by JS to stay in viewport */}
       {isOpen && (
-        <div role="dialog" aria-label="Notifications" className="fixed inset-x-3 bottom-20 sm:absolute sm:inset-auto sm:right-0 sm:left-auto sm:bottom-full sm:mb-2 w-[calc(100vw-1.5rem)] sm:w-96 max-h-[70vh] sm:max-h-[500px] bg-white dark:bg-charcoal rounded-2xl border border-off-white dark:border-medium-gray/20 shadow-2xl overflow-hidden z-[100] animate-in fade-in-0 zoom-in-95 duration-200">
+        <div
+          role="dialog"
+          aria-label="Notifications"
+          style={dropdownStyle}
+          className="bg-white dark:bg-charcoal rounded-2xl border border-off-white dark:border-medium-gray/20 shadow-2xl overflow-hidden z-[100] animate-in fade-in-0 zoom-in-95 duration-200"
+        >
           {/* Header */}
           <div className="px-4 py-3 border-b border-off-white dark:border-medium-gray/20 flex items-center justify-between">
             <h3 className="font-semibold text-dark-gray dark:text-white">Notifications</h3>
@@ -183,7 +262,7 @@ export function NotificationCenter() {
           </div>
 
           {/* Notifications List */}
-          <div className="max-h-[400px] overflow-y-auto">
+          <div className="overflow-y-auto" style={{ maxHeight: 'calc(100% - 100px)' }}>
             {notifications.length === 0 ? (
               <div className="py-12 text-center">
                 <Bell className="w-12 h-12 text-light-gray mx-auto mb-3" />

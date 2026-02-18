@@ -48,6 +48,11 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Name must be at least 2 characters' }, { status: 400 })
     }
 
+    // Validate phone: only digits, +, -, spaces allowed
+    if (phone !== undefined && phone && !/^[0-9+\- ]+$/.test(phone.trim())) {
+      return NextResponse.json({ error: 'Phone number must contain only numbers, +, - and spaces' }, { status: 400 })
+    }
+
     // Prevent self-reporting
     if (reportsToId !== undefined && reportsToId === currentUser.id) {
       return NextResponse.json({ error: 'You cannot report to yourself' }, { status: 400 })

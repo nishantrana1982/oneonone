@@ -27,10 +27,35 @@ interface ProfileClientProps {
   managers: { id: string; name: string; email: string }[]
 }
 
+const COUNTRY_CODES = [
+  { code: '+91', country: 'IN', label: '🇮🇳 +91' },
+  { code: '+1', country: 'US', label: '🇺🇸 +1' },
+]
+
+function parsePhone(phone: string | null): { countryCode: string; localNumber: string } {
+  if (!phone) return { countryCode: '+91', localNumber: '' }
+  const trimmed = phone.trim()
+  // Try to match a known country code at the start (longest first)
+  const sorted = [...COUNTRY_CODES].sort((a, b) => b.code.length - a.code.length)
+  for (const cc of sorted) {
+    if (trimmed.startsWith(cc.code)) {
+      return { countryCode: cc.code, localNumber: trimmed.slice(cc.code.length).trim() }
+    }
+  }
+  // If no code matched but starts with +, keep +91 default and put the whole thing as local
+  return { countryCode: '+91', localNumber: trimmed.replace(/^\+/, '') }
+}
+
 export function ProfileClient({ user, departments, managers }: ProfileClientProps) {
   const router = useRouter()
   const { toastSuccess, toastError } = useToast()
   const [saving, setSaving] = useState(false)
+
+  const parsed = parsePhone(user.phone)
+  const [countryCode, setCountryCode] = useState(parsed.countryCode)
+  const [localNumber, setLocalNumber] = useState(parsed.localNumber)
+
+  const combinedPhone = localNumber ? `${countryCode} ${localNumber}` : ''
 
   const [formData, setFormData] = useState({
     name: user.name,
@@ -52,7 +77,7 @@ export function ProfileClient({ user, departments, managers }: ProfileClientProp
       const response = await fetch('/api/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, phone: combinedPhone }),
       })
 
       const data = await response.json()
@@ -78,7 +103,7 @@ export function ProfileClient({ user, departments, managers }: ProfileClientProp
 
   const hasChanges =
     formData.name !== user.name ||
-    formData.phone !== (user.phone || '') ||
+    combinedPhone !== (user.phone || '') ||
     formData.title !== (user.title || '') ||
     formData.departmentId !== (user.departmentId || '') ||
     formData.reportsToId !== (user.reportsToId || '')
@@ -159,15 +184,45 @@ export function ProfileClient({ user, departments, managers }: ProfileClientProp
                   Phone Number
                 </div>
               </label>
-              <input
-                type="tel"
-                inputMode="tel"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="+1 (555) 000-0000"
-                className="w-full px-4 py-3 rounded-xl border border-off-white dark:border-medium-gray/20 bg-white dark:bg-dark-gray text-dark-gray dark:text-white focus:outline-none focus:ring-2 focus:ring-orange/50 transition-shadow"
-                aria-label="Phone number"
-              />
+              <div className="flex gap-2">
+                <div className="relative flex-shrink-0">
+                  <select
+                    value={countryCode}
+                    onChange={(e) => setCountryCode(e.target.value)}
+                    className="h-full w-[100px] sm:w-[110px] px-2.5 py-3 rounded-xl border border-off-white dark:border-medium-gray/20 bg-white dark:bg-dark-gray text-dark-gray dark:text-white focus:outline-none focus:ring-2 focus:ring-orange/50 transition-shadow appearance-none pr-7 text-sm"
+                    aria-label="Country code"
+                  >
+                    {COUNTRY_CODES.map((cc) => (
+                      <option key={cc.code} value={cc.code}>
+                        {cc.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-medium-gray pointer-events-none" />
+                </div>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  value={localNumber}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9 ]/g, '')
+                    setLocalNumber(val)
+                  }}
+                  onKeyDown={(e) => {
+                    if (
+                      e.key.length === 1 &&
+                      !/[0-9 ]/.test(e.key) &&
+                      !e.ctrlKey && !e.metaKey
+                    ) {
+                      e.preventDefault()
+                    }
+                  }}
+                  placeholder="98765 43210"
+                  maxLength={12}
+                  className="flex-1 min-w-0 px-4 py-3 rounded-xl border border-off-white dark:border-medium-gray/20 bg-white dark:bg-dark-gray text-dark-gray dark:text-white focus:outline-none focus:ring-2 focus:ring-orange/50 transition-shadow"
+                  aria-label="Phone number"
+                />
+              </div>
             </div>
 
             <div>

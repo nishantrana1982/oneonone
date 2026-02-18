@@ -266,6 +266,21 @@ export async function notifyTodoOverdue(
   })
 }
 
+export async function notifyFormReminder(
+  employeeId: string,
+  reporterName: string,
+  meetingDate: Date,
+  meetingId: string
+) {
+  return createNotification({
+    userId: employeeId,
+    type: 'FORM_REMINDER',
+    title: 'Form Reminder',
+    message: `Your meeting with ${reporterName} is tomorrow. Please submit your check-in form before the meeting.`,
+    link: `/meetings/${meetingId}/form`,
+  })
+}
+
 // ── Proposal-based scheduling notifications ─────────────────────────
 
 export async function notifyMeetingProposed(

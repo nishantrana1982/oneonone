@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { RecurringFrequency } from '@prisma/client'
-import { notifyMeetingProposed, notifyMeetingReminder } from '@/lib/notifications'
-import { sendMeetingProposalEmail, sendMeetingReminderEmail } from '@/lib/email'
+import { notifyMeetingProposed, notifyMeetingReminder, notifyFormReminder } from '@/lib/notifications'
+import { sendMeetingProposalEmail, sendMeetingReminderEmail, sendFormReminderEmail } from '@/lib/email'
 
 // This endpoint should be called by a cron job (e.g., every hour)
 // Set up a cron job to call: POST /api/cron/meetings with header: x-cron-secret: YOUR_SECRET
@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
       recurringMeetingsCreated: 0,
       reminders24hSent: 0,
       reminders1hSent: 0,
+      formRemindersSent: 0,
       errors: [] as string[],
     }
 
@@ -31,6 +32,9 @@ export async function POST(request: NextRequest) {
 
     // 2. Send meeting reminders
     await sendMeetingReminders(results)
+
+    // 3. Send form reminders for meetings within 24h where form is not submitted
+    await sendFormReminders(results)
 
     return NextResponse.json({
       success: true,
@@ -254,6 +258,74 @@ async function sendMeetingReminders(results: { recurringMeetingsCreated: number;
     } catch (error) {
       console.error(`Error sending 1h reminder for meeting ${meeting.id}:`, error)
       results.errors.push(`Failed to send 1h reminder for meeting ${meeting.id}`)
+    }
+  }
+}
+
+async function sendFormReminders(results: { formRemindersSent: number; errors: string[] }) {
+  const now = new Date()
+  const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+
+  const settings = await prisma.systemSettings.findUnique({
+    where: { id: 'system' },
+  })
+
+  if (settings && !settings.enableEmailReminders) {
+    return
+  }
+
+  const meetings = await prisma.meeting.findMany({
+    where: {
+      status: 'SCHEDULED',
+      formSubmittedAt: null,
+      formReminderSent: false,
+      meetingDate: {
+        gte: now,
+        lte: in24h,
+      },
+    },
+    include: {
+      employee: { select: { id: true, name: true, email: true } },
+      reporter: { select: { id: true, name: true, email: true } },
+    },
+  })
+
+  for (const meeting of meetings) {
+    try {
+      // Send form reminder email to the employee
+      try {
+        await sendFormReminderEmail(
+          meeting.employee.email,
+          meeting.employee.name,
+          meeting.reporter.name,
+          meeting.meetingDate,
+          meeting.id
+        )
+      } catch (emailError) {
+        console.error('Failed to send form reminder email:', emailError)
+      }
+
+      // In-app notification
+      try {
+        await notifyFormReminder(
+          meeting.employeeId,
+          meeting.reporter.name || 'your manager',
+          meeting.meetingDate,
+          meeting.id
+        )
+      } catch (notifError) {
+        console.error('Failed to send form reminder notification:', notifError)
+      }
+
+      await prisma.meeting.update({
+        where: { id: meeting.id },
+        data: { formReminderSent: true },
+      })
+
+      results.formRemindersSent++
+    } catch (error) {
+      console.error(`Error sending form reminder for meeting ${meeting.id}:`, error)
+      results.errors.push(`Failed to send form reminder for meeting ${meeting.id}`)
     }
   }
 }

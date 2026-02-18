@@ -112,6 +112,7 @@ model Meeting {
   recurringScheduleId      String?
   reminder24hSent          Boolean            @default(false)
   reminderSent             Boolean            @default(false)
+  formReminderSent         Boolean            @default(false)
   attachments              Attachment[]
   calendarEvent            CalendarEvent?
   employee                 User               @relation("EmployeeMeetings", fields: [employeeId], references: [id])
@@ -361,6 +362,7 @@ enum NotificationType {
   TODO_DUE_SOON
   TODO_OVERDUE
   FORM_SUBMITTED
+  FORM_REMINDER
   RECORDING_READY
   SYSTEM
 }

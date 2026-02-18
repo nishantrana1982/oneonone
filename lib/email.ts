@@ -558,6 +558,38 @@ export async function sendMeetingReminderEmail(
   })
 }
 
+/** Reminder email sent to the employee when their form is not yet submitted ~24h before a meeting. */
+export async function sendFormReminderEmail(
+  employeeEmail: string,
+  employeeName: string | null,
+  reporterName: string | null,
+  meetingDate: Date,
+  meetingId: string
+) {
+  const empName = employeeName || 'Team Member'
+  const mgrName = reporterName || 'your manager'
+  const formattedDate = formatDateFull(meetingDate)
+
+  const html = emailLayout({
+    preheader: `Reminder: Please complete your check-in form before your meeting with ${mgrName}`,
+    heading: 'Form Not Yet Submitted',
+    body: `
+      <p style="margin:0 0 16px;">Hi ${empName},</p>
+      <p style="margin:0 0 20px;">Your one-on-one meeting with <strong>${mgrName}</strong> is coming up soon, but you haven't submitted your check-in form yet. Please take a few minutes to fill it out so your manager can prepare for the meeting.</p>
+      ${detailRow('Meeting With', mgrName)}
+      ${detailRow('Date & Time', formattedDate)}
+    `,
+    ctaText: 'Fill Out Form',
+    ctaUrl: `${baseUrl()}/meetings/${meetingId}/form`,
+  })
+
+  await sendEmail({
+    to: employeeEmail,
+    subject: `Action Required – Submit your form before meeting with ${mgrName} · ${formattedDate}`,
+    html,
+  })
+}
+
 /** Email sent to the other party when the receiver suggests a new time. */
 export async function sendMeetingSuggestionEmail(
   recipientEmail: string,

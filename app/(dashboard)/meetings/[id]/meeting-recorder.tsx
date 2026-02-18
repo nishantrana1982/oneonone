@@ -217,10 +217,59 @@ export function MeetingRecorder({
       setSubmitError(null)
       setChunkError(null)
 
-      // 1. Get microphone
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 44100 },
-      })
+      // 1. Check secure context (HTTPS required for microphone in most browsers)
+      if (typeof window !== 'undefined' && !window.isSecureContext) {
+        throw new Error(
+          'Microphone access requires HTTPS. Please access this site via https:// instead of http://.'
+        )
+      }
+
+      // 2. Check if getUserMedia is available
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error(
+          'Your browser does not support audio recording. Please use a modern browser like Chrome, Safari, or Firefox.'
+        )
+      }
+
+      // 3. Check permission state (if Permissions API is available)
+      if (navigator.permissions) {
+        try {
+          const permStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName })
+          if (permStatus.state === 'denied') {
+            throw new Error(
+              'Microphone access was previously blocked. Click the lock/site-settings icon in your browser\'s address bar, set Microphone to "Allow", then reload the page.'
+            )
+          }
+        } catch (permErr) {
+          // Permissions API query may not be supported for microphone in all browsers — continue
+          if (permErr instanceof Error && permErr.message.includes('blocked')) throw permErr
+        }
+      }
+
+      // 4. Request microphone
+      let stream: MediaStream
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 44100 },
+        })
+      } catch (micErr: any) {
+        if (micErr.name === 'NotAllowedError' || micErr.name === 'PermissionDeniedError') {
+          throw new Error(
+            'Microphone permission denied. Click the lock/site-settings icon in your browser\'s address bar, set Microphone to "Allow", then reload this page and try again.'
+          )
+        }
+        if (micErr.name === 'NotFoundError' || micErr.name === 'DevicesNotFoundError') {
+          throw new Error(
+            'No microphone found. Please connect a microphone and try again.'
+          )
+        }
+        if (micErr.name === 'NotReadableError' || micErr.name === 'TrackStartError') {
+          throw new Error(
+            'Microphone is in use by another application. Close other apps using the mic and try again.'
+          )
+        }
+        throw new Error(micErr.message || 'Could not access microphone. Please check your browser settings.')
+      }
       streamRef.current = stream
 
       // 2. Start server session (creates DB record, returns S3 prefix)
@@ -519,7 +568,12 @@ export function MeetingRecorder({
 
       {submitError && (
         <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
-          <p className="text-sm text-red-500">{submitError}</p>
+          <p className="text-sm text-red-600 dark:text-red-400 font-medium">{submitError}</p>
+          {submitError.includes('lock') && (
+            <p className="text-xs text-red-500/80 mt-2">
+              In Chrome: click the 🔒 icon in the address bar → Site settings → Microphone → Allow → Reload page
+            </p>
+          )}
         </div>
       )}
 

@@ -54,8 +54,8 @@ const frequencyLabels: Record<RecurringFrequency, string> = {
   MONTHLY: 'Monthly',
 }
 
-const timeOptions = Array.from({ length: 24 * 2 }, (_, i) => {
-  const hour = Math.floor(i / 2)
+const timeOptions = Array.from({ length: 20 }, (_, i) => {
+  const hour = 9 + Math.floor(i / 2)
   const minute = i % 2 === 0 ? '00' : '30'
   return `${String(hour).padStart(2, '0')}:${minute}`
 })

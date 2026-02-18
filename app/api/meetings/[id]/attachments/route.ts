@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
-import { getSignedUploadUrl, deleteFromS3 } from '@/lib/s3'
+import { getSignedUploadUrl, getSignedDownloadUrl, deleteFromS3 } from '@/lib/s3'
 
-// Get attachments for a meeting
+// Get attachments for a meeting, or get a signed download URL for a specific attachment
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -36,6 +36,23 @@ export async function GET(
     const isAdmin = user.role === UserRole.SUPER_ADMIN
     if (!isParticipant && !isAdmin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    // If attachmentId is provided, return a signed download URL
+    const attachmentId = request.nextUrl.searchParams.get('attachmentId')
+    if (attachmentId) {
+      const attachment = meeting.attachments.find(a => a.id === attachmentId)
+      if (!attachment) {
+        return NextResponse.json({ error: 'Attachment not found' }, { status: 404 })
+      }
+
+      try {
+        const downloadUrl = await getSignedDownloadUrl(attachment.s3Key)
+        return NextResponse.json({ downloadUrl, fileName: attachment.fileName })
+      } catch (error) {
+        console.error('Failed to generate download URL:', error)
+        return NextResponse.json({ error: 'File storage not configured or file not found' }, { status: 500 })
+      }
     }
 
     return NextResponse.json(meeting.attachments)

@@ -32,7 +32,7 @@ export default async function TodosPage() {
   const overdue = todos.filter(t => t.dueDate && new Date(t.dueDate) < now && t.status !== 'DONE')
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       {/* Header */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-dark-gray dark:text-white mb-1">To-Dos</h1>
@@ -41,48 +41,48 @@ export default async function TodosPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
-        <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-5">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gray-500/10 flex items-center justify-center">
-              <Clock className="w-5 h-5 text-gray-500" />
+        <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-3 sm:p-5">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gray-500/10 flex items-center justify-center flex-shrink-0">
+              <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
             </div>
-            <div>
-              <p className="text-2xl font-bold text-dark-gray dark:text-white">{notStarted.length}</p>
-              <p className="text-sm text-medium-gray">Not Started</p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-5">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
-              <CheckSquare className="w-5 h-5 text-blue-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-dark-gray dark:text-white">{inProgress.length}</p>
-              <p className="text-sm text-medium-gray">In Progress</p>
+            <div className="min-w-0">
+              <p className="text-xl sm:text-2xl font-bold text-dark-gray dark:text-white">{notStarted.length}</p>
+              <p className="text-xs sm:text-sm text-medium-gray truncate">Not Started</p>
             </div>
           </div>
         </div>
-        <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-5">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
-              <CheckCircle2 className="w-5 h-5 text-green-500" />
+        <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-3 sm:p-5">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+              <CheckSquare className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
             </div>
-            <div>
-              <p className="text-2xl font-bold text-dark-gray dark:text-white">{done.length}</p>
-              <p className="text-sm text-medium-gray">Completed</p>
+            <div className="min-w-0">
+              <p className="text-xl sm:text-2xl font-bold text-dark-gray dark:text-white">{inProgress.length}</p>
+              <p className="text-xs sm:text-sm text-medium-gray truncate">In Progress</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-3 sm:p-5">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-green-500/10 flex items-center justify-center flex-shrink-0">
+              <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xl sm:text-2xl font-bold text-dark-gray dark:text-white">{done.length}</p>
+              <p className="text-xs sm:text-sm text-medium-gray truncate">Completed</p>
             </div>
           </div>
         </div>
         {overdue.length > 0 && (
-          <div className="rounded-2xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 p-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
-                <AlertTriangle className="w-5 h-5 text-red-500" />
+          <div className="rounded-2xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 p-3 sm:p-5">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-red-500/10 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
               </div>
-              <div>
-                <p className="text-2xl font-bold text-red-600 dark:text-red-400">{overdue.length}</p>
-                <p className="text-sm text-red-600/70 dark:text-red-400/70">Overdue</p>
+              <div className="min-w-0">
+                <p className="text-xl sm:text-2xl font-bold text-red-600 dark:text-red-400">{overdue.length}</p>
+                <p className="text-xs sm:text-sm text-red-600/70 dark:text-red-400/70 truncate">Overdue</p>
               </div>
             </div>
           </div>

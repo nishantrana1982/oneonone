@@ -123,9 +123,9 @@ export function TodoList({ todos, currentUserId, userRole }: TodoListProps) {
               return (
                 <div
                   key={todo.id}
-                  className={`p-5 transition-colors active:bg-off-white/70 dark:active:bg-dark-gray/70 ${isOverdue ? 'bg-red-50/50 dark:bg-red-500/5' : ''}`}
+                  className={`p-4 sm:p-5 transition-colors active:bg-off-white/70 dark:active:bg-dark-gray/70 ${isOverdue ? 'bg-red-50/50 dark:bg-red-500/5' : ''}`}
                 >
-                  <div className="flex items-start gap-4">
+                  <div className="flex items-start gap-3 sm:gap-4">
                     {/* Status Toggle */}
                     <button
                       onClick={() => {
@@ -135,20 +135,20 @@ export function TodoList({ todos, currentUserId, userRole }: TodoListProps) {
                         updateStatus(todo.id, nextStatus)
                       }}
                       disabled={updating === todo.id}
-                      className={`w-10 h-10 rounded-xl ${status.bg} flex items-center justify-center transition-all hover:scale-105 disabled:opacity-50`}
+                      className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl ${status.bg} flex items-center justify-center flex-shrink-0 transition-all hover:scale-105 disabled:opacity-50`}
                     >
                       {updating === todo.id ? (
-                        <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin text-medium-gray" />
+                        <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-current border-t-transparent rounded-full animate-spin text-medium-gray" />
                       ) : (
-                        <StatusIcon className={`w-5 h-5 ${status.color}`} />
+                        <StatusIcon className={`w-4 h-4 sm:w-5 sm:h-5 ${status.color}`} />
                       )}
                     </button>
 
                     {/* Content */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <h3 className={`font-medium ${
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-4">
+                        <div className="min-w-0">
+                          <h3 className={`font-medium text-sm sm:text-base ${
                             todo.status === 'DONE' 
                               ? 'text-medium-gray line-through' 
                               : 'text-dark-gray dark:text-white'
@@ -156,22 +156,35 @@ export function TodoList({ todos, currentUserId, userRole }: TodoListProps) {
                             {todo.title}
                           </h3>
                           {todo.description && (
-                            <p className="text-sm text-medium-gray mt-1 line-clamp-2">
+                            <p className="text-xs sm:text-sm text-medium-gray mt-1 line-clamp-2">
                               {todo.description}
                             </p>
                           )}
                         </div>
 
-                        {/* Priority Badge */}
-                        <div className="flex items-center gap-2">
-                          <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${priority.bg} ${priority.color}`}>
+                        {/* Priority Badge + Status Dropdown (row on mobile) */}
+                        <div className="flex items-center gap-2 mt-1.5 sm:mt-0 flex-shrink-0">
+                          <span className={`px-2 sm:px-2.5 py-0.5 sm:py-1 text-xs font-medium rounded-full ${priority.bg} ${priority.color}`}>
                             {priority.label}
                           </span>
+                          <div className="relative sm:hidden">
+                            <select
+                              value={todo.status}
+                              onChange={(e) => updateStatus(todo.id, e.target.value as TodoStatus)}
+                              disabled={updating === todo.id}
+                              className="appearance-none pl-2 pr-6 py-1 text-xs font-medium rounded-lg border border-off-white dark:border-medium-gray/20 bg-white dark:bg-charcoal text-dark-gray dark:text-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange/20 disabled:opacity-50"
+                            >
+                              <option value="NOT_STARTED">Not Started</option>
+                              <option value="IN_PROGRESS">In Progress</option>
+                              <option value="DONE">Done</option>
+                            </select>
+                            <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-medium-gray pointer-events-none" />
+                          </div>
                         </div>
                       </div>
 
                       {/* Meta Info */}
-                      <div className="flex items-center gap-4 mt-3 text-xs text-medium-gray">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:gap-4 mt-2 sm:mt-3 text-xs text-medium-gray">
                         <span className="flex items-center gap-1">
                           <span className="font-medium">Assigned to:</span> {todo.assignedTo.name}
                         </span>
@@ -188,8 +201,8 @@ export function TodoList({ todos, currentUserId, userRole }: TodoListProps) {
                       </div>
                     </div>
 
-                    {/* Status Dropdown */}
-                    <div className="relative">
+                    {/* Status Dropdown (desktop only) */}
+                    <div className="relative hidden sm:block flex-shrink-0">
                       <select
                         value={todo.status}
                         onChange={(e) => updateStatus(todo.id, e.target.value as TodoStatus)}
@@ -210,25 +223,25 @@ export function TodoList({ todos, currentUserId, userRole }: TodoListProps) {
         </div>
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-off-white dark:border-medium-gray/20">
-            <p className="text-sm text-medium-gray">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-4 py-3 border-t border-off-white dark:border-medium-gray/20">
+            <p className="text-xs sm:text-sm text-medium-gray">
               Showing {startIndex + 1}-{Math.min(endIndex, filteredTodos.length)} of {filteredTodos.length} tasks
             </p>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="px-3 py-2 text-sm rounded-lg border border-off-white dark:border-medium-gray/20 disabled:opacity-40 hover:bg-off-white dark:hover:bg-dark-gray transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                className="px-3 py-2 text-xs sm:text-sm rounded-lg border border-off-white dark:border-medium-gray/20 disabled:opacity-40 hover:bg-off-white dark:hover:bg-dark-gray transition-colors min-h-[44px] flex items-center justify-center"
               >
-                Previous
+                Prev
               </button>
-              <span className="text-sm text-medium-gray px-2">
+              <span className="text-xs sm:text-sm text-medium-gray px-1 sm:px-2">
                 {currentPage} / {totalPages}
               </span>
               <button
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="px-3 py-2 text-sm rounded-lg border border-off-white dark:border-medium-gray/20 disabled:opacity-40 hover:bg-off-white dark:hover:bg-dark-gray transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                className="px-3 py-2 text-xs sm:text-sm rounded-lg border border-off-white dark:border-medium-gray/20 disabled:opacity-40 hover:bg-off-white dark:hover:bg-dark-gray transition-colors min-h-[44px] flex items-center justify-center"
               >
                 Next
               </button>

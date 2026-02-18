@@ -45,6 +45,7 @@ export function FileAttachments({ meetingId, initialAttachments, canUpload }: Fi
   const [attachments, setAttachments] = useState<Attachment[]>(initialAttachments)
   const [uploading, setUploading] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [downloading, setDownloading] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -148,6 +149,32 @@ export function FileAttachments({ meetingId, initialAttachments, canUpload }: Fi
     }
   }
 
+  const handleDownload = async (attachment: Attachment) => {
+    setDownloading(attachment.id)
+    try {
+      const res = await fetch(
+        `/api/meetings/${meetingId}/attachments?attachmentId=${attachment.id}`
+      )
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to get download link')
+      }
+      const { downloadUrl } = await res.json()
+      // Open the signed S3 URL — browser will download the file
+      const a = document.createElement('a')
+      a.href = downloadUrl
+      a.download = attachment.fileName
+      a.rel = 'noopener noreferrer'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+    } catch (error) {
+      toastError(error instanceof Error ? error.message : 'Failed to download file')
+    } finally {
+      setDownloading(null)
+    }
+  }
+
   return (
     <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-hidden">
       <div className="px-6 py-4 border-b border-off-white dark:border-medium-gray/20 flex items-center justify-between">
@@ -226,10 +253,16 @@ export function FileAttachments({ meetingId, initialAttachments, canUpload }: Fi
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
+                      onClick={() => handleDownload(attachment)}
+                      disabled={downloading === attachment.id}
                       className="p-2 hover:bg-white dark:hover:bg-dark-gray rounded-lg transition-colors"
                       title="Download"
                     >
-                      <Download className="w-4 h-4 text-medium-gray" />
+                      {downloading === attachment.id ? (
+                        <Loader2 className="w-4 h-4 text-medium-gray animate-spin" />
+                      ) : (
+                        <Download className="w-4 h-4 text-medium-gray" />
+                      )}
                     </button>
                     {canUpload && (
                       <button
