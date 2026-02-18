@@ -123,6 +123,35 @@ export async function POST(request: NextRequest) {
       frequency || 'BIWEEKLY'
     )
 
+    // Check both calendars for the first occurrence (if both connected)
+    try {
+      const { isCalendarEnabled, isDateTimeFreeForBoth } = await import('@/lib/google-calendar')
+      const [reporterConnected, employeeConnected] = await Promise.all([
+        isCalendarEnabled(user.id),
+        isCalendarEnabled(employeeId),
+      ])
+      if (reporterConnected && employeeConnected) {
+        const free = await isDateTimeFreeForBoth(user.id, employeeId, nextMeetingDate)
+        if (!free) {
+          const formatted = nextMeetingDate.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+          })
+          return NextResponse.json(
+            { error: `One or both of you have a calendar conflict on the first occurrence (${formatted}). Please choose a different day or time.` },
+            { status: 409 }
+          )
+        }
+      }
+    } catch (err) {
+      console.error('Recurring schedule calendar check:', err)
+      // Allow creation if calendar check fails (e.g. API error)
+    }
+
     // Create the recurring schedule
     const schedule = await prisma.recurringSchedule.create({
       data: {

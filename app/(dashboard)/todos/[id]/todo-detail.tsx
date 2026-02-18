@@ -71,8 +71,8 @@ export function TodoDetail({ todo, currentUserId, userRole }: TodoDetailProps) {
   const StatusIcon = status.icon
   const now = new Date()
   const isOverdue = todo.dueDate && new Date(todo.dueDate) < now && currentStatus !== 'DONE'
-  const canEdit = todo.assignedToId === currentUserId || userRole === 'SUPER_ADMIN'
-  const canDelete = todo.createdById === currentUserId || userRole === 'SUPER_ADMIN'
+  const canEdit = todo.assignedTo.id === currentUserId || userRole === 'SUPER_ADMIN'
+  const canDelete = todo.createdBy.id === currentUserId || userRole === 'SUPER_ADMIN'
 
   const updateStatus = async (newStatus: TodoStatus) => {
     setUpdating(true)

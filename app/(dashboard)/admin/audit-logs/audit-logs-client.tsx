@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { 
   Shield, 
   User, 
@@ -75,7 +75,7 @@ export function AuditLogsClient() {
   })
   const limit = 20
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
@@ -97,11 +97,11 @@ export function AuditLogsClient() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [page, filters, limit])
 
   useEffect(() => {
     fetchLogs()
-  }, [page, filters])
+  }, [fetchLogs])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString()

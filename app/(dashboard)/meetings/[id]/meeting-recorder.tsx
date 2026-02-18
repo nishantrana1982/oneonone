@@ -192,6 +192,7 @@ export function MeetingRecorder({
   // auto-stop at max duration
   useEffect(() => {
     if (recordingTime >= MAX_DURATION && isRecording) stopRecording()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: only when time/recording cross threshold
   }, [recordingTime, isRecording])
 
   // --- chunk upload logic ---

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { 
   Search, 
   TrendingUp, 
@@ -126,11 +126,7 @@ export function InsightsClient({ departments, isSuperAdmin }: InsightsClientProp
   const [aiResult, setAiResult] = useState<AIQueryResult | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchInsights()
-  }, [selectedDepartment, period])
-
-  const fetchInsights = async () => {
+  const fetchInsights = useCallback(async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams({ period })
@@ -146,7 +142,11 @@ export function InsightsClient({ departments, isSuperAdmin }: InsightsClientProp
     } finally {
       setLoading(false)
     }
-  }
+  }, [selectedDepartment, period])
+
+  useEffect(() => {
+    fetchInsights()
+  }, [fetchInsights])
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return

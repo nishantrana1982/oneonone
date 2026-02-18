@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Calendar, Repeat, ArrowLeft, Loader2, Check } from 'lucide-react'
+import { Calendar, Repeat, ArrowLeft, Loader2, Check, AlertCircle } from 'lucide-react'
 import { RecurringFrequency } from '@prisma/client'
 import { NewMeetingForm } from './new-meeting-form'
 import { useToast } from '@/components/ui/toast'
@@ -34,6 +34,47 @@ export function ScheduleMeetingClient({ employees, currentUserId }: ScheduleMeet
     dayOfWeek: 1,
     timeOfDay: '10:00',
   })
+  const [recurringAvailabilityLoading, setRecurringAvailabilityLoading] = useState(false)
+  const [recurringAvailability, setRecurringAvailability] = useState<{
+    available: boolean | null
+    message: string | null
+    calendarUnavailable: boolean
+  } | null>(null)
+
+  const fetchRecurringAvailability = useCallback(async () => {
+    if (!recurringForm.employeeId || recurringForm.timeOfDay === '') return
+    setRecurringAvailabilityLoading(true)
+    setRecurringAvailability(null)
+    try {
+      const params = new URLSearchParams({
+        employeeId: recurringForm.employeeId,
+        dayOfWeek: String(recurringForm.dayOfWeek),
+        timeOfDay: recurringForm.timeOfDay,
+        frequency: recurringForm.frequency,
+      })
+      const res = await fetch(`/api/meetings/availability/recurring?${params}`)
+      const data = await res.json()
+      if (res.ok) {
+        setRecurringAvailability({
+          available: data.available ?? null,
+          message: data.message ?? null,
+          calendarUnavailable: data.calendarUnavailable ?? true,
+        })
+      }
+    } catch {
+      setRecurringAvailability(null)
+    } finally {
+      setRecurringAvailabilityLoading(false)
+    }
+  }, [recurringForm.employeeId, recurringForm.dayOfWeek, recurringForm.timeOfDay, recurringForm.frequency])
+
+  useEffect(() => {
+    if (recurringForm.employeeId && recurringForm.timeOfDay) {
+      fetchRecurringAvailability()
+    } else {
+      setRecurringAvailability(null)
+    }
+  }, [recurringForm.employeeId, recurringForm.dayOfWeek, recurringForm.timeOfDay, recurringForm.frequency, fetchRecurringAvailability])
 
   const timeOptions = Array.from({ length: 20 }, (_, i) => {
     const hour = 9 + Math.floor(i / 2)
@@ -233,6 +274,30 @@ export function ScheduleMeetingClient({ employees, currentUserId }: ScheduleMeet
               </select>
             </div>
           </div>
+
+          {recurringForm.employeeId && recurringForm.timeOfDay && (
+            <div className="rounded-xl border border-off-white dark:border-medium-gray/20 p-3 sm:p-4 bg-off-white/30 dark:bg-dark-gray/30">
+              {recurringAvailabilityLoading ? (
+                <p className="text-sm text-medium-gray flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Checking both calendars...
+                </p>
+              ) : recurringAvailability?.message ? (
+                <p className={`text-sm flex items-center gap-2 ${
+                  recurringAvailability.calendarUnavailable
+                    ? 'text-medium-gray'
+                    : recurringAvailability.available
+                      ? 'text-green-600 dark:text-green-400'
+                      : 'text-amber-600 dark:text-amber-400'
+                }`}>
+                  {!recurringAvailability.calendarUnavailable && recurringAvailability.available === false && (
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  )}
+                  {recurringAvailability.message}
+                </p>
+              ) : null}
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-2">
             <button

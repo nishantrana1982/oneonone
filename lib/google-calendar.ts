@@ -326,3 +326,27 @@ export async function getMutualFreeSlots(
 
   return slots
 }
+
+const SLOT_DURATION_MINUTES = 30
+
+/**
+ * Check if a specific date/time is free for both reporter and employee
+ * (i.e. falls within one of their mutual free slots for that day).
+ */
+export async function isDateTimeFreeForBoth(
+  reporterId: string,
+  employeeId: string,
+  dateTime: Date,
+  durationMinutes = SLOT_DURATION_MINUTES
+): Promise<boolean> {
+  const day = new Date(dateTime)
+  day.setHours(0, 0, 0, 0)
+  const slots = await getMutualFreeSlots(reporterId, employeeId, day, 30)
+  const startMs = dateTime.getTime()
+  const endMs = startMs + durationMinutes * 60 * 1000
+  return slots.some((slot) => {
+    const slotStart = new Date(slot.start).getTime()
+    const slotEnd = new Date(slot.end).getTime()
+    return startMs >= slotStart && endMs <= slotEnd
+  })
+}

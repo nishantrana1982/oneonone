@@ -83,7 +83,7 @@ export function MeetingsClient({
       toastError(text)
     }
     setTimeout(() => setMessage(null), 5000)
-  }, [])
+  }, [toastError])
 
   const now = new Date()
   const canSchedule =

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { FileText, Save, Loader2 } from 'lucide-react'
 
 interface MeetingNotesProps {
@@ -15,28 +15,9 @@ export function MeetingNotes({ meetingId, initialNotes, canEdit }: MeetingNotesP
   const [saved, setSaved] = useState(false)
   const timeoutRef = useRef<NodeJS.Timeout>()
 
-  // Auto-save after 2 seconds of no typing
-  useEffect(() => {
-    if (notes === initialNotes || !canEdit) return
-
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current)
-    }
-
-    timeoutRef.current = setTimeout(() => {
-      saveNotes()
-    }, 2000)
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-      }
-    }
-  }, [notes])
-
-  const saveNotes = async () => {
+  const saveNotes = useCallback(async () => {
     if (notes === initialNotes) return
-    
+
     setSaving(true)
     setSaved(false)
 
@@ -56,7 +37,26 @@ export function MeetingNotes({ meetingId, initialNotes, canEdit }: MeetingNotesP
     } finally {
       setSaving(false)
     }
-  }
+  }, [meetingId, notes, initialNotes])
+
+  // Auto-save after 2 seconds of no typing
+  useEffect(() => {
+    if (notes === initialNotes || !canEdit) return
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+    }
+
+    timeoutRef.current = setTimeout(() => {
+      saveNotes()
+    }, 2000)
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+    }
+  }, [notes, initialNotes, canEdit, saveNotes])
 
   return (
     <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-hidden">
