@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Calendar, Repeat, ArrowLeft, Loader2, Check, AlertCircle } from 'lucide-react'
+import { Calendar, Repeat, ArrowLeft, Loader2, Check, AlertCircle, Clock } from 'lucide-react'
 import { RecurringFrequency } from '@prisma/client'
 import { NewMeetingForm } from './new-meeting-form'
 import { useToast } from '@/components/ui/toast'
@@ -15,6 +15,35 @@ const frequencyOptions: { value: RecurringFrequency; label: string }[] = [
   { value: 'BIWEEKLY', label: 'Every 2 weeks' },
   { value: 'MONTHLY', label: 'Monthly' },
 ]
+
+interface FreeSlot { start: string; end: string }
+
+function getNextOccurrenceDate(dayOfWeek: number): string {
+  const now = new Date()
+  const currentDay = now.getDay()
+  let daysUntil = dayOfWeek - currentDay
+  if (daysUntil < 0 || (daysUntil === 0 && now.getHours() >= 18)) daysUntil += 7
+  const next = new Date(now)
+  next.setDate(now.getDate() + daysUntil)
+  return next.toISOString().slice(0, 10)
+}
+
+function slotToTimeInTz(slotStartIso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(slotStartIso))
+}
+
+function formatSlotTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+}
 
 interface ScheduleMeetingClientProps {
   employees: Array<{ id: string; name: string; email: string }>
@@ -32,8 +61,14 @@ export function ScheduleMeetingClient({ employees, currentUserId }: ScheduleMeet
     employeeId: '',
     frequency: 'BIWEEKLY' as RecurringFrequency,
     dayOfWeek: 1,
-    timeOfDay: '10:00',
+    timeOfDay: '',
   })
+
+  const [recurringSlots, setRecurringSlots] = useState<FreeSlot[]>([])
+  const [recurringSlotsLoading, setRecurringSlotsLoading] = useState(false)
+  const [recurringWorkingHoursLabel, setRecurringWorkingHoursLabel] = useState<string | null>(null)
+  const [reporterTimeZone, setReporterTimeZone] = useState<string>('Asia/Kolkata')
+
   const [recurringAvailabilityLoading, setRecurringAvailabilityLoading] = useState(false)
   const [recurringAvailability, setRecurringAvailability] = useState<{
     available: boolean | null
@@ -41,6 +76,36 @@ export function ScheduleMeetingClient({ employees, currentUserId }: ScheduleMeet
     calendarUnavailable: boolean
   } | null>(null)
 
+  // Fetch slots when employee or day changes
+  useEffect(() => {
+    setRecurringForm((prev) => ({ ...prev, timeOfDay: '' }))
+    if (!recurringForm.employeeId || recurringForm.dayOfWeek == null) {
+      setRecurringSlots([])
+      setRecurringWorkingHoursLabel(null)
+      return
+    }
+    let cancelled = false
+    setRecurringSlotsLoading(true)
+    setRecurringSlots([])
+    const date = getNextOccurrenceDate(recurringForm.dayOfWeek)
+    fetch(`/api/meetings/availability?employeeId=${encodeURIComponent(recurringForm.employeeId)}&date=${encodeURIComponent(date)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return
+        if (!data.calendarUnavailable && Array.isArray(data.slots)) {
+          setRecurringSlots(data.slots)
+          setRecurringWorkingHoursLabel(data.workingHoursLabel ?? null)
+          setReporterTimeZone(data.reporterTimeZone ?? 'Asia/Kolkata')
+        } else {
+          setRecurringSlots([])
+          setRecurringWorkingHoursLabel(null)
+        }
+      })
+      .finally(() => { if (!cancelled) setRecurringSlotsLoading(false) })
+    return () => { cancelled = true }
+  }, [recurringForm.employeeId, recurringForm.dayOfWeek])
+
+  // Check first-occurrence availability when time is selected
   const fetchRecurringAvailability = useCallback(async () => {
     if (!recurringForm.employeeId || recurringForm.timeOfDay === '') return
     setRecurringAvailabilityLoading(true)
@@ -75,12 +140,6 @@ export function ScheduleMeetingClient({ employees, currentUserId }: ScheduleMeet
       setRecurringAvailability(null)
     }
   }, [recurringForm.employeeId, recurringForm.dayOfWeek, recurringForm.timeOfDay, recurringForm.frequency, fetchRecurringAvailability])
-
-  const timeOptions = Array.from({ length: 20 }, (_, i) => {
-    const hour = 9 + Math.floor(i / 2)
-    const minute = i % 2 === 0 ? '00' : '30'
-    return `${String(hour).padStart(2, '0')}:${minute}`
-  })
 
   const handleRecurringSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -214,7 +273,7 @@ export function ScheduleMeetingClient({ employees, currentUserId }: ScheduleMeet
             </select>
           </div>
 
-          <div className="grid gap-6 sm:grid-cols-3">
+          <div className="grid gap-6 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-dark-gray dark:text-white mb-2">
                 Frequency
@@ -252,28 +311,54 @@ export function ScheduleMeetingClient({ employees, currentUserId }: ScheduleMeet
                 ))}
               </select>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-dark-gray dark:text-white mb-2">
-                Time
-              </label>
-              <select
-                value={recurringForm.timeOfDay}
-                onChange={(e) => setRecurringForm({ ...recurringForm, timeOfDay: e.target.value })}
-                className="w-full rounded-xl border border-off-white dark:border-medium-gray/20 bg-white dark:bg-charcoal px-4 py-3 text-dark-gray dark:text-white focus:outline-none focus:ring-2 focus:ring-dark-gray/20 dark:focus:ring-white/20"
-              >
-                {timeOptions.map((time) => (
-                  <option key={time} value={time}>
-                    {new Date(`2000-01-01T${time}:00`).toLocaleTimeString('en-US', {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                      hour12: true,
-                    })}
-                  </option>
-                ))}
-              </select>
-            </div>
           </div>
+
+          {recurringForm.employeeId && recurringForm.dayOfWeek != null && (
+            <div className="rounded-2xl border border-off-white dark:border-medium-gray/20 p-4 sm:p-5">
+              <div className="flex items-center gap-3 mb-1">
+                <div className="w-9 h-9 rounded-full bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-purple-500" />
+                </div>
+                <div>
+                  <p className="font-semibold text-dark-gray dark:text-white">Available time slots</p>
+                  {recurringWorkingHoursLabel && (
+                    <p className="text-sm text-medium-gray">{recurringWorkingHoursLabel}</p>
+                  )}
+                </div>
+              </div>
+              {recurringSlotsLoading ? (
+                <p className="text-sm text-medium-gray flex items-center gap-2 mt-3">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading slots for next {dayNames[recurringForm.dayOfWeek]}...
+                </p>
+              ) : recurringSlots.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mt-3">
+                  {recurringSlots.map((slot) => {
+                    const timeInTz = slotToTimeInTz(slot.start, reporterTimeZone)
+                    const isSelected = recurringForm.timeOfDay === timeInTz
+                    return (
+                      <button
+                        key={slot.start}
+                        type="button"
+                        onClick={() => setRecurringForm({ ...recurringForm, timeOfDay: timeInTz })}
+                        className={`py-2.5 px-3 rounded-xl border text-sm font-medium transition-colors ${
+                          isSelected
+                            ? 'border-orange bg-orange/10 text-orange dark:bg-orange/20'
+                            : 'border-off-white dark:border-medium-gray/20 hover:border-orange/50 text-dark-gray dark:text-white'
+                        }`}
+                      >
+                        {formatSlotTime(slot.start)}
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-medium-gray mt-3">
+                  No free slots in overlapping working hours for that day. Try a different day.
+                </p>
+              )}
+            </div>
+          )}
 
           {recurringForm.employeeId && recurringForm.timeOfDay && (
             <div className="rounded-xl border border-off-white dark:border-medium-gray/20 p-3 sm:p-4 bg-off-white/30 dark:bg-dark-gray/30">
@@ -309,7 +394,7 @@ export function ScheduleMeetingClient({ employees, currentUserId }: ScheduleMeet
             </button>
             <button
               type="submit"
-              disabled={recurringLoading || !recurringForm.employeeId}
+              disabled={recurringLoading || !recurringForm.employeeId || !recurringForm.timeOfDay}
               className="px-6 py-3 rounded-xl bg-dark-gray dark:bg-white text-white dark:text-dark-gray font-medium hover:bg-charcoal dark:hover:bg-off-white disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
             >
               {recurringLoading ? (
