@@ -22,49 +22,51 @@ export default async function MeetingsPage() {
 
   const canManageRecurring = user.role === UserRole.REPORTER || user.role === UserRole.SUPER_ADMIN
 
+  const meetingSelect = {
+    employee: { select: { name: true, email: true } },
+    reporter: { select: { name: true, email: true } },
+  }
+
   if (user.role === UserRole.EMPLOYEE) {
     meetings = await prisma.meeting.findMany({
       where: { employeeId: user.id },
-      include: {
-        reporter: { select: { name: true, email: true } },
-      },
-      orderBy: { meetingDate: 'desc' },
-    })
-  } else if (user.role === UserRole.REPORTER) {
-    meetings = await prisma.meeting.findMany({
-      where: {
-        OR: [{ employeeId: user.id }, { reporterId: user.id }],
-      },
-      include: {
-        employee: { select: { name: true, email: true } },
-        reporter: { select: { name: true, email: true } },
-      },
+      include: meetingSelect,
       orderBy: { meetingDate: 'desc' },
     })
 
-    // Get recurring schedules for this reporter
+    recurringSchedules = await prisma.recurringSchedule.findMany({
+      where: { employeeId: user.id, isActive: true },
+      include: {
+        employee: { select: { id: true, name: true, email: true } },
+        reporter: { select: { name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+  } else if (user.role === UserRole.REPORTER) {
+    meetings = await prisma.meeting.findMany({
+      where: { OR: [{ employeeId: user.id }, { reporterId: user.id }] },
+      include: meetingSelect,
+      orderBy: { meetingDate: 'desc' },
+    })
+
     recurringSchedules = await prisma.recurringSchedule.findMany({
       where: { reporterId: user.id, isActive: true },
       include: {
         employee: { select: { id: true, name: true, email: true } },
+        reporter: { select: { name: true } },
       },
       orderBy: { createdAt: 'desc' },
     })
   } else {
-    // SUPER_ADMIN sees all
     meetings = await prisma.meeting.findMany({
-      include: {
-        employee: { select: { name: true, email: true } },
-        reporter: { select: { name: true, email: true } },
-      },
+      include: meetingSelect,
       orderBy: { meetingDate: 'desc' },
     })
 
-    // Get all recurring schedules
     recurringSchedules = await prisma.recurringSchedule.findMany({
       where: { isActive: true },
       include: {
-        employee: { select: { id: true, name: true } },
+        employee: { select: { id: true, name: true, email: true } },
         reporter: { select: { name: true } },
       },
       orderBy: { createdAt: 'desc' },

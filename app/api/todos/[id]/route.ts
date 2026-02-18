@@ -4,6 +4,37 @@ import { prisma } from '@/lib/prisma'
 import { TodoStatus, TodoPriority } from '@prisma/client'
 import { logTodoUpdated, logTodoDeleted } from '@/lib/audit'
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const user = await requireAuth()
+
+    const todo = await prisma.todo.findUnique({
+      where: { id: params.id },
+      include: {
+        assignedTo: { select: { id: true, name: true, email: true } },
+        createdBy: { select: { id: true, name: true, email: true } },
+        meeting: { select: { id: true, meetingDate: true, employee: { select: { name: true } }, reporter: { select: { name: true } } } },
+      },
+    })
+
+    if (!todo) {
+      return NextResponse.json({ error: 'Todo not found' }, { status: 404 })
+    }
+
+    if (todo.assignedToId !== user.id && todo.createdById !== user.id && user.role !== 'SUPER_ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    return NextResponse.json(todo)
+  } catch (error) {
+    console.error('Error fetching todo:', error)
+    return NextResponse.json({ error: 'Failed to fetch todo' }, { status: 500 })
+  }
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }

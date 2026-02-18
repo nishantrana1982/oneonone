@@ -27,6 +27,7 @@ interface Meeting {
   status: string
   checkInPersonal: string | null
   employeeId: string
+  recurringScheduleId?: string | null
   reporter?: { name: string | null; email: string | null } | null
   employee?: { name: string | null; email: string | null } | null
 }
@@ -68,7 +69,7 @@ export function MeetingsClient({
   const router = useRouter()
   const { toastError } = useToast()
   const confirm = useConfirm()
-  const [activeTab, setActiveTab] = useState<'all' | 'recurring'>('all')
+  const [activeTab, setActiveTab] = useState<'all' | 'one-time' | 'recurring'>('all')
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [isToggling, setIsToggling] = useState<string | null>(null)
   const [deletedScheduleIds, setDeletedScheduleIds] = useState<Set<string>>(new Set())
@@ -103,8 +104,15 @@ export function MeetingsClient({
       !m.checkInPersonal
   )
 
+  // Filter meetings by tab
+  const tabFilteredMeetings = activeTab === 'one-time'
+    ? meetings.filter((m) => !m.recurringScheduleId)
+    : activeTab === 'recurring'
+      ? meetings.filter((m) => !!m.recurringScheduleId)
+      : meetings
+
   // Sort: upcoming/active meetings first (nearest date first), then past meetings (most recent first)
-  const sortedMeetings = [...meetings].sort((a, b) => {
+  const sortedMeetings = [...tabFilteredMeetings].sort((a, b) => {
     const dateA = new Date(a.meetingDate).getTime()
     const dateB = new Date(b.meetingDate).getTime()
     const nowMs = now.getTime()
@@ -192,9 +200,16 @@ export function MeetingsClient({
     return `${hour}:${minutes} ${ampm}`
   }
 
+  const isEmployeeRole = userRole === UserRole.EMPLOYEE
+
   const renderRecurringList = (schedules: RecurringSchedule[]) => (
     <div className="divide-y divide-off-white dark:divide-medium-gray/20">
-      {schedules.map((schedule) => (
+      {schedules.map((schedule) => {
+        const displayName = isEmployeeRole
+          ? schedule.reporter?.name || 'Your manager'
+          : schedule.employee.name
+
+        return (
         <div
           key={schedule.id}
           className="flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4"
@@ -212,7 +227,7 @@ export function MeetingsClient({
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-medium text-dark-gray dark:text-white text-sm sm:text-base truncate">
-              {schedule.employee.name}
+              {displayName}
             </p>
             <p className="text-xs sm:text-sm text-medium-gray truncate">
               {schedule.frequency === 'BIWEEKLY'
@@ -231,40 +246,43 @@ export function MeetingsClient({
           >
             {schedule.isActive ? 'Active' : 'Paused'}
           </span>
-          <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
-            <button
-              type="button"
-              onClick={() =>
-                handleToggleRecurring(schedule.id, schedule.isActive)
-              }
-              disabled={isToggling === schedule.id}
-              className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-off-white dark:hover:bg-charcoal transition-colors focus-visible:ring-2 focus-visible:ring-orange/50 focus-visible:outline-none"
-              title={schedule.isActive ? 'Pause' : 'Resume'}
-            >
-              {isToggling === schedule.id ? (
-                <div className="w-4 h-4 border-2 border-medium-gray border-t-transparent rounded-full animate-spin" />
-              ) : schedule.isActive ? (
-                <Pause className="w-4 h-4 text-medium-gray" />
-              ) : (
-                <Play className="w-4 h-4 text-medium-gray" />
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleDeleteRecurring(schedule.id)}
-              disabled={isDeleting === schedule.id}
-              className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors focus-visible:ring-2 focus-visible:ring-orange/50 focus-visible:outline-none"
-              title="Delete"
-            >
-              {isDeleting === schedule.id ? (
-                <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Trash2 className="w-4 h-4 text-red-500" />
-              )}
-            </button>
-          </div>
+          {canSchedule && (
+            <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() =>
+                  handleToggleRecurring(schedule.id, schedule.isActive)
+                }
+                disabled={isToggling === schedule.id}
+                className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-off-white dark:hover:bg-charcoal transition-colors focus-visible:ring-2 focus-visible:ring-orange/50 focus-visible:outline-none"
+                title={schedule.isActive ? 'Pause' : 'Resume'}
+              >
+                {isToggling === schedule.id ? (
+                  <div className="w-4 h-4 border-2 border-medium-gray border-t-transparent rounded-full animate-spin" />
+                ) : schedule.isActive ? (
+                  <Pause className="w-4 h-4 text-medium-gray" />
+                ) : (
+                  <Play className="w-4 h-4 text-medium-gray" />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteRecurring(schedule.id)}
+                disabled={isDeleting === schedule.id}
+                className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors focus-visible:ring-2 focus-visible:ring-orange/50 focus-visible:outline-none"
+                title="Delete"
+              >
+                {isDeleting === schedule.id ? (
+                  <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4 text-red-500" />
+                )}
+              </button>
+            </div>
+          )}
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 
@@ -375,238 +393,204 @@ export function MeetingsClient({
       )}
 
 
-      {/* Tabs — hidden when there's no data at all */}
-      {canSchedule && !hasNoData && (
+      {/* Tabs — visible for all users when there's data */}
+      {!hasNoData && (
         <div className="overflow-x-auto">
           <div className="flex gap-1 p-1 bg-off-white dark:bg-charcoal rounded-xl w-fit min-w-0">
-          <button
-            type="button"
-            onClick={() => { setActiveTab('all'); setCurrentPage(1) }}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-orange/50 focus-visible:outline-none ${
-              activeTab === 'all'
-                ? 'bg-white dark:bg-charcoal text-dark-gray dark:text-white shadow-sm'
-                : 'text-medium-gray hover:text-dark-gray dark:hover:text-white'
-            }`}
-          >
-            <Calendar className="w-4 h-4" />
-            All Meetings
-          </button>
-          <button
-            type="button"
-            onClick={() => { setActiveTab('recurring'); setCurrentPage(1) }}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-orange/50 focus-visible:outline-none ${
-              activeTab === 'recurring'
-                ? 'bg-white dark:bg-charcoal text-dark-gray dark:text-white shadow-sm'
-                : 'text-medium-gray hover:text-dark-gray dark:hover:text-white'
-            }`}
-          >
-            <Repeat className="w-4 h-4" />
-            Recurring
-          </button>
+          {(['all', 'one-time', 'recurring'] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => { setActiveTab(tab); setCurrentPage(1) }}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-orange/50 focus-visible:outline-none ${
+                activeTab === tab
+                  ? 'bg-white dark:bg-charcoal text-dark-gray dark:text-white shadow-sm'
+                  : 'text-medium-gray hover:text-dark-gray dark:hover:text-white'
+              }`}
+            >
+              {tab === 'all' && <Calendar className="w-4 h-4" />}
+              {tab === 'one-time' && <Clock className="w-4 h-4" />}
+              {tab === 'recurring' && <Repeat className="w-4 h-4" />}
+              {tab === 'all' ? 'All' : tab === 'one-time' ? 'One-time' : 'Recurring'}
+            </button>
+          ))}
           </div>
         </div>
       )}
 
-      {/* Content: All (default) */}
-      {activeTab === 'all' && (
-        <>
-          {visibleRecurring.length > 0 && (
-            <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-hidden">
-              <div className="px-6 py-3 border-b border-off-white dark:border-medium-gray/20 flex items-center justify-between">
-                <h3 className="font-semibold text-dark-gray dark:text-white">
-                  Recurring schedules
-                </h3>
-                <Link
-                  href="/meetings/recurring"
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-medium-gray hover:text-dark-gray dark:hover:text-white rounded-lg hover:bg-off-white dark:hover:bg-charcoal transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                  Manage Schedules
-                </Link>
-              </div>
-              {renderRecurringList(visibleRecurring)}
-            </div>
-          )}
-
-          {meetings.length === 0 && visibleRecurring.length === 0 ? (
-            <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-6 sm:p-8 text-center">
-              <Calendar className="w-10 h-10 sm:w-12 sm:h-12 text-light-gray mx-auto mb-2 sm:mb-3" />
-              <h3 className="text-base sm:text-lg font-semibold text-dark-gray dark:text-white mb-1">
-                No meetings yet
-              </h3>
-              <p className="text-sm text-medium-gray max-w-md mx-auto mb-3 sm:mb-4">
-                {canSchedule
-                  ? 'Get started by scheduling your first one-on-one meeting or a recurring schedule.'
-                  : 'Your manager will schedule one-on-one meetings with you.'}
-              </p>
-              {canSchedule && (
-                <Link
-                  href="/meetings/new"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-dark-gray dark:bg-white text-white dark:text-dark-gray rounded-xl font-medium hover:bg-charcoal dark:hover:bg-off-white transition-colors text-sm"
-                >
-                  <Plus className="w-4 h-4" />
-                  Schedule Meeting
-                </Link>
-              )}
-            </div>
-          ) : meetings.length > 0 ? (
-            <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-hidden">
-              {visibleRecurring.length > 0 && (
-                <div className="px-6 py-3 border-b border-off-white dark:border-medium-gray/20">
-                  <h3 className="font-semibold text-dark-gray dark:text-white">
-                    One-on-one meetings
-                  </h3>
-                </div>
-              )}
-              <div className="divide-y divide-off-white dark:divide-medium-gray/20">
-                {paginatedMeetings.map((meeting) => {
-                  const meetingDate = new Date(meeting.meetingDate)
-                  const isPast = meetingDate < now
-                  const needsForm =
-                    isPast &&
-                    meeting.status === 'SCHEDULED' &&
-                    !meeting.checkInPersonal
-                  const isEmployee = meeting.employeeId === currentUserId
-                  const otherPerson = isEmployee
-                    ? meeting.reporter
-                    : meeting.employee
-
-                  return (
-                    <Link
-                      key={meeting.id}
-                      href={`/meetings/${meeting.id}`}
-                      className="flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4 hover:bg-off-white/50 dark:hover:bg-charcoal/50 active:bg-off-white dark:active:bg-charcoal transition-colors"
-                    >
-                      <div
-                        className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                          meeting.status === 'COMPLETED'
-                            ? 'bg-green-500/10'
-                            : needsForm
-                              ? 'bg-amber-500/10'
-                              : 'bg-blue-500/10'
-                        }`}
-                      >
-                        <Calendar
-                          className={`w-5 h-5 sm:w-6 sm:h-6 ${
-                            meeting.status === 'COMPLETED'
-                              ? 'text-green-500'
-                              : needsForm
-                                ? 'text-amber-500'
-                                : 'text-blue-500'
-                          }`}
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-dark-gray dark:text-white text-sm sm:text-base truncate">
-                            {otherPerson?.name ?? 'Unknown'}
-                          </p>
-                          {needsForm && isEmployee && (
-                            <span className="px-2 py-0.5 text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-full flex-shrink-0">
-                              Form needed
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs sm:text-sm text-medium-gray">
-                          {formatMeetingDateShort(meetingDate)}
-                        </p>
-                      </div>
-                      <span
-                        className={`px-2 sm:px-3 py-1 text-xs font-medium rounded-full flex-shrink-0 ${
-                          meeting.status === 'COMPLETED'
-                            ? 'bg-green-500/10 text-green-600 dark:text-green-400'
-                            : meeting.status === 'PROPOSED'
-                            ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                            : meeting.status === 'CANCELLED'
-                            ? 'bg-red-500/10 text-red-600 dark:text-red-400'
-                            : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                        }`}
-                      >
-                        {meeting.status === 'COMPLETED'
-                          ? 'Completed'
-                          : meeting.status === 'PROPOSED'
-                          ? 'Proposed'
-                          : meeting.status === 'CANCELLED'
-                          ? 'Cancelled'
-                          : isPast
-                            ? 'Pending'
-                            : 'Scheduled'}
-                      </span>
-                      <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-light-gray hidden sm:block" />
-                    </Link>
-                  )
-                })}
-              </div>
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t border-off-white dark:border-medium-gray/20">
-                  <p className="text-sm text-medium-gray">
-                    Showing {startIndex + 1}-{Math.min(endIndex, sortedMeetings.length)} of {sortedMeetings.length} meetings
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                      className="px-3 py-2 text-sm rounded-lg border border-off-white dark:border-medium-gray/20 disabled:opacity-40 hover:bg-off-white dark:hover:bg-dark-gray transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
-                    >
-                      Previous
-                    </button>
-                    <span className="text-sm text-medium-gray px-2">
-                      {currentPage} / {totalPages}
-                    </span>
-                    <button
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
-                      className="px-3 py-2 text-sm rounded-lg border border-off-white dark:border-medium-gray/20 disabled:opacity-40 hover:bg-off-white dark:hover:bg-dark-gray transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : null}
-        </>
-      )}
-
-      {/* Content: Recurring only */}
-      {activeTab === 'recurring' && (
-        <>
-          <div className="flex justify-end">
-            <Link
-              href="/meetings/recurring"
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-dark-gray dark:bg-white text-white dark:text-dark-gray rounded-xl hover:bg-charcoal dark:hover:bg-off-white transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Manage Schedules
-            </Link>
-          </div>
-
-          {visibleRecurring.length === 0 ? (
-            <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-6 sm:p-8 text-center">
-              <Repeat className="w-10 h-10 sm:w-12 sm:h-12 text-light-gray mx-auto mb-2 sm:mb-3" />
-              <h3 className="text-base sm:text-lg font-semibold text-dark-gray dark:text-white mb-1">
-                No recurring schedules
-              </h3>
-              <p className="text-sm text-medium-gray max-w-md mx-auto mb-3 sm:mb-4">
-                Set up recurring schedules to automatically create bi-weekly
-                one-on-one meetings.
-              </p>
+      {/* Recurring schedules management section (only on 'recurring' tab) */}
+      {activeTab === 'recurring' && visibleRecurring.length > 0 && (
+        <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-hidden">
+          <div className="px-6 py-3 border-b border-off-white dark:border-medium-gray/20 flex items-center justify-between">
+            <h3 className="font-semibold text-dark-gray dark:text-white">
+              Recurring Schedules
+            </h3>
+            {canSchedule && (
               <Link
                 href="/meetings/recurring"
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-dark-gray dark:bg-white text-white dark:text-dark-gray rounded-xl font-medium hover:bg-charcoal dark:hover:bg-off-white transition-colors text-sm"
+                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-medium-gray hover:text-dark-gray dark:hover:text-white rounded-lg hover:bg-off-white dark:hover:bg-charcoal transition-colors"
               >
                 <Plus className="w-4 h-4" />
-                Create Schedule
+                Manage
               </Link>
-            </div>
-          ) : (
-            <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-hidden">
-              {renderRecurringList(visibleRecurring)}
+            )}
+          </div>
+          {renderRecurringList(visibleRecurring)}
+        </div>
+      )}
+
+      {/* Meetings list */}
+      {sortedMeetings.length > 0 ? (
+        <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-hidden">
+          <div className="divide-y divide-off-white dark:divide-medium-gray/20">
+            {paginatedMeetings.map((meeting) => {
+              const meetingDate = new Date(meeting.meetingDate)
+              const isPast = meetingDate < now
+              const needsForm =
+                isPast &&
+                meeting.status === 'SCHEDULED' &&
+                !meeting.checkInPersonal
+              const isEmployee = meeting.employeeId === currentUserId
+              const otherPerson = isEmployee
+                ? meeting.reporter
+                : meeting.employee
+
+              return (
+                <Link
+                  key={meeting.id}
+                  href={`/meetings/${meeting.id}`}
+                  className="flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4 hover:bg-off-white/50 dark:hover:bg-charcoal/50 active:bg-off-white dark:active:bg-charcoal transition-colors"
+                >
+                  <div
+                    className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                      meeting.status === 'COMPLETED'
+                        ? 'bg-green-500/10'
+                        : needsForm
+                          ? 'bg-amber-500/10'
+                          : 'bg-blue-500/10'
+                    }`}
+                  >
+                    {meeting.recurringScheduleId ? (
+                      <Repeat className={`w-5 h-5 sm:w-6 sm:h-6 ${meeting.status === 'COMPLETED' ? 'text-green-500' : needsForm ? 'text-amber-500' : 'text-blue-500'}`} />
+                    ) : (
+                      <Calendar className={`w-5 h-5 sm:w-6 sm:h-6 ${meeting.status === 'COMPLETED' ? 'text-green-500' : needsForm ? 'text-amber-500' : 'text-blue-500'}`} />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-dark-gray dark:text-white text-sm sm:text-base truncate">
+                        {otherPerson?.name ?? 'Unknown'}
+                      </p>
+                      {needsForm && isEmployee && (
+                        <span className="px-2 py-0.5 text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-full flex-shrink-0">
+                          Form needed
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs sm:text-sm text-medium-gray">
+                      {formatMeetingDateShort(meetingDate)}
+                    </p>
+                  </div>
+                  <span
+                    className={`px-2 sm:px-3 py-1 text-xs font-medium rounded-full flex-shrink-0 ${
+                      meeting.status === 'COMPLETED'
+                        ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                        : meeting.status === 'PROPOSED'
+                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                        : meeting.status === 'CANCELLED'
+                        ? 'bg-red-500/10 text-red-600 dark:text-red-400'
+                        : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                    }`}
+                  >
+                    {meeting.status === 'COMPLETED'
+                      ? 'Completed'
+                      : meeting.status === 'PROPOSED'
+                      ? 'Proposed'
+                      : meeting.status === 'CANCELLED'
+                      ? 'Cancelled'
+                      : isPast
+                        ? 'Pending'
+                        : 'Scheduled'}
+                  </span>
+                  <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-light-gray hidden sm:block" />
+                </Link>
+              )
+            })}
+          </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-off-white dark:border-medium-gray/20">
+              <p className="text-sm text-medium-gray">
+                Showing {startIndex + 1}-{Math.min(endIndex, sortedMeetings.length)} of {sortedMeetings.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-2 text-sm rounded-lg border border-off-white dark:border-medium-gray/20 disabled:opacity-40 hover:bg-off-white dark:hover:bg-dark-gray transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                >
+                  Prev
+                </button>
+                <span className="text-sm text-medium-gray px-2">{currentPage} / {totalPages}</span>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-2 text-sm rounded-lg border border-off-white dark:border-medium-gray/20 disabled:opacity-40 hover:bg-off-white dark:hover:bg-dark-gray transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           )}
-        </>
-      )}
+        </div>
+      ) : !hasNoData ? (
+        <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-6 sm:p-8 text-center">
+          {activeTab === 'recurring' ? (
+            <Repeat className="w-10 h-10 sm:w-12 sm:h-12 text-light-gray mx-auto mb-2 sm:mb-3" />
+          ) : (
+            <Calendar className="w-10 h-10 sm:w-12 sm:h-12 text-light-gray mx-auto mb-2 sm:mb-3" />
+          )}
+          <h3 className="text-base sm:text-lg font-semibold text-dark-gray dark:text-white mb-1">
+            {activeTab === 'one-time' ? 'No one-time meetings' : activeTab === 'recurring' ? 'No recurring meetings' : 'No meetings yet'}
+          </h3>
+          <p className="text-sm text-medium-gray max-w-md mx-auto mb-3 sm:mb-4">
+            {canSchedule
+              ? activeTab === 'recurring'
+                ? 'Set up a recurring schedule to automatically create meetings.'
+                : 'Get started by scheduling your first one-on-one meeting.'
+              : 'Your manager will schedule one-on-one meetings with you.'}
+          </p>
+          {canSchedule && (
+            <Link
+              href={activeTab === 'recurring' ? '/meetings/recurring' : '/meetings/new'}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-dark-gray dark:bg-white text-white dark:text-dark-gray rounded-xl font-medium hover:bg-charcoal dark:hover:bg-off-white transition-colors text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              {activeTab === 'recurring' ? 'Create Schedule' : 'Schedule Meeting'}
+            </Link>
+          )}
+        </div>
+      ) : hasNoData ? (
+        <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-6 sm:p-8 text-center">
+          <Calendar className="w-10 h-10 sm:w-12 sm:h-12 text-light-gray mx-auto mb-2 sm:mb-3" />
+          <h3 className="text-base sm:text-lg font-semibold text-dark-gray dark:text-white mb-1">
+            No meetings yet
+          </h3>
+          <p className="text-sm text-medium-gray max-w-md mx-auto mb-3 sm:mb-4">
+            {canSchedule
+              ? 'Get started by scheduling your first one-on-one meeting or a recurring schedule.'
+              : 'Your manager will schedule one-on-one meetings with you.'}
+          </p>
+          {canSchedule && (
+            <Link
+              href="/meetings/new"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-dark-gray dark:bg-white text-white dark:text-dark-gray rounded-xl font-medium hover:bg-charcoal dark:hover:bg-off-white transition-colors text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Schedule Meeting
+            </Link>
+          )}
+        </div>
+      ) : null}
     </div>
   )
 }

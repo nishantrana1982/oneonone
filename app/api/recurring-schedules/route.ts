@@ -198,28 +198,30 @@ function calculateNextMeetingDate(
   timeOfDay: string,
   frequency: RecurringFrequency
 ): Date {
-  const now = new Date()
   const [hours, minutes] = timeOfDay.split(':').map(Number)
-  
-  // Find the next occurrence of the specified day
-  let nextDate = new Date(now)
-  nextDate.setHours(hours, minutes, 0, 0)
-  
-  // Calculate days until next occurrence
-  const currentDay = now.getDay()
+  const IST_OFFSET = 5 * 60 + 30 // IST is UTC+5:30
+
+  // Work in IST by shifting the current UTC time
+  const nowUtc = new Date()
+  const nowIst = new Date(nowUtc.getTime() + IST_OFFSET * 60 * 1000)
+
+  // Build "today at the desired IST time" using UTC methods on the shifted date
+  const todayIst = new Date(nowIst)
+  todayIst.setUTCHours(hours, minutes, 0, 0)
+
+  const currentDay = nowIst.getUTCDay()
   let daysUntil = dayOfWeek - currentDay
-  
-  // If it's the same day but time has passed, or if the day has passed this week
-  if (daysUntil < 0 || (daysUntil === 0 && now >= nextDate)) {
+  if (daysUntil < 0 || (daysUntil === 0 && nowIst >= todayIst)) {
     daysUntil += 7
   }
-  
-  nextDate.setDate(now.getDate() + daysUntil)
-  
-  // For biweekly, if the date is too close, add another week
+
+  const nextIst = new Date(todayIst)
+  nextIst.setUTCDate(todayIst.getUTCDate() + daysUntil)
+
   if (frequency === 'BIWEEKLY' && daysUntil < 7) {
-    nextDate.setDate(nextDate.getDate() + 7)
+    nextIst.setUTCDate(nextIst.getUTCDate() + 7)
   }
-  
-  return nextDate
+
+  // Convert back from IST to UTC for storage
+  return new Date(nextIst.getTime() - IST_OFFSET * 60 * 1000)
 }

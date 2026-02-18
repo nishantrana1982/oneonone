@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckSquare, AlertTriangle, Circle, CheckCircle2, Clock, Calendar, ChevronDown } from 'lucide-react'
+import Link from 'next/link'
+import { CheckSquare, AlertTriangle, Circle, CheckCircle2, Clock, Calendar, ChevronDown, ChevronRight } from 'lucide-react'
 import { UserRole, TodoStatus, TodoPriority } from '@prisma/client'
 import { useToast } from '@/components/ui/toast'
 
@@ -39,7 +40,7 @@ const priorityConfig = {
 export function TodoList({ todos, currentUserId, userRole }: TodoListProps) {
   const router = useRouter()
   const { toastError } = useToast()
-  const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('active')
+  const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all')
   const [updating, setUpdating] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const ITEMS_PER_PAGE = 15
@@ -91,7 +92,7 @@ export function TodoList({ todos, currentUserId, userRole }: TodoListProps) {
     <div className="space-y-4">
       {/* Filter Tabs */}
       <div className="flex gap-2">
-        {(['active', 'all', 'completed'] as const).map((tab) => (
+        {(['all', 'active', 'completed'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => { setFilter(tab); setCurrentPage(1) }}
@@ -123,19 +124,20 @@ export function TodoList({ todos, currentUserId, userRole }: TodoListProps) {
               return (
                 <div
                   key={todo.id}
-                  className={`p-4 sm:p-5 transition-colors active:bg-off-white/70 dark:active:bg-dark-gray/70 ${isOverdue ? 'bg-red-50/50 dark:bg-red-500/5' : ''}`}
+                  className={`relative transition-colors hover:bg-off-white/50 dark:hover:bg-dark-gray/30 ${isOverdue ? 'bg-red-50/50 dark:bg-red-500/5' : ''}`}
                 >
-                  <div className="flex items-start gap-3 sm:gap-4">
-                    {/* Status Toggle */}
+                  <div className="flex items-start gap-3 sm:gap-4 p-4 sm:p-5">
+                    {/* Status Toggle — interactive, kept outside the link */}
                     <button
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation()
                         const nextStatus: TodoStatus = 
                           todo.status === 'NOT_STARTED' ? 'IN_PROGRESS' :
                           todo.status === 'IN_PROGRESS' ? 'DONE' : 'NOT_STARTED'
                         updateStatus(todo.id, nextStatus)
                       }}
                       disabled={updating === todo.id}
-                      className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl ${status.bg} flex items-center justify-center flex-shrink-0 transition-all hover:scale-105 disabled:opacity-50`}
+                      className={`relative z-10 w-9 h-9 sm:w-10 sm:h-10 rounded-xl ${status.bg} flex items-center justify-center flex-shrink-0 transition-all hover:scale-105 disabled:opacity-50`}
                     >
                       {updating === todo.id ? (
                         <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-current border-t-transparent rounded-full animate-spin text-medium-gray" />
@@ -144,8 +146,8 @@ export function TodoList({ todos, currentUserId, userRole }: TodoListProps) {
                       )}
                     </button>
 
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
+                    {/* Content — clickable link to detail page */}
+                    <Link href={`/todos/${todo.id}`} className="flex-1 min-w-0 cursor-pointer">
                       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-4">
                         <div className="min-w-0">
                           <h3 className={`font-medium text-sm sm:text-base ${
@@ -162,24 +164,11 @@ export function TodoList({ todos, currentUserId, userRole }: TodoListProps) {
                           )}
                         </div>
 
-                        {/* Priority Badge + Status Dropdown (row on mobile) */}
+                        {/* Priority Badge */}
                         <div className="flex items-center gap-2 mt-1.5 sm:mt-0 flex-shrink-0">
                           <span className={`px-2 sm:px-2.5 py-0.5 sm:py-1 text-xs font-medium rounded-full ${priority.bg} ${priority.color}`}>
                             {priority.label}
                           </span>
-                          <div className="relative sm:hidden">
-                            <select
-                              value={todo.status}
-                              onChange={(e) => updateStatus(todo.id, e.target.value as TodoStatus)}
-                              disabled={updating === todo.id}
-                              className="appearance-none pl-2 pr-6 py-1 text-xs font-medium rounded-lg border border-off-white dark:border-medium-gray/20 bg-white dark:bg-charcoal text-dark-gray dark:text-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange/20 disabled:opacity-50"
-                            >
-                              <option value="NOT_STARTED">Not Started</option>
-                              <option value="IN_PROGRESS">In Progress</option>
-                              <option value="DONE">Done</option>
-                            </select>
-                            <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-medium-gray pointer-events-none" />
-                          </div>
                         </div>
                       </div>
 
@@ -199,10 +188,10 @@ export function TodoList({ todos, currentUserId, userRole }: TodoListProps) {
                           </span>
                         )}
                       </div>
-                    </div>
+                    </Link>
 
-                    {/* Status Dropdown (desktop only) */}
-                    <div className="relative hidden sm:block flex-shrink-0">
+                    {/* Status Dropdown (desktop) — interactive, kept outside the link */}
+                    <div className="relative z-10 hidden sm:block flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                       <select
                         value={todo.status}
                         onChange={(e) => updateStatus(todo.id, e.target.value as TodoStatus)}
@@ -215,6 +204,9 @@ export function TodoList({ todos, currentUserId, userRole }: TodoListProps) {
                       </select>
                       <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-medium-gray pointer-events-none" />
                     </div>
+
+                    {/* Chevron indicator */}
+                    <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-light-gray hidden sm:block flex-shrink-0 mt-2" />
                   </div>
                 </div>
               )

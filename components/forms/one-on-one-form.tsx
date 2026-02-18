@@ -6,7 +6,7 @@ import * as z from 'zod'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-const formSchema = z.object({
+const draftSchema = z.object({
   checkInPersonal: z.string().optional(),
   checkInProfessional: z.string().optional(),
   priorityGoalProfessional: z.string().optional(),
@@ -19,7 +19,14 @@ const formSchema = z.object({
   anythingElse: z.string().optional(),
 })
 
-type FormData = z.infer<typeof formSchema>
+const REQUIRED_FIELDS: { key: keyof FormData; label: string }[] = [
+  { key: 'checkInPersonal', label: 'Personal best since we last met' },
+  { key: 'checkInProfessional', label: 'Professional best since we last met' },
+  { key: 'priorityGoalProfessional', label: 'Professional growth goals' },
+  { key: 'progressReport', label: 'Report on progress' },
+]
+
+type FormData = z.infer<typeof draftSchema>
 
 interface OneOnOneFormProps {
   onSubmit: (data: FormData) => Promise<void>
@@ -41,11 +48,33 @@ export function OneOnOneForm({
   const {
     register,
     handleSubmit,
+    setError,
+    clearErrors,
+    getValues,
     formState: { errors },
   } = useForm<FormData>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(draftSchema),
     defaultValues: initialData,
   })
+
+  const validateRequiredFields = (): boolean => {
+    const values = getValues()
+    let valid = true
+    for (const { key, label } of REQUIRED_FIELDS) {
+      if (!values[key]?.trim()) {
+        setError(key, { type: 'required', message: `${label} is required` })
+        valid = false
+      } else {
+        clearErrors(key)
+      }
+    }
+    return valid
+  }
+
+  const handleFormSubmit = async (data: FormData) => {
+    if (!validateRequiredFields()) return
+    await onSubmit(data)
+  }
 
   const inputClass = isReadOnly
     ? 'w-full rounded-xl border border-light-gray dark:border-medium-gray bg-gray-100 dark:bg-charcoal/80 px-4 py-3 text-dark-gray dark:text-white cursor-not-allowed'
@@ -53,7 +82,7 @@ export function OneOnOneForm({
 
   return (
     <form
-      onSubmit={isReadOnly ? (e) => e.preventDefault() : handleSubmit(onSubmit)}
+      onSubmit={isReadOnly ? (e) => e.preventDefault() : handleSubmit(handleFormSubmit)}
       className="space-y-8"
     >
       {/* Page 1 */}
@@ -64,28 +93,34 @@ export function OneOnOneForm({
         <CardContent className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-dark-gray dark:text-white mb-2">
-              Personal best since we last met
+              Personal best since we last met <span className="text-red-500">*</span>
             </label>
             <textarea
               {...register('checkInPersonal')}
               rows={4}
-              className={inputClass}
+              className={`${inputClass} ${errors.checkInPersonal ? '!border-red-500 focus:!ring-red-500/20' : ''}`}
               placeholder="Share your personal highlights..."
               disabled={isReadOnly}
             />
+            {errors.checkInPersonal && (
+              <p className="mt-1.5 text-sm text-red-500">{errors.checkInPersonal.message}</p>
+            )}
           </div>
 
           <div>
             <label className="block text-sm font-medium text-dark-gray dark:text-white mb-2">
-              Professional best since we last met
+              Professional best since we last met <span className="text-red-500">*</span>
             </label>
             <textarea
               {...register('checkInProfessional')}
               rows={4}
-              className={inputClass}
+              className={`${inputClass} ${errors.checkInProfessional ? '!border-red-500 focus:!ring-red-500/20' : ''}`}
               placeholder="Share your professional highlights..."
               disabled={isReadOnly}
             />
+            {errors.checkInProfessional && (
+              <p className="mt-1.5 text-sm text-red-500">{errors.checkInProfessional.message}</p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -97,15 +132,18 @@ export function OneOnOneForm({
         <CardContent className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-dark-gray dark:text-white mb-2">
-              To serve your professional growth
+              To serve your professional growth <span className="text-red-500">*</span>
             </label>
             <textarea
               {...register('priorityGoalProfessional')}
               rows={4}
-              className={inputClass}
+              className={`${inputClass} ${errors.priorityGoalProfessional ? '!border-red-500 focus:!ring-red-500/20' : ''}`}
               placeholder="What are your professional growth goals for this quarter?"
               disabled={isReadOnly}
             />
+            {errors.priorityGoalProfessional && (
+              <p className="mt-1.5 text-sm text-red-500">{errors.priorityGoalProfessional.message}</p>
+            )}
           </div>
 
           <div>
@@ -123,15 +161,18 @@ export function OneOnOneForm({
 
           <div>
             <label className="block text-sm font-medium text-dark-gray dark:text-white mb-2">
-              Report on progress of these issues/goals
+              Report on progress of these issues/goals <span className="text-red-500">*</span>
             </label>
             <textarea
               {...register('progressReport')}
               rows={5}
-              className={inputClass}
+              className={`${inputClass} ${errors.progressReport ? '!border-red-500 focus:!ring-red-500/20' : ''}`}
               placeholder="How are you progressing on these goals?"
               disabled={isReadOnly}
             />
+            {errors.progressReport && (
+              <p className="mt-1.5 text-sm text-red-500">{errors.progressReport.message}</p>
+            )}
           </div>
         </CardContent>
       </Card>

@@ -70,6 +70,8 @@ export function MeetingRecorder({
   const [recordingTime, setRecordingTime] = useState(0)
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [selectedLanguage, setSelectedLanguage] = useState('auto')
+  const [micBlocked, setMicBlocked] = useState(false)
+  const [micPermGranted, setMicPermGranted] = useState(false)
 
   // Chunk upload state
   const [chunksUploaded, setChunksUploaded] = useState(0)
@@ -160,6 +162,33 @@ export function MeetingRecorder({
     }
   }, [])
 
+  // Watch for permission changes when mic is blocked
+  useEffect(() => {
+    if (!micBlocked) return
+    let permStatus: PermissionStatus | null = null
+
+    const handleChange = () => {
+      if (permStatus?.state === 'granted') {
+        setMicPermGranted(true)
+      }
+    }
+
+    navigator.permissions
+      ?.query({ name: 'microphone' as PermissionName })
+      .then((status) => {
+        permStatus = status
+        if (status.state === 'granted') {
+          setMicPermGranted(true)
+        }
+        status.addEventListener('change', handleChange)
+      })
+      .catch(() => { /* not supported */ })
+
+    return () => {
+      permStatus?.removeEventListener('change', handleChange)
+    }
+  }, [micBlocked])
+
   // auto-stop at max duration
   useEffect(() => {
     if (recordingTime >= MAX_DURATION && isRecording) stopRecording()
@@ -231,22 +260,8 @@ export function MeetingRecorder({
         )
       }
 
-      // 3. Check permission state (if Permissions API is available)
-      if (navigator.permissions) {
-        try {
-          const permStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName })
-          if (permStatus.state === 'denied') {
-            throw new Error(
-              'Microphone access was previously blocked. Click the lock/site-settings icon in your browser\'s address bar, set Microphone to "Allow", then reload the page.'
-            )
-          }
-        } catch (permErr) {
-          // Permissions API query may not be supported for microphone in all browsers — continue
-          if (permErr instanceof Error && permErr.message.includes('blocked')) throw permErr
-        }
-      }
-
-      // 4. Request microphone
+      // 3. Request microphone (also handles permission prompt)
+      setMicBlocked(false)
       let stream: MediaStream
       try {
         stream = await navigator.mediaDevices.getUserMedia({
@@ -254,9 +269,8 @@ export function MeetingRecorder({
         })
       } catch (micErr: any) {
         if (micErr.name === 'NotAllowedError' || micErr.name === 'PermissionDeniedError') {
-          throw new Error(
-            'Microphone permission denied. Click the lock/site-settings icon in your browser\'s address bar, set Microphone to "Allow", then reload this page and try again.'
-          )
+          setMicBlocked(true)
+          return
         }
         if (micErr.name === 'NotFoundError' || micErr.name === 'DevicesNotFoundError') {
           throw new Error(
@@ -566,14 +580,9 @@ export function MeetingRecorder({
         )}
       </div>
 
-      {submitError && (
+      {submitError && !micBlocked && (
         <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
           <p className="text-sm text-red-600 dark:text-red-400 font-medium">{submitError}</p>
-          {submitError.includes('lock') && (
-            <p className="text-xs text-red-500/80 mt-2">
-              In Chrome: click the 🔒 icon in the address bar → Site settings → Microphone → Allow → Reload page
-            </p>
-          )}
         </div>
       )}
 
@@ -711,8 +720,84 @@ export function MeetingRecorder({
         </div>
       )}
 
+      {/* ---- Microphone blocked ---- */}
+      {!isRecording && !audioBlob && micBlocked && (
+        <div className="space-y-5">
+          {micPermGranted ? (
+            /* Permission was just granted — show success and let user proceed */
+            <div className="rounded-xl bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 p-5">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                  <p className="font-semibold text-dark-gray dark:text-white">Microphone Allowed</p>
+                  <p className="text-sm text-medium-gray mt-0.5">
+                    Permission granted. You can now start recording.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Permission still blocked — show instructions */
+            <div className="rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 p-5">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                  <Mic className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <p className="font-semibold text-dark-gray dark:text-white">Microphone Access Needed</p>
+                  <p className="text-sm text-medium-gray mt-0.5">
+                    Your browser blocked access to the microphone. Follow these simple steps to allow it:
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3 ml-1">
+                <div className="flex items-start gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold flex items-center justify-center">1</span>
+                  <p className="text-sm text-dark-gray dark:text-white/90">
+                    Click the <strong>lock icon</strong> (or tune icon) at the <strong>left side of the address bar</strong> at the top of your browser.
+                  </p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold flex items-center justify-center">2</span>
+                  <p className="text-sm text-dark-gray dark:text-white/90">
+                    Find <strong>&quot;Microphone&quot;</strong> and change it to <strong>&quot;Allow&quot;</strong>.
+                  </p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold flex items-center justify-center">3</span>
+                  <p className="text-sm text-dark-gray dark:text-white/90">
+                    Click <strong>&quot;Start Recording&quot;</strong> below. The page will auto-detect the change.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => { setMicBlocked(false); setMicPermGranted(false); startRecording() }}
+              className="inline-flex items-center gap-3 px-8 py-4 text-lg font-medium bg-gradient-to-r from-red-500 to-orange text-white rounded-2xl hover:opacity-90 transition-opacity shadow-lg"
+            >
+              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                <Mic className="w-5 h-5" />
+              </div>
+              Start Recording
+            </button>
+          </div>
+
+          {!micPermGranted && (
+            <p className="text-center text-xs text-medium-gray">
+              Changed the setting? The page will detect it automatically, or click Start Recording to try again.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* ---- Start recording ---- */}
-      {!isRecording && !audioBlob && (
+      {!isRecording && !audioBlob && !micBlocked && (
         <div className="text-center space-y-4">
           <div className="flex items-center justify-center gap-2">
             <Globe className="w-4 h-4 text-medium-gray" />

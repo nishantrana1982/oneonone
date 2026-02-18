@@ -49,6 +49,20 @@ export async function POST(
       anythingElse: typeof body.anythingElse === 'string' ? body.anythingElse || null : null,
     }
 
+    if (isSubmit) {
+      const missing: string[] = []
+      if (!data.checkInPersonal?.trim()) missing.push('Personal best since we last met')
+      if (!data.checkInProfessional?.trim()) missing.push('Professional best since we last met')
+      if (!data.priorityGoalProfessional?.trim()) missing.push('Professional growth goals')
+      if (!data.progressReport?.trim()) missing.push('Report on progress')
+      if (missing.length > 0) {
+        return NextResponse.json(
+          { error: `Please fill in the required fields: ${missing.join(', ')}` },
+          { status: 400 }
+        )
+      }
+    }
+
     if (isDraft) {
       // Save draft: update fields only, do not set formSubmittedAt or status
       const updatedMeeting = await prisma.meeting.update({

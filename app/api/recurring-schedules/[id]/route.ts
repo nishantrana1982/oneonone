@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
-import { UserRole } from '@prisma/client'
-import { MeetingStatus } from '@prisma/client'
+import { UserRole, MeetingStatus, RecurringFrequency } from '@prisma/client'
 
 function getScheduleId(params: { id?: string }): string | null {
   const id = params?.id
@@ -140,14 +139,82 @@ export async function PATCH(
       )
     }
 
+    const scheduleChanged =
+      (frequency !== undefined && frequency !== existing.frequency) ||
+      (dayOfWeek !== undefined && dayOfWeek !== existing.dayOfWeek) ||
+      (timeOfDay !== undefined && timeOfDay !== existing.timeOfDay)
+
+    const updateData: Record<string, unknown> = {
+      ...(frequency !== undefined && { frequency }),
+      ...(dayOfWeek !== undefined && { dayOfWeek }),
+      ...(timeOfDay !== undefined && { timeOfDay }),
+      ...(isActive !== undefined && { isActive }),
+    }
+
+    // Recalculate nextMeetingDate when schedule timing changes
+    if (scheduleChanged) {
+      const newDay = dayOfWeek ?? existing.dayOfWeek
+      const newTime = timeOfDay ?? existing.timeOfDay
+      const newFreq = (frequency ?? existing.frequency) as RecurringFrequency
+      const newNextDate = recalculateNextMeetingDate(newDay, newTime, newFreq)
+      updateData.nextMeetingDate = newNextDate
+
+      // Update any future PROPOSED meetings linked to this schedule
+      const now = new Date()
+      const futureProposed = await prisma.meeting.findMany({
+        where: {
+          recurringScheduleId: id,
+          status: MeetingStatus.PROPOSED,
+          meetingDate: { gt: now },
+        },
+      })
+      for (const m of futureProposed) {
+        await prisma.meeting.update({
+          where: { id: m.id },
+          data: { meetingDate: newNextDate },
+        })
+      }
+
+      // Send email notification to the employee
+      try {
+        const employee = await prisma.user.findUnique({
+          where: { id: existing.employeeId },
+          select: { email: true, name: true },
+        })
+        if (employee) {
+          const { sendRecurringScheduleUpdatedEmail } = await import('@/lib/email')
+          await sendRecurringScheduleUpdatedEmail(
+            employee.email,
+            employee.name,
+            user.name,
+            newDay,
+            newTime,
+            newFreq,
+          )
+        }
+      } catch (emailError) {
+        console.error('Failed to send schedule update email:', emailError)
+      }
+
+      // In-app notification
+      try {
+        const { createNotification } = await import('@/lib/notifications')
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+        await createNotification({
+          userId: existing.employeeId,
+          type: 'MEETING_SCHEDULED',
+          title: 'Recurring Schedule Updated',
+          message: `${user.name || 'Your manager'} updated your recurring meeting to ${dayNames[dayOfWeek ?? existing.dayOfWeek]}s at ${timeOfDay ?? existing.timeOfDay}.`,
+          link: '/meetings',
+        })
+      } catch (notifError) {
+        console.error('Failed to send schedule update notification:', notifError)
+      }
+    }
+
     const schedule = await prisma.recurringSchedule.update({
       where: { id },
-      data: {
-        ...(frequency !== undefined && { frequency }),
-        ...(dayOfWeek !== undefined && { dayOfWeek }),
-        ...(timeOfDay !== undefined && { timeOfDay }),
-        ...(isActive !== undefined && { isActive }),
-      },
+      data: updateData,
     })
 
     return NextResponse.json({ ...schedule, cancelledMeetingCount })
@@ -218,4 +285,34 @@ export async function DELETE(
       { status: 500 }
     )
   }
+}
+
+function recalculateNextMeetingDate(
+  dayOfWeek: number,
+  timeOfDay: string,
+  frequency: RecurringFrequency
+): Date {
+  const [hours, minutes] = timeOfDay.split(':').map(Number)
+  const IST_OFFSET = 5 * 60 + 30
+
+  const nowUtc = new Date()
+  const nowIst = new Date(nowUtc.getTime() + IST_OFFSET * 60 * 1000)
+
+  const todayIst = new Date(nowIst)
+  todayIst.setUTCHours(hours, minutes, 0, 0)
+
+  const currentDay = nowIst.getUTCDay()
+  let daysUntil = dayOfWeek - currentDay
+  if (daysUntil < 0 || (daysUntil === 0 && nowIst >= todayIst)) {
+    daysUntil += 7
+  }
+
+  const nextIst = new Date(todayIst)
+  nextIst.setUTCDate(todayIst.getUTCDate() + daysUntil)
+
+  if (frequency === 'BIWEEKLY' && daysUntil < 7) {
+    nextIst.setUTCDate(nextIst.getUTCDate() + 7)
+  }
+
+  return new Date(nextIst.getTime() - IST_OFFSET * 60 * 1000)
 }

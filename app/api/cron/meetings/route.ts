@@ -337,28 +337,31 @@ function calculateNextMeetingDate(
   lastDate: Date
 ): Date {
   const [hours, minutes] = timeOfDay.split(':').map(Number)
-  
-  let nextDate = new Date(lastDate)
-  
-  // Add the appropriate interval
+  const IST_OFFSET = 5 * 60 + 30
+
+  // Convert lastDate to IST for day-of-week arithmetic
+  const lastIst = new Date(lastDate.getTime() + IST_OFFSET * 60 * 1000)
+
   switch (frequency) {
     case 'WEEKLY':
-      nextDate.setDate(nextDate.getDate() + 7)
+      lastIst.setUTCDate(lastIst.getUTCDate() + 7)
       break
     case 'BIWEEKLY':
-      nextDate.setDate(nextDate.getDate() + 14)
+      lastIst.setUTCDate(lastIst.getUTCDate() + 14)
       break
-    case 'MONTHLY':
-      nextDate.setMonth(nextDate.getMonth() + 1)
-      // Adjust for day of week
-      const currentDay = nextDate.getDay()
+    case 'MONTHLY': {
+      lastIst.setUTCMonth(lastIst.getUTCMonth() + 1)
+      const currentDay = lastIst.getUTCDay()
       let daysUntil = dayOfWeek - currentDay
       if (daysUntil < 0) daysUntil += 7
-      nextDate.setDate(nextDate.getDate() + daysUntil)
+      lastIst.setUTCDate(lastIst.getUTCDate() + daysUntil)
       break
+    }
   }
-  
-  nextDate.setHours(hours, minutes, 0, 0)
-  
-  return nextDate
+
+  // Set the desired IST time
+  lastIst.setUTCHours(hours, minutes, 0, 0)
+
+  // Convert back to UTC for storage
+  return new Date(lastIst.getTime() - IST_OFFSET * 60 * 1000)
 }

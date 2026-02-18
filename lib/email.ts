@@ -621,3 +621,44 @@ export async function sendMeetingSuggestionEmail(
     html,
   })
 }
+
+/** Email sent to the employee when their recurring schedule is updated. */
+export async function sendRecurringScheduleUpdatedEmail(
+  employeeEmail: string,
+  employeeName: string | null,
+  managerName: string | null,
+  dayOfWeek: number,
+  timeOfDay: string,
+  frequency: string
+) {
+  const empName = employeeName || 'Team Member'
+  const mgrName = managerName || 'Your manager'
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const dayName = dayNames[dayOfWeek] || 'Unknown'
+  const formattedTime = new Date(`2000-01-01T${timeOfDay}:00`).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+  const freqLabel = frequency === 'WEEKLY' ? 'Weekly' : frequency === 'BIWEEKLY' ? 'Every 2 Weeks' : 'Monthly'
+
+  const html = emailLayout({
+    preheader: `${mgrName} updated your recurring one-on-one schedule`,
+    heading: 'Recurring Schedule Updated',
+    body: `
+      <p style="margin:0 0 16px;">Hi ${empName},</p>
+      <p style="margin:0 0 20px;"><strong>${mgrName}</strong> has updated the recurring one-on-one meeting schedule with you. Please review the new details below.</p>
+      ${detailRow('Frequency', freqLabel)}
+      ${detailRow('Day', dayName)}
+      ${detailRow('Time', formattedTime)}
+    `,
+    ctaText: 'View Meetings',
+    ctaUrl: `${baseUrl()}/meetings`,
+  })
+
+  await sendEmail({
+    to: employeeEmail,
+    subject: `Schedule Updated – ${freqLabel} on ${dayName}s at ${formattedTime}`,
+    html,
+  })
+}
