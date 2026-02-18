@@ -165,9 +165,9 @@ export function NotificationCenter() {
         )}
       </button>
 
-      {/* Dropdown - opens above the bell on desktop sidebar, or as a fixed panel on mobile */}
+      {/* Dropdown - on mobile: fixed above bottom nav; on desktop: above bell, right-aligned so it stays in view */}
       {isOpen && (
-        <div role="dialog" aria-label="Notifications" className="fixed inset-x-3 bottom-20 sm:absolute sm:inset-auto sm:left-0 sm:bottom-full sm:mb-2 w-auto sm:w-96 max-h-[70vh] sm:max-h-[500px] bg-white dark:bg-charcoal rounded-2xl border border-off-white dark:border-medium-gray/20 shadow-2xl overflow-hidden z-[100] animate-in fade-in-0 zoom-in-95 duration-200">
+        <div role="dialog" aria-label="Notifications" className="fixed inset-x-3 bottom-20 sm:absolute sm:inset-auto sm:right-0 sm:left-auto sm:bottom-full sm:mb-2 w-[calc(100vw-1.5rem)] sm:w-96 max-h-[70vh] sm:max-h-[500px] bg-white dark:bg-charcoal rounded-2xl border border-off-white dark:border-medium-gray/20 shadow-2xl overflow-hidden z-[100] animate-in fade-in-0 zoom-in-95 duration-200">
           {/* Header */}
           <div className="px-4 py-3 border-b border-off-white dark:border-medium-gray/20 flex items-center justify-between">
             <h3 className="font-semibold text-dark-gray dark:text-white">Notifications</h3>

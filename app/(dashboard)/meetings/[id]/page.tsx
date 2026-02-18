@@ -88,7 +88,7 @@ export default async function MeetingDetailPage({
   ].filter(section => section.content)
 
   return (
-    <div className="space-y-8 max-w-4xl">
+    <div className="space-y-8 max-w-4xl min-w-0">
       {/* Back Button */}
       <Link
         href="/meetings"

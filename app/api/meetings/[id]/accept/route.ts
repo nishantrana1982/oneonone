@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
+import { logMeetingUpdated } from '@/lib/audit'
 
 export async function POST(
   request: NextRequest,
@@ -99,6 +100,8 @@ export async function POST(
     } catch (error) {
       console.error('Failed to create acceptance notification:', error)
     }
+
+    await logMeetingUpdated(user.id, params.id, { action: 'accepted', acceptedBy: acceptor.name, status: 'SCHEDULED' })
 
     return NextResponse.json(updated)
   } catch (error) {

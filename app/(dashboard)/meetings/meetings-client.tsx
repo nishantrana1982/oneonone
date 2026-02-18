@@ -326,30 +326,30 @@ export function MeetingsClient({
           </div>
         </div>
         {pendingFormMeetings.length > 0 ? (
-          <div className="rounded-2xl bg-amber-500/5 border border-amber-500/20 p-5">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                <AlertCircle className="w-6 h-6 text-amber-500" />
+          <div className="rounded-2xl bg-amber-500/5 border border-amber-500/20 p-3 sm:p-5">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                <AlertCircle className="w-4 h-4 sm:w-6 sm:h-6 text-amber-500" />
               </div>
-              <div>
-                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+              <div className="min-w-0">
+                <p className="text-lg sm:text-2xl font-bold text-amber-600 dark:text-amber-400">
                   {pendingFormMeetings.length}
                 </p>
-                <p className="text-sm text-medium-gray">Pending Form</p>
+                <p className="text-xs sm:text-sm text-medium-gray">Pending Form</p>
               </div>
             </div>
           </div>
         ) : (
-          <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-5">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-off-white dark:bg-dark-gray flex items-center justify-center">
-                <Repeat className="w-6 h-6 text-dark-gray dark:text-white" />
+          <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-3 sm:p-5">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-off-white dark:bg-dark-gray flex items-center justify-center flex-shrink-0">
+                <Repeat className="w-4 h-4 sm:w-6 sm:h-6 text-dark-gray dark:text-white" />
               </div>
-              <div>
-                <p className="text-2xl font-bold text-dark-gray dark:text-white">
+              <div className="min-w-0">
+                <p className="text-lg sm:text-2xl font-bold text-dark-gray dark:text-white">
                   {recurringSchedules.length}
                 </p>
-                <p className="text-sm text-medium-gray">Recurring</p>
+                <p className="text-xs sm:text-sm text-medium-gray">Recurring</p>
               </div>
             </div>
           </div>
@@ -358,7 +358,8 @@ export function MeetingsClient({
 
       {/* Tabs */}
       {canSchedule && (
-        <div className="flex gap-1 p-1 bg-off-white dark:bg-charcoal rounded-xl w-fit">
+        <div className="overflow-x-auto">
+          <div className="flex gap-1 p-1 bg-off-white dark:bg-charcoal rounded-xl w-fit min-w-0">
           <button
             type="button"
             onClick={() => { setActiveTab('all'); setCurrentPage(1) }}
@@ -383,6 +384,7 @@ export function MeetingsClient({
             <Repeat className="w-4 h-4" />
             Recurring
           </button>
+          </div>
         </div>
       )}
 

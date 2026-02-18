@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireRole, getCurrentUser } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { UserRole, RecurringFrequency } from '@prisma/client'
+import { createAuditLog } from '@/lib/audit'
 
 // Get all recurring schedules for the current user
 export async function GET(request: NextRequest) {
@@ -175,6 +176,15 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       console.error('Failed to send proposal notification:', error)
     }
+
+    const employee = await prisma.user.findUnique({ where: { id: employeeId }, select: { name: true } })
+    await createAuditLog({
+      userId: user.id,
+      action: 'CREATE',
+      entityType: 'RecurringSchedule',
+      entityId: schedule.id,
+      details: { employeeId, employeeName: employee?.name, frequency: schedule.frequency, dayOfWeek, timeOfDay },
+    })
 
     return NextResponse.json({ schedule, meeting })
   } catch (error) {

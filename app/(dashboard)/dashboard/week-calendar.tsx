@@ -160,8 +160,9 @@ export function WeekCalendar({ initialMeetings, initialWeekStart, userRole }: We
         </div>
       </div>
 
-      {/* Desktop: 7-column grid */}
-      <div className="hidden sm:grid sm:grid-cols-7 divide-x divide-off-white dark:divide-medium-gray/20 min-h-[140px]">
+      {/* Desktop: 7-column grid (scroll horizontally on narrow viewports) */}
+      <div className="hidden sm:block overflow-x-auto">
+        <div className="grid grid-cols-7 min-w-[56rem] w-full divide-x divide-off-white dark:divide-medium-gray/20 min-h-[140px]">
         {days.map((day, idx) => {
           const isToday = isSameDay(day, today)
           const dayMeetings = meetings
@@ -208,6 +209,7 @@ export function WeekCalendar({ initialMeetings, initialWeekStart, userRole }: We
             </div>
           )
         })}
+        </div>
       </div>
 
       {/* Mobile: stacked list */}
