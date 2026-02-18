@@ -36,7 +36,7 @@ export async function PATCH(
   try {
     const admin = await requireAdmin()
     const body = await request.json()
-    const { name, email, role, departmentId, reportsToId, isActive } = body
+    const { name, email, role, departmentId, reportsToId, isActive, country, timeZone, workDayStart, workDayEnd } = body
 
     // Check if user exists
     const existingUser = await prisma.user.findUnique({
@@ -80,6 +80,10 @@ export async function PATCH(
         departmentId: departmentId === '' ? null : departmentId,
         reportsToId: reportsToId === '' ? null : reportsToId,
         isActive: typeof isActive === 'boolean' ? isActive : undefined,
+        ...(country !== undefined && { country: country || null }),
+        ...(timeZone !== undefined && { timeZone: timeZone || null }),
+        ...(workDayStart !== undefined && { workDayStart: workDayStart || null }),
+        ...(workDayEnd !== undefined && { workDayEnd: workDayEnd || null }),
       },
       include: {
         department: true,

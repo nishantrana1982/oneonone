@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   try {
     const admin = await requireAdmin()
     const body = await request.json()
-    const { email, name, role, departmentId, reportsToId } = body
+    const { email, name, role, departmentId, reportsToId, country, timeZone, workDayStart, workDayEnd } = body
 
     const user = await prisma.user.create({
       data: {
@@ -33,6 +33,10 @@ export async function POST(request: NextRequest) {
         role: role || UserRole.EMPLOYEE,
         departmentId: departmentId || null,
         reportsToId: reportsToId || null,
+        country: country || null,
+        timeZone: timeZone || null,
+        workDayStart: workDayStart || null,
+        workDayEnd: workDayEnd || null,
       },
     })
 

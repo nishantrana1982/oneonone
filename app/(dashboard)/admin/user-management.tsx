@@ -2,9 +2,10 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, Edit2, UserPlus, Users, Building2, ChevronUp, ChevronDown } from 'lucide-react'
+import { X, Edit2, UserPlus, Users, Building2, ChevronUp, ChevronDown, Globe, Clock } from 'lucide-react'
 import { UserRole } from '@prisma/client'
 import { useToast } from '@/components/ui/toast'
+import { COUNTRY_OPTIONS, TIMEZONE_OPTIONS, getDefaultTimeZoneForCountry, getDefaultWorkHoursForCountry, DEFAULT_WORK_START, DEFAULT_WORK_END } from '@/lib/timezones'
 
 type SortKey = 'name' | 'role' | 'department' | 'reportsTo' | 'status'
 type SortDir = 'asc' | 'desc'
@@ -17,6 +18,10 @@ interface User {
   isActive: boolean
   departmentId: string | null
   reportsToId: string | null
+  country: string | null
+  timeZone: string | null
+  workDayStart: string | null
+  workDayEnd: string | null
   department: { name: string } | null
   reportsTo: { name: string } | null
 }
@@ -47,6 +52,10 @@ export function UserManagement({ users, departments, reporters }: UserManagement
     departmentId: '',
     reportsToId: '',
     isActive: true,
+    country: '',
+    timeZone: '',
+    workDayStart: DEFAULT_WORK_START,
+    workDayEnd: DEFAULT_WORK_END,
   })
 
   const resetForm = () => {
@@ -57,6 +66,10 @@ export function UserManagement({ users, departments, reporters }: UserManagement
       departmentId: '',
       reportsToId: '',
       isActive: true,
+      country: '',
+      timeZone: '',
+      workDayStart: DEFAULT_WORK_START,
+      workDayEnd: DEFAULT_WORK_END,
     })
   }
 
@@ -74,6 +87,10 @@ export function UserManagement({ users, departments, reporters }: UserManagement
       departmentId: user.departmentId || '',
       reportsToId: user.reportsToId || '',
       isActive: user.isActive,
+      country: user.country || '',
+      timeZone: user.timeZone || '',
+      workDayStart: user.workDayStart || DEFAULT_WORK_START,
+      workDayEnd: user.workDayEnd || DEFAULT_WORK_END,
     })
     setEditingUser(user)
     setIsAddOpen(true)
@@ -144,6 +161,10 @@ export function UserManagement({ users, departments, reporters }: UserManagement
           ...formData,
           departmentId: formData.departmentId || null,
           reportsToId: formData.reportsToId || null,
+          country: formData.country || null,
+          timeZone: formData.timeZone || null,
+          workDayStart: formData.workDayStart || null,
+          workDayEnd: formData.workDayEnd || null,
         }),
       })
 
@@ -479,6 +500,82 @@ export function UserManagement({ users, departments, reporters }: UserManagement
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div className="border-t border-off-white dark:border-medium-gray/20 pt-4">
+                <p className="text-sm font-medium text-dark-gray dark:text-white mb-3 flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-medium-gray" />
+                  Location & Working Hours
+                </p>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium text-dark-gray dark:text-white mb-1">
+                      Country
+                    </label>
+                    <select
+                      value={formData.country}
+                      onChange={(e) => {
+                        const country = e.target.value
+                        const next = { ...formData, country }
+                        if (!formData.timeZone || formData.timeZone === getDefaultTimeZoneForCountry(formData.country || null)) {
+                          next.timeZone = getDefaultTimeZoneForCountry(country || null)
+                        }
+                        const prevDef = getDefaultWorkHoursForCountry(formData.country || null)
+                        if (formData.workDayStart === prevDef.start && formData.workDayEnd === prevDef.end) {
+                          const def = getDefaultWorkHoursForCountry(country || null)
+                          next.workDayStart = def.start
+                          next.workDayEnd = def.end
+                        }
+                        setFormData(next)
+                      }}
+                      className="w-full rounded-xl border border-off-white dark:border-medium-gray/20 bg-off-white dark:bg-charcoal px-4 py-3 text-dark-gray dark:text-white focus:border-orange focus:outline-none focus:ring-2 focus:ring-orange/20"
+                    >
+                      <option value="">Select country</option>
+                      {COUNTRY_OPTIONS.map((c) => (
+                        <option key={c.value} value={c.value}>{c.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-dark-gray dark:text-white mb-1">
+                      Time Zone
+                    </label>
+                    <select
+                      value={formData.timeZone}
+                      onChange={(e) => setFormData({ ...formData, timeZone: e.target.value })}
+                      className="w-full rounded-xl border border-off-white dark:border-medium-gray/20 bg-off-white dark:bg-charcoal px-4 py-3 text-dark-gray dark:text-white focus:border-orange focus:outline-none focus:ring-2 focus:ring-orange/20"
+                    >
+                      <option value="">Select time zone</option>
+                      {TIMEZONE_OPTIONS.map((tz) => (
+                        <option key={tz.value} value={tz.value}>{tz.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-dark-gray dark:text-white mb-1 flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-medium-gray" />
+                      Work Start (local)
+                    </label>
+                    <input
+                      type="time"
+                      value={formData.workDayStart}
+                      onChange={(e) => setFormData({ ...formData, workDayStart: e.target.value })}
+                      className="w-full rounded-xl border border-off-white dark:border-medium-gray/20 bg-off-white dark:bg-charcoal px-4 py-3 text-dark-gray dark:text-white focus:border-orange focus:outline-none focus:ring-2 focus:ring-orange/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-dark-gray dark:text-white mb-1 flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-medium-gray" />
+                      Work End (local)
+                    </label>
+                    <input
+                      type="time"
+                      value={formData.workDayEnd}
+                      onChange={(e) => setFormData({ ...formData, workDayEnd: e.target.value })}
+                      className="w-full rounded-xl border border-off-white dark:border-medium-gray/20 bg-off-white dark:bg-charcoal px-4 py-3 text-dark-gray dark:text-white focus:border-orange focus:outline-none focus:ring-2 focus:ring-orange/20"
+                    />
+                  </div>
+                </div>
               </div>
 
               {editingUser && (

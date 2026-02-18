@@ -122,7 +122,7 @@ export function RecurringSchedulesClient({ employees, initialSchedules }: Props)
     employeeId: '',
     frequency: 'BIWEEKLY' as RecurringFrequency,
     dayOfWeek: 1,
-    timeOfDay: '10:00',
+    timeOfDay: '',
   })
   const [recurringAvailabilityLoading, setRecurringAvailabilityLoading] = useState(false)
   const [recurringAvailability, setRecurringAvailability] = useState<{
@@ -136,6 +136,7 @@ export function RecurringSchedulesClient({ employees, initialSchedules }: Props)
   const [reporterTimeZone, setReporterTimeZone] = useState<string>('Asia/Kolkata')
 
   useEffect(() => {
+    setFormData((prev) => ({ ...prev, timeOfDay: '' }))
     if (!formData.employeeId || formData.dayOfWeek == null) {
       setRecurringSlots([])
       setRecurringWorkingHoursLabel(null)
@@ -219,7 +220,7 @@ export function RecurringSchedulesClient({ employees, initialSchedules }: Props)
           employeeId: '',
           frequency: 'BIWEEKLY',
           dayOfWeek: 1,
-          timeOfDay: '10:00',
+          timeOfDay: '',
         })
         toastSuccess('Schedule created')
         router.refresh()
@@ -426,7 +427,7 @@ export function RecurringSchedulesClient({ employees, initialSchedules }: Props)
           <h3 className="font-semibold text-dark-gray dark:text-white mb-4">
             Create Recurring Schedule
           </h3>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <label className="block text-sm font-medium text-dark-gray dark:text-white mb-2">
                 Team Member
@@ -482,68 +483,50 @@ export function RecurringSchedulesClient({ employees, initialSchedules }: Props)
               </div>
             </div>
 
-            {recurringSlots.length === 0 && !recurringSlotsLoading && (
-              <div>
-                <label className="block text-sm font-medium text-dark-gray dark:text-white mb-2">
-                  Time
-                </label>
-                <div className="relative">
-                  <select
-                    value={formData.timeOfDay}
-                    onChange={(e) => setFormData({ ...formData, timeOfDay: e.target.value })}
-                    className={selectClass}
-                  >
-                    {timeOptions.map((time) => (
-                      <option key={time} value={time}>{formatTime(time)}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-medium-gray pointer-events-none" />
-                </div>
-              </div>
-            )}
           </div>
 
           {formData.employeeId && formData.dayOfWeek != null && (
             <div className="mt-4 rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-4 sm:p-5">
-              <div className="flex items-center gap-2 text-dark-gray dark:text-white mb-2">
-                <Clock className="w-5 h-5 text-purple-500" />
-                <span className="font-medium">Available time slots</span>
+              <div className="flex items-center gap-3 mb-1">
+                <div className="w-9 h-9 rounded-full bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-purple-500" />
+                </div>
+                <div>
+                  <p className="font-semibold text-dark-gray dark:text-white">Available time slots</p>
+                  {recurringWorkingHoursLabel && (
+                    <p className="text-sm text-medium-gray">{recurringWorkingHoursLabel}</p>
+                  )}
+                </div>
               </div>
               {recurringSlotsLoading ? (
-                <p className="text-sm text-medium-gray flex items-center gap-2">
+                <p className="text-sm text-medium-gray flex items-center gap-2 mt-3">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Loading slots for next {dayNames[formData.dayOfWeek]}...
                 </p>
-              ) : recurringWorkingHoursLabel ? (
-                <>
-                  <p className="text-sm text-medium-gray mb-3">{recurringWorkingHoursLabel}</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                    {recurringSlots.map((slot) => {
-                      const timeInTz = slotToTimeInTz(slot.start, reporterTimeZone)
-                      const isSelected = formData.timeOfDay === timeInTz
-                      return (
-                        <button
-                          key={slot.start}
-                          type="button"
-                          onClick={() => setFormData({ ...formData, timeOfDay: timeInTz })}
-                          className={`py-2.5 px-3 rounded-xl border text-sm font-medium transition-colors ${
-                            isSelected
-                              ? 'border-orange bg-orange/10 text-orange dark:bg-orange/20'
-                              : 'border-off-white dark:border-medium-gray/20 hover:border-orange/50 text-dark-gray dark:text-white'
-                          }`}
-                        >
-                          {formatSlotTime(slot.start)}
-                        </button>
-                      )
-                    })}
-                  </div>
-                  {recurringSlots.length === 0 && (
-                    <p className="text-sm text-medium-gray">No free slots in overlapping working hours for that day.</p>
-                  )}
-                </>
+              ) : recurringSlots.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mt-3">
+                  {recurringSlots.map((slot) => {
+                    const timeInTz = slotToTimeInTz(slot.start, reporterTimeZone)
+                    const isSelected = formData.timeOfDay === timeInTz
+                    return (
+                      <button
+                        key={slot.start}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, timeOfDay: timeInTz })}
+                        className={`py-2.5 px-3 rounded-xl border text-sm font-medium transition-colors ${
+                          isSelected
+                            ? 'border-orange bg-orange/10 text-orange dark:bg-orange/20'
+                            : 'border-off-white dark:border-medium-gray/20 hover:border-orange/50 text-dark-gray dark:text-white'
+                        }`}
+                      >
+                        {formatSlotTime(slot.start)}
+                      </button>
+                    )
+                  })}
+                </div>
               ) : (
-                <p className="text-sm text-medium-gray">
-                  Connect both calendars and pick a day to see available slots, or choose a time above.
+                <p className="text-sm text-medium-gray mt-3">
+                  No free slots in overlapping working hours for that day. Try a different day.
                 </p>
               )}
             </div>
@@ -582,7 +565,7 @@ export function RecurringSchedulesClient({ employees, initialSchedules }: Props)
             </button>
             <button
               onClick={handleCreate}
-              disabled={loading || !formData.employeeId}
+              disabled={loading || !formData.employeeId || !formData.timeOfDay}
               className="flex items-center gap-2 px-5 py-2.5 bg-dark-gray dark:bg-white text-white dark:text-dark-gray rounded-xl font-medium hover:bg-charcoal dark:hover:bg-off-white disabled:opacity-50 transition-all min-h-[44px]"
             >
               {loading ? (
