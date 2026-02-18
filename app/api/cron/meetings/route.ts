@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { RecurringFrequency } from '@prisma/client'
 import { notifyMeetingProposed, notifyMeetingReminder } from '@/lib/notifications'
-import { sendEmail, sendMeetingProposalEmail } from '@/lib/email'
+import { sendMeetingProposalEmail, sendMeetingReminderEmail } from '@/lib/email'
 
 // This endpoint should be called by a cron job (e.g., every hour)
 // Set up a cron job to call: POST /api/cron/meetings with header: x-cron-secret: YOUR_SECRET
@@ -173,16 +173,28 @@ async function sendMeetingReminders(results: { recurringMeetingsCreated: number;
         24
       )
 
-      // Send emails
+      // Send reminder emails to both parties
       try {
-        await sendEmail({
-          to: meeting.employee.email,
-          subject: 'Meeting Reminder: One-on-One Tomorrow',
-          text: `Hi ${meeting.employee.name},\n\nThis is a reminder that you have a one-on-one meeting scheduled with ${meeting.reporter.name} tomorrow at ${meeting.meetingDate.toLocaleTimeString()}.\n\nPlease prepare any topics you'd like to discuss.\n\nBest,\nAMI One-on-One System`,
-          html: `<p>Hi ${meeting.employee.name},</p><p>This is a reminder that you have a one-on-one meeting scheduled with <strong>${meeting.reporter.name}</strong> tomorrow at <strong>${meeting.meetingDate.toLocaleTimeString()}</strong>.</p><p>Please prepare any topics you'd like to discuss.</p><p>Best,<br/>AMI One-on-One System</p>`,
-        })
+        await sendMeetingReminderEmail(
+          meeting.employee.email,
+          meeting.employee.name,
+          meeting.reporter.name,
+          meeting.meetingDate,
+          meeting.id
+        )
       } catch (emailError) {
-        console.error('Failed to send reminder email:', emailError)
+        console.error('Failed to send reminder email to employee:', emailError)
+      }
+      try {
+        await sendMeetingReminderEmail(
+          meeting.reporter.email,
+          meeting.reporter.name,
+          meeting.employee.name,
+          meeting.meetingDate,
+          meeting.id
+        )
+      } catch (emailError) {
+        console.error('Failed to send reminder email to reporter:', emailError)
       }
 
       // Mark as sent

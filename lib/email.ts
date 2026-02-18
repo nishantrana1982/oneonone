@@ -133,6 +133,8 @@ export async function sendEmail({ to, subject, html, text }: EmailOptions): Prom
 
 const appName = 'AMI One-on-One'
 const baseUrl = () => process.env.NEXTAUTH_URL || 'https://app.example.com'
+/** Timezone for all email date/time (match app/calendar: IST) */
+const EMAIL_TIMEZONE = 'Asia/Kolkata'
 
 function emailLayout({
   preheader,
@@ -251,6 +253,7 @@ export async function sendMeetingScheduledEmail(
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+    timeZone: EMAIL_TIMEZONE,
   }).format(meetingDate)
 
   const empName = employeeName || 'Team Member'
@@ -385,6 +388,7 @@ export async function sendFormSubmittedEmail(
     year: 'numeric',
     month: 'long',
     day: 'numeric',
+    timeZone: EMAIL_TIMEZONE,
   }).format(meetingDate)
 
   const mgrName = reporterName || 'Manager'
@@ -422,6 +426,7 @@ function formatDateFull(date: Date): string {
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+    timeZone: EMAIL_TIMEZONE,
   }).format(date)
 }
 
@@ -485,6 +490,70 @@ export async function sendMeetingAcceptedEmail(
   await sendEmail({
     to: proposerEmail,
     subject: `Meeting Confirmed – ${aName} · ${formattedDate}`,
+    html,
+  })
+}
+
+/** Confirmation email to the reporter after they propose a meeting. */
+export async function sendProposalConfirmationEmail(
+  reporterEmail: string,
+  reporterName: string | null,
+  employeeName: string | null,
+  meetingDate: Date,
+  meetingId: string
+) {
+  const mgrName = reporterName || 'Manager'
+  const empName = employeeName || 'Team Member'
+  const formattedDate = formatDateFull(meetingDate)
+
+  const html = emailLayout({
+    preheader: `Your proposal to ${empName} for ${formattedDate} has been sent`,
+    heading: 'Meeting Proposed',
+    body: `
+      <p style="margin:0 0 16px;">Hi ${mgrName},</p>
+      <p style="margin:0 0 20px;">Your one-on-one meeting proposal with <strong>${empName}</strong> has been sent. You'll be notified when they accept or suggest a new time.</p>
+      ${detailRow('Proposed To', empName)}
+      ${detailRow('Date & Time', formattedDate)}
+    `,
+    ctaText: 'View Meeting',
+    ctaUrl: `${baseUrl()}/meetings/${meetingId}`,
+  })
+
+  await sendEmail({
+    to: reporterEmail,
+    subject: `Meeting Proposed – ${empName} · ${formattedDate}`,
+    html,
+  })
+}
+
+/** Reminder email sent ~24h before a meeting. */
+export async function sendMeetingReminderEmail(
+  recipientEmail: string,
+  recipientName: string | null,
+  otherPartyName: string | null,
+  meetingDate: Date,
+  meetingId: string
+) {
+  const name = recipientName || 'Team Member'
+  const otherName = otherPartyName || 'your colleague'
+  const formattedDate = formatDateFull(meetingDate)
+
+  const html = emailLayout({
+    preheader: `Reminder: one-on-one with ${otherName} tomorrow`,
+    heading: 'Meeting Tomorrow',
+    body: `
+      <p style="margin:0 0 16px;">Hi ${name},</p>
+      <p style="margin:0 0 20px;">This is a friendly reminder that you have a one-on-one meeting scheduled for tomorrow. Please prepare any topics you'd like to discuss.</p>
+      ${detailRow('With', otherName)}
+      ${detailRow('Date & Time', formattedDate)}
+    `,
+    ctaText: 'View Meeting',
+    ctaUrl: `${baseUrl()}/meetings/${meetingId}`,
+  })
+
+  await sendEmail({
+    to: recipientEmail,
+    subject: `Meeting Reminder – ${otherName} · ${formattedDate}`,
     html,
   })
 }
