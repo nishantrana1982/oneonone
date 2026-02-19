@@ -148,8 +148,40 @@ async function processRecording(
     console.log(`[Recording] Starting Whisper transcription...`)
     const transcription = await transcribeAudio(combined, 'recording.webm', language)
     console.log(
-      `[Recording] Transcription done. Lang=${transcription.language}, dur=${transcription.duration}s`
+      `[Recording] Transcription done. Lang=${transcription.language}, dur=${transcription.duration}s, textLen=${transcription.text.length}`
     )
+
+    // Check if transcript has meaningful speech content
+    const trimmedText = transcription.text.trim()
+    const isSilentOrEmpty =
+      trimmedText.length === 0 ||
+      trimmedText === '.' ||
+      trimmedText === '...' ||
+      /^\[.*\]$/.test(trimmedText) || // e.g. "[no speech]", "[BLANK_AUDIO]", "[silence]"
+      /^[\s.,!?\-–—…]*$/.test(trimmedText) || // only punctuation
+      (trimmedText.length < 15 && transcription.duration < 30) // very short text from short recording
+
+    if (isSilentOrEmpty) {
+      console.log(`[Recording] No meaningful speech detected. Skipping analysis.`)
+      await prisma.meetingRecording.update({
+        where: { meetingId },
+        data: {
+          transcript: trimmedText || '(No speech detected)',
+          language: transcription.language,
+          duration: Math.round(transcription.duration),
+          summary: 'No speech was detected in this recording. The audio appears to be silent or contain only background noise.',
+          keyPoints: [],
+          autoTodos: [],
+          sentiment: { score: 0, label: 'neutral', employeeMood: 'N/A', reporterEngagement: 'N/A', overallTone: 'No conversation detected' },
+          qualityScore: 0,
+          qualityDetails: { clarity: 0, actionability: 0, engagement: 0, goalAlignment: 0, followUp: 0, overallFeedback: 'No speech was detected in the recording.' },
+          status: 'COMPLETED',
+          processedAt: new Date(),
+        },
+      })
+
+      return // Skip GPT analysis entirely
+    }
 
     await prisma.meetingRecording.update({
       where: { meetingId },

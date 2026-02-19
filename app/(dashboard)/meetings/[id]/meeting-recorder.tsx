@@ -272,6 +272,7 @@ export function MeetingRecorder({
           audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 44100 },
         })
       } catch (micErr: any) {
+        console.error('[Recording] Microphone error:', micErr.name, micErr.message)
         if (micErr.name === 'NotAllowedError' || micErr.name === 'PermissionDeniedError') {
           setMicRetryCount((n) => n + 1)
           setMicBlocked(true)
@@ -743,47 +744,92 @@ export function MeetingRecorder({
               </div>
             </div>
           ) : (
-            <div className="rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 p-5">
-              <div className="flex items-start gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-                  <Mic className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                </div>
-                <div>
-                  <p className="font-semibold text-dark-gray dark:text-white">Microphone Access Needed</p>
-                  <p className="text-sm text-medium-gray mt-0.5">
-                    Your browser blocked access to the microphone. Follow these simple steps to allow it:
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-3 ml-1">
-                <div className="flex items-start gap-3">
-                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold flex items-center justify-center">1</span>
-                  <p className="text-sm text-dark-gray dark:text-white/90">
-                    Click the <strong>lock icon</strong> (or tune icon) at the <strong>left side of the address bar</strong> at the top of your browser.
-                  </p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold flex items-center justify-center">2</span>
-                  <p className="text-sm text-dark-gray dark:text-white/90">
-                    Find <strong>&quot;Microphone&quot;</strong> and change it to <strong>&quot;Allow&quot;</strong>.
-                  </p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold flex items-center justify-center">3</span>
-                  <p className="text-sm text-dark-gray dark:text-white/90">
-                    <strong>Reload this page</strong> after changing the setting, then click <strong>&quot;Start Recording&quot;</strong>.
-                  </p>
-                </div>
-              </div>
-
+            <div className="space-y-4">
+              {/* Step A: macOS system permission (show after first retry) */}
               {micRetryCount > 0 && (
-                <div className="mt-4 rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 p-3">
-                  <p className="text-sm text-red-600 dark:text-red-400 font-medium">
-                    Microphone is still blocked. After enabling it in site settings, you must <strong>reload the page</strong> for the change to take effect.
-                  </p>
+                <div className="rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 p-5">
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
+                      <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-dark-gray dark:text-white">Still Blocked — Check System Settings</p>
+                      <p className="text-sm text-medium-gray mt-0.5">
+                        Your browser site setting looks correct, but your <strong>operating system</strong> may be blocking microphone access. This is the most common cause.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 ml-1">
+                    <p className="text-xs font-semibold text-red-700 dark:text-red-300 uppercase tracking-wide">On Mac:</p>
+                    <div className="flex items-start gap-3">
+                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-red-500/20 text-red-700 dark:text-red-300 text-xs font-bold flex items-center justify-center">1</span>
+                      <p className="text-sm text-dark-gray dark:text-white/90">
+                        Open <strong>System Settings</strong> → <strong>Privacy &amp; Security</strong> → <strong>Microphone</strong>
+                      </p>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-red-500/20 text-red-700 dark:text-red-300 text-xs font-bold flex items-center justify-center">2</span>
+                      <p className="text-sm text-dark-gray dark:text-white/90">
+                        Make sure <strong>Google Chrome</strong> (or your browser) is <strong>toggled ON</strong>
+                      </p>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-red-500/20 text-red-700 dark:text-red-300 text-xs font-bold flex items-center justify-center">3</span>
+                      <p className="text-sm text-dark-gray dark:text-white/90">
+                        <strong>Restart Chrome</strong> completely (quit and reopen), then come back to this page
+                      </p>
+                    </div>
+                    <p className="text-xs font-semibold text-red-700 dark:text-red-300 uppercase tracking-wide mt-3">On Windows:</p>
+                    <div className="flex items-start gap-3">
+                      <span className="flex-shrink-0 w-6 h-6 rounded-full bg-red-500/20 text-red-700 dark:text-red-300 text-xs font-bold flex items-center justify-center">1</span>
+                      <p className="text-sm text-dark-gray dark:text-white/90">
+                        Open <strong>Settings</strong> → <strong>Privacy</strong> → <strong>Microphone</strong> → ensure <strong>&quot;Allow apps to access your microphone&quot;</strong> is ON, and Chrome is listed
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
+
+              {/* Step B: Browser site permission (always shown) */}
+              <div className="rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 p-5">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                    <Mic className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-dark-gray dark:text-white">
+                      {micRetryCount > 0 ? 'Also Check: Browser Site Permission' : 'Microphone Access Needed'}
+                    </p>
+                    <p className="text-sm text-medium-gray mt-0.5">
+                      {micRetryCount > 0
+                        ? 'Make sure the browser site permission is also set to Allow:'
+                        : 'Your browser blocked access to the microphone. Follow these steps:'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3 ml-1">
+                  <div className="flex items-start gap-3">
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold flex items-center justify-center">1</span>
+                    <p className="text-sm text-dark-gray dark:text-white/90">
+                      Click the <strong>lock icon</strong> (or tune icon) at the <strong>left side of the address bar</strong>.
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold flex items-center justify-center">2</span>
+                    <p className="text-sm text-dark-gray dark:text-white/90">
+                      Find <strong>&quot;Microphone&quot;</strong> and set it to <strong>&quot;Allow&quot;</strong>.
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold flex items-center justify-center">3</span>
+                    <p className="text-sm text-dark-gray dark:text-white/90">
+                      <strong>Reload this page</strong>, then click <strong>&quot;Start Recording&quot;</strong>.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -791,7 +837,7 @@ export function MeetingRecorder({
             {micRetryCount > 0 && !micPermGranted && (
               <button
                 onClick={() => window.location.reload()}
-                className="inline-flex items-center gap-3 px-8 py-4 text-lg font-medium bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors shadow-lg"
+                className="inline-flex items-center gap-3 px-6 py-3 text-base font-medium bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors shadow-lg"
               >
                 <RefreshCw className="w-5 h-5" />
                 Reload Page
@@ -799,10 +845,10 @@ export function MeetingRecorder({
             )}
             <button
               onClick={() => { setMicBlocked(false); setMicPermGranted(false); startRecording() }}
-              className={`inline-flex items-center gap-3 px-8 py-4 text-lg font-medium bg-gradient-to-r from-red-500 to-orange text-white rounded-2xl hover:opacity-90 transition-opacity shadow-lg ${micRetryCount > 0 && !micPermGranted ? 'opacity-70' : ''}`}
+              className="inline-flex items-center gap-3 px-6 py-3 text-base font-medium bg-gradient-to-r from-red-500 to-orange text-white rounded-2xl hover:opacity-90 transition-opacity shadow-lg"
             >
-              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                <Mic className="w-5 h-5" />
+              <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center">
+                <Mic className="w-4 h-4" />
               </div>
               {micRetryCount > 0 ? 'Try Again' : 'Start Recording'}
             </button>

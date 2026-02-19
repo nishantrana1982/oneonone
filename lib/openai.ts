@@ -162,6 +162,11 @@ The transcript may be in English, Hindi, or Gujarati. Provide analysis in Englis
 Employee: ${employeeName}
 Reporter/Manager: ${reporterName}
 
+CRITICAL RULES:
+- ONLY analyze what is actually said in the transcript. NEVER fabricate, invent, or assume content that is not explicitly present.
+- If the transcript is empty, contains only silence markers, or has no meaningful conversation, return a quality score of 0 and a summary stating "No meaningful conversation detected."
+- If the transcript is very short or unclear, base your analysis strictly on what was actually said. Do not fill in gaps with imagined content.
+
 Analyze the transcript and provide:
 1. A concise summary (2-3 sentences)
 2. Key points discussed (bullet points)
