@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { fromZonedTime, toZonedTime } from 'date-fns-tz'
+import { addDays, addWeeks, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns'
 import { getCurrentUser } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { UserRole, MeetingStatus, RecurringFrequency } from '@prisma/client'
+
+const FALLBACK_TZ = 'Asia/Kolkata'
 
 function getScheduleId(params: { id?: string }): string | null {
   const id = params?.id
@@ -153,10 +157,15 @@ export async function PATCH(
 
     // Recalculate nextMeetingDate when schedule timing changes
     if (scheduleChanged) {
+      const reporterProfile = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { timeZone: true },
+      })
+      const reporterTz = reporterProfile?.timeZone || FALLBACK_TZ
       const newDay = dayOfWeek ?? existing.dayOfWeek
       const newTime = timeOfDay ?? existing.timeOfDay
       const newFreq = (frequency ?? existing.frequency) as RecurringFrequency
-      const newNextDate = recalculateNextMeetingDate(newDay, newTime, newFreq)
+      const newNextDate = recalculateNextMeetingDate(newDay, newTime, newFreq, reporterTz)
       updateData.nextMeetingDate = newNextDate
 
       // Update any future PROPOSED meetings linked to this schedule
@@ -290,29 +299,27 @@ export async function DELETE(
 function recalculateNextMeetingDate(
   dayOfWeek: number,
   timeOfDay: string,
-  frequency: RecurringFrequency
+  frequency: RecurringFrequency,
+  timeZone = FALLBACK_TZ
 ): Date {
   const [hours, minutes] = timeOfDay.split(':').map(Number)
-  const IST_OFFSET = 5 * 60 + 30
-
-  const nowUtc = new Date()
-  const nowIst = new Date(nowUtc.getTime() + IST_OFFSET * 60 * 1000)
-
-  const todayIst = new Date(nowIst)
-  todayIst.setUTCHours(hours, minutes, 0, 0)
-
-  const currentDay = nowIst.getUTCDay()
+  const now = new Date()
+  const zoned = toZonedTime(now, timeZone)
+  const currentDay = zoned.getDay()
   let daysUntil = dayOfWeek - currentDay
-  if (daysUntil < 0 || (daysUntil === 0 && nowIst >= todayIst)) {
-    daysUntil += 7
+  if (daysUntil < 0) daysUntil += 7
+  else if (daysUntil === 0) {
+    if (zoned.getHours() > hours || (zoned.getHours() === hours && zoned.getMinutes() >= minutes)) {
+      daysUntil += 7
+    }
   }
-
-  const nextIst = new Date(todayIst)
-  nextIst.setUTCDate(todayIst.getUTCDate() + daysUntil)
-
+  let nextLocal = addDays(zoned, daysUntil)
+  nextLocal = setHours(nextLocal, hours)
+  nextLocal = setMinutes(nextLocal, minutes)
+  nextLocal = setSeconds(nextLocal, 0)
+  nextLocal = setMilliseconds(nextLocal, 0)
   if (frequency === 'BIWEEKLY' && daysUntil < 7) {
-    nextIst.setUTCDate(nextIst.getUTCDate() + 7)
+    nextLocal = addWeeks(nextLocal, 1)
   }
-
-  return new Date(nextIst.getTime() - IST_OFFSET * 60 * 1000)
+  return fromZonedTime(nextLocal, timeZone)
 }

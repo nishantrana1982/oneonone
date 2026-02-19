@@ -63,6 +63,12 @@ export async function createCalendarEvent(
   reporterName: string
 ) {
   try {
+    const reporter = await prisma.user.findUnique({
+      where: { id: reporterId },
+      select: { timeZone: true },
+    })
+    const calendarTz = reporter?.timeZone || FALLBACK_TZ
+
     const oauth2Client = await getAuthenticatedClient(reporterId)
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
 
@@ -71,11 +77,11 @@ export async function createCalendarEvent(
       description: `AMI One-on-One Meeting\n\nView meeting details: ${process.env.NEXTAUTH_URL}/meetings/${meetingId}`,
       start: {
         dateTime: meetingDate.toISOString(),
-        timeZone: 'Asia/Kolkata', // IST timezone
+        timeZone: calendarTz,
       },
       end: {
-        dateTime: new Date(meetingDate.getTime() + 30 * 60 * 1000).toISOString(), // 30 minutes default
-        timeZone: 'Asia/Kolkata',
+        dateTime: new Date(meetingDate.getTime() + 30 * 60 * 1000).toISOString(),
+        timeZone: calendarTz,
       },
       attendees: [
         { email: employeeEmail },
@@ -144,6 +150,12 @@ export async function updateCalendarEvent(
   reporterName: string
 ) {
   try {
+    const userRecord = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { timeZone: true },
+    })
+    const calendarTz = userRecord?.timeZone || FALLBACK_TZ
+
     const oauth2Client = await getAuthenticatedClient(userId)
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
 
@@ -151,11 +163,11 @@ export async function updateCalendarEvent(
       summary: `One-on-One: ${employeeName} & ${reporterName}`,
       start: {
         dateTime: meetingDate.toISOString(),
-        timeZone: 'Asia/Kolkata',
+        timeZone: calendarTz,
       },
       end: {
         dateTime: new Date(meetingDate.getTime() + 30 * 60 * 1000).toISOString(),
-        timeZone: 'Asia/Kolkata',
+        timeZone: calendarTz,
       },
     }
 
@@ -238,7 +250,7 @@ export async function getFreeBusy(
     requestBody: {
       timeMin: timeMin.toISOString(),
       timeMax: timeMax.toISOString(),
-      timeZone: 'Asia/Kolkata',
+      timeZone: 'UTC',
       items: [{ id: 'primary' }],
     },
   })
@@ -257,8 +269,6 @@ interface FreeSlot {
 /**
  * Business-hours window (9 AM – 7 PM IST) when no user prefs are provided.
  */
-const BUSINESS_START_HOUR = 9
-const BUSINESS_END_HOUR = 19
 const FALLBACK_TZ = 'Asia/Kolkata'
 
 function parseHHmm(hhmm: string): { hours: number; minutes: number } {
@@ -338,21 +348,9 @@ export async function getMutualFreeSlots(
   const employeeStart = options?.employeeWorkStart ?? DEFAULT_WORK_START
   const employeeEnd = options?.employeeWorkEnd ?? DEFAULT_WORK_END
 
-  let windowStart: Date
-  let windowEnd: Date
-
-  if (options && (options.reporterTimeZone ?? options.employeeTimeZone)) {
-    const reporterWindow = getWorkWindowUtc(date, reporterTz, reporterStart, reporterEnd)
-    windowStart = reporterWindow.start
-    windowEnd = reporterWindow.end
-  } else {
-    // Legacy: IST 9–19
-    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000
-    const dayStart = new Date(date)
-    dayStart.setUTCHours(0, 0, 0, 0)
-    windowStart = new Date(dayStart.getTime() + BUSINESS_START_HOUR * 3600000 - IST_OFFSET_MS)
-    windowEnd = new Date(dayStart.getTime() + BUSINESS_END_HOUR * 3600000 - IST_OFFSET_MS)
-  }
+  const reporterWindow = getWorkWindowUtc(date, reporterTz, reporterStart, reporterEnd)
+  const windowStart = reporterWindow.start
+  const windowEnd = reporterWindow.end
 
   const [reporterBusy, employeeBusy] = await Promise.all([
     getFreeBusy(reporterId, windowStart, windowEnd),

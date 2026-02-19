@@ -232,7 +232,7 @@ export async function GET(request: NextRequest) {
         ['Meetings'],
         ['Date', 'Employee', 'Department', 'Reporter', 'Status', 'Form Submitted'],
         ...meetings.map(m => [
-          new Date(m.meetingDate).toLocaleDateString(),
+          new Date(m.meetingDate).toLocaleDateString('en-US', { timeZone: 'Asia/Kolkata' }),
           m.employee.name,
           m.employee.department?.name || 'N/A',
           m.reporter.name,

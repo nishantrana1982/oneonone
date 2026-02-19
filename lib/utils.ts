@@ -5,16 +5,17 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatDate(date: Date | string): string {
+export function formatDate(date: Date | string, timeZone = 'Asia/Kolkata'): string {
   const d = typeof date === 'string' ? new Date(date) : date
   return new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
+    timeZone,
   }).format(d)
 }
 
-export function formatDateTime(date: Date | string): string {
+export function formatDateTime(date: Date | string, timeZone = 'Asia/Kolkata'): string {
   const d = typeof date === 'string' ? new Date(date) : date
   return new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
@@ -22,11 +23,24 @@ export function formatDateTime(date: Date | string): string {
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+    timeZone,
   }).format(d)
 }
 
-/** Timezone used for displaying meeting date/times (same everywhere so list and detail match) */
+/** Fallback timezone used for displaying meeting date/times when user TZ is unknown */
 export const MEETING_DISPLAY_TIMEZONE = 'Asia/Kolkata'
+
+/** Short date for notifications (server-side safe) */
+export function formatDateForNotification(date: Date, timeZone = 'Asia/Kolkata'): string {
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone,
+  }).format(date)
+}
 
 /** Format meeting date for list view (short: Wed, Feb 18, 11:30 AM) */
 export function formatMeetingDateShort(date: Date | string): string {

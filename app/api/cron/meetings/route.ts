@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { fromZonedTime, toZonedTime } from 'date-fns-tz'
+import { addDays, addWeeks, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns'
 import { prisma } from '@/lib/prisma'
 import { RecurringFrequency } from '@prisma/client'
 import { notifyMeetingProposed, notifyMeetingReminder, notifyFormReminder } from '@/lib/notifications'
 import { sendMeetingProposalEmail, sendMeetingReminderEmail, sendFormReminderEmail } from '@/lib/email'
+
+const FALLBACK_TZ = 'Asia/Kolkata'
 
 // This endpoint should be called by a cron job (e.g., every hour)
 // Set up a cron job to call: POST /api/cron/meetings with header: x-cron-secret: YOUR_SECRET
@@ -58,7 +62,7 @@ async function generateRecurringMeetings(results: { recurringMeetingsCreated: nu
       },
     },
     include: {
-      reporter: { select: { id: true, name: true, email: true } },
+      reporter: { select: { id: true, name: true, email: true, timeZone: true } },
       employee: { select: { id: true, name: true, email: true } },
     },
   })
@@ -80,11 +84,13 @@ async function generateRecurringMeetings(results: { recurringMeetingsCreated: nu
       })
 
       // Calculate next meeting date
+      const reporterTz = schedule.reporter?.timeZone || FALLBACK_TZ
       const nextDate = calculateNextMeetingDate(
         schedule.dayOfWeek,
         schedule.timeOfDay,
         schedule.frequency,
-        meetingDate
+        meetingDate,
+        reporterTz
       )
 
       // Update the schedule
@@ -334,34 +340,34 @@ function calculateNextMeetingDate(
   dayOfWeek: number,
   timeOfDay: string,
   frequency: RecurringFrequency,
-  lastDate: Date
+  lastDate: Date,
+  timeZone = FALLBACK_TZ
 ): Date {
   const [hours, minutes] = timeOfDay.split(':').map(Number)
-  const IST_OFFSET = 5 * 60 + 30
-
-  // Convert lastDate to IST for day-of-week arithmetic
-  const lastIst = new Date(lastDate.getTime() + IST_OFFSET * 60 * 1000)
+  let zoned = toZonedTime(lastDate, timeZone)
 
   switch (frequency) {
     case 'WEEKLY':
-      lastIst.setUTCDate(lastIst.getUTCDate() + 7)
+      zoned = addDays(zoned, 7)
       break
     case 'BIWEEKLY':
-      lastIst.setUTCDate(lastIst.getUTCDate() + 14)
+      zoned = addDays(zoned, 14)
       break
     case 'MONTHLY': {
-      lastIst.setUTCMonth(lastIst.getUTCMonth() + 1)
-      const currentDay = lastIst.getUTCDay()
+      zoned = new Date(zoned)
+      zoned.setMonth(zoned.getMonth() + 1)
+      const currentDay = zoned.getDay()
       let daysUntil = dayOfWeek - currentDay
       if (daysUntil < 0) daysUntil += 7
-      lastIst.setUTCDate(lastIst.getUTCDate() + daysUntil)
+      zoned = addDays(zoned, daysUntil)
       break
     }
   }
 
-  // Set the desired IST time
-  lastIst.setUTCHours(hours, minutes, 0, 0)
+  zoned = setHours(zoned, hours)
+  zoned = setMinutes(zoned, minutes)
+  zoned = setSeconds(zoned, 0)
+  zoned = setMilliseconds(zoned, 0)
 
-  // Convert back to UTC for storage
-  return new Date(lastIst.getTime() - IST_OFFSET * 60 * 1000)
+  return fromZonedTime(zoned, timeZone)
 }

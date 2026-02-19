@@ -313,6 +313,7 @@ export async function sendTodoAssignedEmail(
         year: 'numeric',
         month: 'long',
         day: 'numeric',
+        timeZone: EMAIL_TIMEZONE,
       }).format(dueDate)
     : 'No due date'
 
@@ -352,6 +353,7 @@ export async function sendTodoDueReminderEmail(
     year: 'numeric',
     month: 'long',
     day: 'numeric',
+    timeZone: EMAIL_TIMEZONE,
   }).format(dueDate)
 
   const name = assigneeName || 'Team Member'
@@ -635,11 +637,12 @@ export async function sendRecurringScheduleUpdatedEmail(
   const mgrName = managerName || 'Your manager'
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
   const dayName = dayNames[dayOfWeek] || 'Unknown'
-  const formattedTime = new Date(`2000-01-01T${timeOfDay}:00`).toLocaleTimeString('en-US', {
+  const formattedTime = new Intl.DateTimeFormat('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
-  })
+    timeZone: EMAIL_TIMEZONE,
+  }).format(new Date(`2000-01-01T${timeOfDay}:00`))
   const freqLabel = frequency === 'WEEKLY' ? 'Weekly' : frequency === 'BIWEEKLY' ? 'Every 2 Weeks' : 'Monthly'
 
   const html = emailLayout({

@@ -1,5 +1,6 @@
 import { prisma } from './prisma'
 import { NotificationType, Prisma } from '@prisma/client'
+import { formatDateForNotification } from './utils'
 
 interface CreateNotificationParams {
   userId: string
@@ -148,7 +149,7 @@ export async function notifyMeetingScheduled(
     userId: employeeId,
     type: 'MEETING_SCHEDULED',
     title: 'New Meeting Scheduled',
-    message: `${reporterName} has scheduled a one-on-one meeting with you on ${meetingDate.toLocaleDateString()}`,
+    message: `${reporterName} has scheduled a one-on-one meeting with you on ${formatDateForNotification(meetingDate)}`,
     link: `/meetings/${meetingId}`,
   })
 }
@@ -220,7 +221,7 @@ export async function notifyMeetingCancelled(
     userId,
     type: 'MEETING_CANCELLED',
     title: 'Meeting Cancelled',
-    message: `${cancelledByName} cancelled the one-on-one meeting scheduled for ${meetingDate.toLocaleDateString()}`,
+    message: `${cancelledByName} cancelled the one-on-one meeting scheduled for ${formatDateForNotification(meetingDate)}`,
     link: `/meetings/${meetingId}`,
   })
 }
@@ -248,7 +249,7 @@ export async function notifyTodoDueSoon(
     userId,
     type: 'TODO_DUE_SOON',
     title: 'Task Due Soon',
-    message: `Your task "${todoTitle}" is due on ${dueDate.toLocaleDateString()}`,
+    message: `Your task "${todoTitle}" is due on ${formatDateForNotification(dueDate)}`,
     link: `/todos`,
   })
 }
@@ -293,7 +294,7 @@ export async function notifyMeetingProposed(
     userId: employeeId,
     type: 'MEETING_SCHEDULED',
     title: 'Meeting Request',
-    message: `${reporterName} proposed a one-on-one for ${meetingDate.toLocaleDateString()}. Accept or suggest a new time.`,
+    message: `${reporterName} proposed a one-on-one for ${formatDateForNotification(meetingDate)}. Accept or suggest a new time.`,
     link: `/meetings/${meetingId}`,
   })
 }
@@ -308,7 +309,7 @@ export async function notifyMeetingAccepted(
     userId: proposerId,
     type: 'MEETING_SCHEDULED',
     title: 'Meeting Confirmed',
-    message: `${acceptorName} accepted the one-on-one for ${meetingDate.toLocaleDateString()}.`,
+    message: `${acceptorName} accepted the one-on-one for ${formatDateForNotification(meetingDate)}.`,
     link: `/meetings/${meetingId}`,
   })
 }
@@ -323,7 +324,7 @@ export async function notifyMeetingSuggested(
     userId: recipientId,
     type: 'MEETING_SCHEDULED',
     title: 'New Time Suggested',
-    message: `${suggestorName} suggested a new time for the one-on-one: ${newDate.toLocaleDateString()}. Accept or suggest another time.`,
+    message: `${suggestorName} suggested a new time for the one-on-one: ${formatDateForNotification(newDate)}. Accept or suggest another time.`,
     link: `/meetings/${meetingId}`,
   })
 }

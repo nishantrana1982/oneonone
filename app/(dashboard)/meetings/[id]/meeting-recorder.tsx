@@ -72,6 +72,7 @@ export function MeetingRecorder({
   const [selectedLanguage, setSelectedLanguage] = useState('auto')
   const [micBlocked, setMicBlocked] = useState(false)
   const [micPermGranted, setMicPermGranted] = useState(false)
+  const [micRetryCount, setMicRetryCount] = useState(0)
 
   // Chunk upload state
   const [chunksUploaded, setChunksUploaded] = useState(0)
@@ -162,14 +163,16 @@ export function MeetingRecorder({
     }
   }, [])
 
-  // Watch for permission changes when mic is blocked
+  // Watch for permission changes when mic is blocked (event + polling fallback)
   useEffect(() => {
     if (!micBlocked) return
     let permStatus: PermissionStatus | null = null
+    let pollTimer: ReturnType<typeof setInterval> | null = null
 
-    const handleChange = () => {
+    const checkGranted = () => {
       if (permStatus?.state === 'granted') {
         setMicPermGranted(true)
+        if (pollTimer) clearInterval(pollTimer)
       }
     }
 
@@ -177,15 +180,15 @@ export function MeetingRecorder({
       ?.query({ name: 'microphone' as PermissionName })
       .then((status) => {
         permStatus = status
-        if (status.state === 'granted') {
-          setMicPermGranted(true)
-        }
-        status.addEventListener('change', handleChange)
+        checkGranted()
+        status.addEventListener('change', checkGranted)
+        pollTimer = setInterval(checkGranted, 2000)
       })
       .catch(() => { /* not supported */ })
 
     return () => {
-      permStatus?.removeEventListener('change', handleChange)
+      permStatus?.removeEventListener('change', checkGranted)
+      if (pollTimer) clearInterval(pollTimer)
     }
   }, [micBlocked])
 
@@ -270,6 +273,7 @@ export function MeetingRecorder({
         })
       } catch (micErr: any) {
         if (micErr.name === 'NotAllowedError' || micErr.name === 'PermissionDeniedError') {
+          setMicRetryCount((n) => n + 1)
           setMicBlocked(true)
           return
         }
@@ -725,7 +729,6 @@ export function MeetingRecorder({
       {!isRecording && !audioBlob && micBlocked && (
         <div className="space-y-5">
           {micPermGranted ? (
-            /* Permission was just granted — show success and let user proceed */
             <div className="rounded-xl bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/20 p-5">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
@@ -740,7 +743,6 @@ export function MeetingRecorder({
               </div>
             </div>
           ) : (
-            /* Permission still blocked — show instructions */
             <div className="rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 p-5">
               <div className="flex items-start gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center flex-shrink-0">
@@ -770,28 +772,45 @@ export function MeetingRecorder({
                 <div className="flex items-start gap-3">
                   <span className="flex-shrink-0 w-6 h-6 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold flex items-center justify-center">3</span>
                   <p className="text-sm text-dark-gray dark:text-white/90">
-                    Click <strong>&quot;Start Recording&quot;</strong> below. The page will auto-detect the change.
+                    <strong>Reload this page</strong> after changing the setting, then click <strong>&quot;Start Recording&quot;</strong>.
                   </p>
                 </div>
               </div>
+
+              {micRetryCount > 0 && (
+                <div className="mt-4 rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 p-3">
+                  <p className="text-sm text-red-600 dark:text-red-400 font-medium">
+                    Microphone is still blocked. After enabling it in site settings, you must <strong>reload the page</strong> for the change to take effect.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
           <div className="flex items-center justify-center gap-3">
+            {micRetryCount > 0 && !micPermGranted && (
+              <button
+                onClick={() => window.location.reload()}
+                className="inline-flex items-center gap-3 px-8 py-4 text-lg font-medium bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors shadow-lg"
+              >
+                <RefreshCw className="w-5 h-5" />
+                Reload Page
+              </button>
+            )}
             <button
               onClick={() => { setMicBlocked(false); setMicPermGranted(false); startRecording() }}
-              className="inline-flex items-center gap-3 px-8 py-4 text-lg font-medium bg-gradient-to-r from-red-500 to-orange text-white rounded-2xl hover:opacity-90 transition-opacity shadow-lg"
+              className={`inline-flex items-center gap-3 px-8 py-4 text-lg font-medium bg-gradient-to-r from-red-500 to-orange text-white rounded-2xl hover:opacity-90 transition-opacity shadow-lg ${micRetryCount > 0 && !micPermGranted ? 'opacity-70' : ''}`}
             >
               <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
                 <Mic className="w-5 h-5" />
               </div>
-              Start Recording
+              {micRetryCount > 0 ? 'Try Again' : 'Start Recording'}
             </button>
           </div>
 
-          {!micPermGranted && (
+          {!micPermGranted && micRetryCount === 0 && (
             <p className="text-center text-xs text-medium-gray">
-              Changed the setting? The page will detect it automatically, or click Start Recording to try again.
+              Changed the setting? Reload the page, or click Start Recording to try again.
             </p>
           )}
         </div>
