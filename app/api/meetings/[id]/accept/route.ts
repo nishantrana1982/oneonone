@@ -29,12 +29,22 @@ export async function POST(
       )
     }
 
+    if (new Date(meeting.meetingDate).getTime() < Date.now()) {
+      return NextResponse.json(
+        { error: 'The proposed meeting time has already passed. Please suggest a new time instead.' },
+        { status: 400 }
+      )
+    }
+
     // Only the receiver can accept.
     // If reporter proposed → employee accepts.
     // If employee suggested → reporter accepts.
+    // If a Super Admin (third party) proposed → employee accepts.
+    const proposerIsThirdParty = !!meeting.proposedById && meeting.proposedById !== meeting.reporterId && meeting.proposedById !== meeting.employeeId
     const isReceiver =
       (meeting.proposedById === meeting.reporterId && user.id === meeting.employeeId) ||
-      (meeting.proposedById === meeting.employeeId && user.id === meeting.reporterId)
+      (meeting.proposedById === meeting.employeeId && user.id === meeting.reporterId) ||
+      (proposerIsThirdParty && user.id === meeting.employeeId)
 
     if (!isReceiver && user.role !== 'SUPER_ADMIN') {
       return NextResponse.json(
@@ -102,6 +112,81 @@ export async function POST(
     }
 
     await logMeetingUpdated(user.id, params.id, { action: 'accepted', acceptedBy: acceptor.name, status: 'SCHEDULED' })
+
+    // Auto-generate the next occurrence for recurring meetings
+    if (meeting.recurringScheduleId) {
+      try {
+        const { advanceToNextOccurrence } = await import('@/lib/recurring-dates')
+        const schedule = await prisma.recurringSchedule.findUnique({
+          where: { id: meeting.recurringScheduleId },
+          include: {
+            reporter: { select: { id: true, name: true, email: true, timeZone: true } },
+            employee: { select: { id: true, name: true, email: true } },
+          },
+        })
+
+        if (schedule && schedule.isActive && schedule.nextMeetingDate) {
+          const reporterTz = schedule.reporter?.timeZone || 'Asia/Kolkata'
+          const nextDate = schedule.nextMeetingDate
+
+          // Only auto-generate if no meeting exists for this date yet
+          const alreadyExists = await prisma.meeting.findFirst({
+            where: {
+              recurringScheduleId: schedule.id,
+              meetingDate: nextDate,
+              status: { not: 'CANCELLED' },
+            },
+          })
+
+          if (!alreadyExists) {
+            const nextMeeting = await prisma.meeting.create({
+              data: {
+                employeeId: schedule.employeeId,
+                reporterId: schedule.reporterId,
+                meetingDate: nextDate,
+                recurringScheduleId: schedule.id,
+                status: 'SCHEDULED',
+                proposedById: schedule.reporterId,
+              },
+            })
+
+            // Advance the schedule's nextMeetingDate
+            const futureDate = advanceToNextOccurrence(
+              schedule.dayOfWeek,
+              schedule.timeOfDay,
+              schedule.frequency,
+              nextDate,
+              reporterTz
+            )
+            await prisma.recurringSchedule.update({
+              where: { id: schedule.id },
+              data: { nextMeetingDate: futureDate, lastGeneratedAt: new Date() },
+            })
+
+            // Book calendar event for the auto-scheduled meeting
+            try {
+              const { createCalendarEvent, isCalendarEnabled } = await import('@/lib/google-calendar')
+              const calendarEnabled = await isCalendarEnabled(schedule.reporterId)
+              if (calendarEnabled && schedule.reporter && schedule.employee) {
+                await createCalendarEvent(
+                  nextMeeting.id,
+                  schedule.employee.email,
+                  schedule.reporter.email,
+                  schedule.reporterId,
+                  nextDate,
+                  schedule.employee.name,
+                  schedule.reporter.name
+                )
+              }
+            } catch (calError) {
+              console.error('Failed to create calendar event for next recurring meeting:', calError)
+            }
+          }
+        }
+      } catch (recurError) {
+        console.error('Failed to auto-generate next recurring meeting:', recurError)
+      }
+    }
 
     return NextResponse.json(updated)
   } catch (error) {

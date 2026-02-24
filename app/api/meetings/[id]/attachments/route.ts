@@ -177,19 +177,20 @@ export async function DELETE(
       return NextResponse.json({ error: 'Attachment not found' }, { status: 404 })
     }
 
-    // Authorization - only uploader, reporter, or admin can delete
-    const isUploader = attachment.uploadedBy === user.id
-    const isReporter = attachment.meeting.reporterId === user.id
+    // Authorization - any meeting participant or admin can delete
+    const isParticipant =
+      attachment.meeting.employeeId === user.id ||
+      attachment.meeting.reporterId === user.id
     const isAdmin = user.role === UserRole.SUPER_ADMIN
-    if (!isUploader && !isReporter && !isAdmin) {
+    if (!isParticipant && !isAdmin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    // Delete from S3
+    // Delete from S3 (non-blocking — proceed even if S3 delete fails)
     try {
       await deleteFromS3(attachment.s3Key)
     } catch (error) {
-      console.error('Failed to delete from S3:', error)
+      console.error('Failed to delete from S3 (continuing with DB cleanup):', error)
     }
 
     // Delete record

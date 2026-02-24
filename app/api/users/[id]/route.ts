@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
 import { logUserUpdated, logUserDeleted } from '@/lib/audit'
 
+const ALLOWED_EMAIL_DOMAIN = '@whitelabeliq.com'
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -49,6 +51,12 @@ export async function PATCH(
 
     // Check for email conflicts if email is being changed
     if (email && email !== existingUser.email) {
+      if (!email.toLowerCase().endsWith(ALLOWED_EMAIL_DOMAIN)) {
+        return NextResponse.json(
+          { error: `Only ${ALLOWED_EMAIL_DOMAIN} email addresses are allowed` },
+          { status: 400 }
+        )
+      }
       const emailExists = await prisma.user.findUnique({
         where: { email },
       })
@@ -110,17 +118,58 @@ export async function DELETE(
   try {
     const admin = await requireAdmin()
 
-    // Soft delete by setting isActive to false
-    const user = await prisma.user.update({
-      where: { id: params.id },
-      data: { isActive: false },
+    if (admin.id === params.id) {
+      return NextResponse.json({ error: 'You cannot delete your own account' }, { status: 400 })
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: params.id } })
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.updateMany({
+        where: { reportsToId: params.id },
+        data: { reportsToId: null },
+      })
+
+      await tx.meeting.updateMany({
+        where: { proposedById: params.id },
+        data: { proposedById: null },
+      })
+
+      const userMeetings = await tx.meeting.findMany({
+        where: { OR: [{ employeeId: params.id }, { reporterId: params.id }] },
+        select: { id: true },
+      })
+      const meetingIds = userMeetings.map((m) => m.id)
+
+      if (meetingIds.length > 0) {
+        await tx.calendarEvent.deleteMany({ where: { meetingId: { in: meetingIds } } })
+        await tx.meetingRecording.deleteMany({ where: { meetingId: { in: meetingIds } } })
+        await tx.attachment.deleteMany({ where: { meetingId: { in: meetingIds } } })
+        await tx.todo.deleteMany({ where: { meetingId: { in: meetingIds } } })
+        await tx.meeting.deleteMany({ where: { id: { in: meetingIds } } })
+      }
+
+      await tx.todo.deleteMany({
+        where: { OR: [{ assignedToId: params.id }, { createdById: params.id }] },
+      })
+
+      await tx.recurringSchedule.deleteMany({
+        where: { OR: [{ reporterId: params.id }, { employeeId: params.id }] },
+      })
+
+      await tx.auditLog.deleteMany({ where: { userId: params.id } })
+
+      await tx.user.delete({ where: { id: params.id } })
     })
 
-    // Audit log
     await logUserDeleted(admin.id, params.id, user.email)
 
-    return NextResponse.json({ success: true, user })
+    return NextResponse.json({ success: true })
   } catch (error) {
+    console.error('Error deleting user:', error)
     return NextResponse.json({ error: 'Failed to delete user' }, { status: 500 })
   }
 }

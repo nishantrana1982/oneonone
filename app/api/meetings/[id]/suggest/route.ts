@@ -37,10 +37,12 @@ export async function POST(
 
     const isParticipant =
       user.id === meeting.employeeId || user.id === meeting.reporterId
-    const isProposer = user.id === meeting.proposedById
+    const proposerIsThirdParty = !!meeting.proposedById && meeting.proposedById !== meeting.reporterId && meeting.proposedById !== meeting.employeeId
+    const isProposer = user.id === meeting.proposedById || (proposerIsThirdParty && user.id === meeting.reporterId)
     const isReceiver =
       (meeting.proposedById === meeting.reporterId && user.id === meeting.employeeId) ||
-      (meeting.proposedById === meeting.employeeId && user.id === meeting.reporterId)
+      (meeting.proposedById === meeting.employeeId && user.id === meeting.reporterId) ||
+      (proposerIsThirdParty && user.id === meeting.employeeId)
 
     if (!isParticipant && user.role !== 'SUPER_ADMIN') {
       return NextResponse.json(

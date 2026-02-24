@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireRole, UnauthorizedError, ForbiddenError } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { generateOrganizationInsights } from '@/lib/openai'
-import { UserRole, Prisma } from '@prisma/client'
+import { UserRole, Prisma, MeetingStatus } from '@prisma/client'
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,9 +25,33 @@ export async function GET(request: NextRequest) {
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - parseInt(period))
 
-    // Build where clause
-    const whereClause: Prisma.MeetingWhereInput = {
+    const baseWhere: Prisma.MeetingWhereInput = {
       meetingDate: { gte: startDate },
+    }
+    if (user.role === UserRole.REPORTER) {
+      baseWhere.reporterId = user.id
+    }
+    if (departmentId) {
+      baseWhere.employee = { departmentId }
+    }
+
+    const allMeetings = await prisma.meeting.findMany({
+      where: baseWhere,
+      select: { status: true, meetingDate: true },
+    })
+
+    const now = new Date()
+    const meetingOverview = {
+      total: allMeetings.length,
+      upcoming: allMeetings.filter(m => m.status === MeetingStatus.SCHEDULED && new Date(m.meetingDate) > now).length,
+      completed: allMeetings.filter(m => m.status === MeetingStatus.COMPLETED).length,
+      proposed: allMeetings.filter(m => m.status === MeetingStatus.PROPOSED).length,
+      cancelled: allMeetings.filter(m => m.status === MeetingStatus.CANCELLED).length,
+    }
+
+    // Build where clause for recording-based analytics
+    const whereClause: Prisma.MeetingWhereInput = {
+      ...baseWhere,
       recording: {
         is: {
           status: 'COMPLETED',
@@ -36,19 +60,6 @@ export async function GET(request: NextRequest) {
       },
     }
 
-    // Reporters can only see their direct reports
-    if (user.role === UserRole.REPORTER) {
-      whereClause.reporterId = user.id
-    }
-
-    // Filter by department
-    if (departmentId) {
-      whereClause.employee = {
-        departmentId,
-      }
-    }
-
-    // Get meetings with completed recordings
     const meetings = await prisma.meeting.findMany({
       where: whereClause,
       include: {
@@ -176,6 +187,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       period: parseInt(period),
+      meetingOverview,
       stats: {
         totalMeetings,
         totalRecordings: recordingsWithAnalysis.length,

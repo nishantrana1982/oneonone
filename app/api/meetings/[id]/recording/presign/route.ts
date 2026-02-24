@@ -20,6 +20,10 @@ export async function POST(
       return NextResponse.json({ error: 'Meeting not found' }, { status: 404 })
     }
 
+    if (meeting.status === 'CANCELLED') {
+      return NextResponse.json({ error: 'Cannot record a cancelled meeting' }, { status: 400 })
+    }
+
     if (
       !canAccessEmployeeData(user.role, user.id, meeting.employeeId, meeting.employee.reportsToId)
     ) {

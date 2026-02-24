@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth-helpers'
-import { UserRole } from '@prisma/client'
+import { UserRole, MeetingStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { fromZonedTime, toZonedTime } from 'date-fns-tz'
 import { DEFAULT_WORK_END, DEFAULT_WORK_START, formatWorkHoursLabel } from '@/lib/timezones'
 
 export async function GET(request: NextRequest) {
@@ -79,13 +80,50 @@ export async function GET(request: NextRequest) {
     const employeeStart = employee?.workDayStart ?? DEFAULT_WORK_START
     const employeeEnd = employee?.workDayEnd ?? DEFAULT_WORK_END
 
-    const slots = await getMutualFreeSlots(user.id, employeeId, parsedDate, 30, {
+    const calendarSlots = await getMutualFreeSlots(user.id, employeeId, parsedDate, 30, {
       reporterTimeZone: reporterTz,
       reporterWorkStart: reporterStart,
       reporterWorkEnd: reporterEnd,
       employeeTimeZone: employeeTz,
       employeeWorkStart: employeeStart,
       employeeWorkEnd: employeeEnd,
+    })
+
+    // Filter out slots that conflict with existing DB meetings (PROPOSED / SCHEDULED).
+    // Use timezone-aware day boundaries so we capture meetings that fall on the
+    // selected date in the reporter's timezone (not just UTC midnight-to-midnight).
+    const zoned = toZonedTime(parsedDate, reporterTz)
+    const y = zoned.getFullYear(), mo = zoned.getMonth(), d = zoned.getDate()
+    const dayStartTz = fromZonedTime(new Date(y, mo, d, 0, 0, 0, 0), reporterTz)
+    const dayEndTz = fromZonedTime(new Date(y, mo, d + 1, 0, 0, 0, 0), reporterTz)
+
+    const activeStatuses: MeetingStatus[] = [MeetingStatus.PROPOSED, MeetingStatus.SCHEDULED]
+    const existingMeetings = await prisma.meeting.findMany({
+      where: {
+        status: { in: activeStatuses },
+        meetingDate: { gte: dayStartTz, lt: dayEndTz },
+        OR: [
+          { employeeId },
+          { reporterId: user.id },
+          { employeeId: user.id },
+          { reporterId: employeeId },
+        ],
+      },
+      select: { meetingDate: true },
+    })
+
+    const SLOT_MS = 30 * 60 * 1000
+    const busyRanges = existingMeetings.map((m) => {
+      const start = new Date(m.meetingDate).getTime()
+      return { start, end: start + SLOT_MS }
+    })
+
+    const slots = calendarSlots.filter((slot) => {
+      const slotStart = new Date(slot.start).getTime()
+      const slotEnd = new Date(slot.end).getTime()
+      return !busyRanges.some(
+        (busy) => slotStart < busy.end && slotEnd > busy.start
+      )
     })
 
     const workingHoursLabel =

@@ -32,7 +32,9 @@ function SignInContent() {
           {error && (
             <div className="mb-6 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 px-4 py-3">
               <p className="text-sm text-red-600 dark:text-red-400 text-center">
-                {error === 'AccessDenied'
+                {error === 'AccountInactive'
+                  ? 'Your account has been deactivated. Please contact your administrator.'
+                  : error === 'AccessDenied'
                   ? 'Access denied. Please use your company email.'
                   : error === 'OAuthAccountNotLinked'
                   ? 'This email is already linked to another account.'

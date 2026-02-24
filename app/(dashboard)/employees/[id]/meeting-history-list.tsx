@@ -8,7 +8,7 @@ interface MeetingHistoryItem {
   id: string
   meetingDate: Date
   status: string
-  checkInPersonal: string | null
+  formSubmittedAt: Date | string | null
   reporter: { name: string }
   recording: {
     id: string
@@ -43,7 +43,7 @@ export function MeetingHistoryList({ meetings }: MeetingHistoryListProps) {
           const date = new Date(meeting.meetingDate)
           const isPast = date < now
           const isMissed =
-            isPast && meeting.status === 'SCHEDULED' && !meeting.checkInPersonal
+            isPast && meeting.status === 'SCHEDULED' && !meeting.formSubmittedAt
           const hasRecording =
             meeting.recording && meeting.recording.status === 'COMPLETED'
           const sentiment = hasRecording
@@ -55,7 +55,7 @@ export function MeetingHistoryList({ meetings }: MeetingHistoryListProps) {
             <Link
               key={meeting.id}
               href={`/meetings/${meeting.id}`}
-              className="block px-4 sm:px-6 py-3 sm:py-4 hover:bg-off-white/50 dark:hover:bg-charcoal/50 active:bg-off-white dark:active:bg-charcoal transition-colors"
+              className="block px-4 sm:px-6 py-3 sm:py-4 even:bg-off-white/40 dark:even:bg-charcoal/40 hover:bg-off-white/70 dark:hover:bg-charcoal/60 active:bg-off-white dark:active:bg-charcoal transition-colors"
             >
               <div className="flex items-center gap-3">
                 <div

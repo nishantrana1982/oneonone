@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { fromZonedTime, toZonedTime } from 'date-fns-tz'
-import { addDays, addWeeks, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns'
 import { getCurrentUser } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
-import { UserRole, MeetingStatus, RecurringFrequency } from '@prisma/client'
+import { UserRole, MeetingStatus } from '@prisma/client'
+import { calculateFirstOccurrence } from '@/lib/recurring-dates'
 
 const FALLBACK_TZ = 'Asia/Kolkata'
 
@@ -164,8 +163,8 @@ export async function PATCH(
       const reporterTz = reporterProfile?.timeZone || FALLBACK_TZ
       const newDay = dayOfWeek ?? existing.dayOfWeek
       const newTime = timeOfDay ?? existing.timeOfDay
-      const newFreq = (frequency ?? existing.frequency) as RecurringFrequency
-      const newNextDate = recalculateNextMeetingDate(newDay, newTime, newFreq, reporterTz)
+      const newFreq = frequency ?? existing.frequency
+      const newNextDate = calculateFirstOccurrence(newDay, newTime, newFreq, reporterTz)
       updateData.nextMeetingDate = newNextDate
 
       // Update any future PROPOSED meetings linked to this schedule
@@ -209,11 +208,16 @@ export async function PATCH(
       try {
         const { createNotification } = await import('@/lib/notifications')
         const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+        const rawTime = timeOfDay ?? existing.timeOfDay
+        const [hh, mm] = rawTime.split(':').map(Number)
+        const period = hh >= 12 ? 'PM' : 'AM'
+        const h12 = hh % 12 || 12
+        const displayTime = `${h12}:${String(mm).padStart(2, '0')} ${period}`
         await createNotification({
           userId: existing.employeeId,
           type: 'MEETING_SCHEDULED',
           title: 'Recurring Schedule Updated',
-          message: `${user.name || 'Your manager'} updated your recurring meeting to ${dayNames[dayOfWeek ?? existing.dayOfWeek]}s at ${timeOfDay ?? existing.timeOfDay}.`,
+          message: `${user.name || 'Your manager'} updated your recurring meeting to ${dayNames[dayOfWeek ?? existing.dayOfWeek]}s at ${displayTime}.`,
           link: '/meetings',
         })
       } catch (notifError) {
@@ -296,30 +300,3 @@ export async function DELETE(
   }
 }
 
-function recalculateNextMeetingDate(
-  dayOfWeek: number,
-  timeOfDay: string,
-  frequency: RecurringFrequency,
-  timeZone = FALLBACK_TZ
-): Date {
-  const [hours, minutes] = timeOfDay.split(':').map(Number)
-  const now = new Date()
-  const zoned = toZonedTime(now, timeZone)
-  const currentDay = zoned.getDay()
-  let daysUntil = dayOfWeek - currentDay
-  if (daysUntil < 0) daysUntil += 7
-  else if (daysUntil === 0) {
-    if (zoned.getHours() > hours || (zoned.getHours() === hours && zoned.getMinutes() >= minutes)) {
-      daysUntil += 7
-    }
-  }
-  let nextLocal = addDays(zoned, daysUntil)
-  nextLocal = setHours(nextLocal, hours)
-  nextLocal = setMinutes(nextLocal, minutes)
-  nextLocal = setSeconds(nextLocal, 0)
-  nextLocal = setMilliseconds(nextLocal, 0)
-  if (frequency === 'BIWEEKLY' && daysUntil < 7) {
-    nextLocal = addWeeks(nextLocal, 1)
-  }
-  return fromZonedTime(nextLocal, timeZone)
-}

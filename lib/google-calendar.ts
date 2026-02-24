@@ -349,12 +349,23 @@ export async function getMutualFreeSlots(
   const employeeEnd = options?.employeeWorkEnd ?? DEFAULT_WORK_END
 
   const reporterWindow = getWorkWindowUtc(date, reporterTz, reporterStart, reporterEnd)
-  const windowStart = reporterWindow.start
-  const windowEnd = reporterWindow.end
+  const employeeWindow = getWorkWindowUtc(date, employeeTz, employeeStart, employeeEnd)
+
+  // Query free/busy over the union of both windows to capture all busy events
+  const queryStart = new Date(Math.min(reporterWindow.start.getTime(), employeeWindow.start.getTime()))
+  const queryEnd = new Date(Math.max(reporterWindow.end.getTime(), employeeWindow.end.getTime()))
+
+  // Generate slots over the intersection (only times within BOTH work windows)
+  const windowStart = new Date(Math.max(reporterWindow.start.getTime(), employeeWindow.start.getTime()))
+  const windowEnd = new Date(Math.min(reporterWindow.end.getTime(), employeeWindow.end.getTime()))
+
+  if (windowStart >= windowEnd) {
+    return []
+  }
 
   const [reporterBusy, employeeBusy] = await Promise.all([
-    getFreeBusy(reporterId, windowStart, windowEnd),
-    getFreeBusy(employeeId, windowStart, windowEnd),
+    getFreeBusy(reporterId, queryStart, queryEnd),
+    getFreeBusy(employeeId, queryStart, queryEnd),
   ])
 
   const allBusy = [...reporterBusy, ...employeeBusy]

@@ -383,7 +383,7 @@ export default async function EmployeeDetailPage({
         ) : (
           <div className="divide-y divide-off-white dark:divide-medium-gray/20">
             {todos.map((todo) => (
-              <div key={todo.id} className="px-4 sm:px-6 py-3 sm:py-4">
+              <div key={todo.id} className="px-4 sm:px-6 py-3 sm:py-4 even:bg-off-white/40 dark:even:bg-charcoal/40">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <div

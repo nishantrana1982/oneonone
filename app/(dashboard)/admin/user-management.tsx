@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, Edit2, UserPlus, Users, Building2, ChevronUp, ChevronDown, Globe, Clock } from 'lucide-react'
+import { X, Edit2, Trash2, UserPlus, Users, Building2, ChevronUp, ChevronDown, Globe, Clock, AlertTriangle, Loader2 } from 'lucide-react'
 import { UserRole } from '@prisma/client'
 import { useToast } from '@/components/ui/toast'
 import { COUNTRY_OPTIONS, TIMEZONE_OPTIONS, getDefaultTimeZoneForCountry, getDefaultWorkHoursForCountry, DEFAULT_WORK_START, DEFAULT_WORK_END } from '@/lib/timezones'
@@ -45,6 +45,8 @@ export function UserManagement({ users, departments, reporters }: UserManagement
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [emailError, setEmailError] = useState('')
+  const ALLOWED_EMAIL_DOMAIN = '@whitelabeliq.com'
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -96,10 +98,33 @@ export function UserManagement({ users, departments, reporters }: UserManagement
     setIsAddOpen(true)
   }
 
+  const [deletingUser, setDeletingUser] = useState<User | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
   const closeModal = () => {
     setIsAddOpen(false)
     setEditingUser(null)
     resetForm()
+    setEmailError('')
+  }
+
+  const handleDelete = async () => {
+    if (!deletingUser) return
+    setIsDeleting(true)
+
+    try {
+      const response = await fetch(`/api/users/${deletingUser.id}`, { method: 'DELETE' })
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to delete user')
+      }
+      setDeletingUser(null)
+      router.refresh()
+    } catch (error) {
+      toastError(error instanceof Error ? error.message : 'Failed to delete user')
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   const handleSort = (key: SortKey) => {
@@ -148,6 +173,12 @@ export function UserManagement({ users, departments, reporters }: UserManagement
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!formData.email.toLowerCase().endsWith(ALLOWED_EMAIL_DOMAIN)) {
+      setEmailError(`Only ${ALLOWED_EMAIL_DOMAIN} email addresses are allowed`)
+      return
+    }
+    setEmailError('')
     setIsLoading(true)
 
     try {
@@ -308,7 +339,7 @@ export function UserManagement({ users, departments, reporters }: UserManagement
               {sortedUsers.map((user) => (
                 <tr
                   key={user.id}
-                  className="border-b border-off-white/50 dark:border-medium-gray/10 hover:bg-off-white/50 dark:hover:bg-charcoal/50 transition-colors"
+                  className="border-b border-off-white/50 dark:border-medium-gray/10 even:bg-off-white/40 dark:even:bg-charcoal/40 hover:bg-off-white/70 dark:hover:bg-charcoal/60 transition-colors"
                 >
                   <td className="py-4 px-6">
                     <div className="flex items-center gap-3">
@@ -348,12 +379,20 @@ export function UserManagement({ users, departments, reporters }: UserManagement
                     </span>
                   </td>
                   <td className="py-4 px-6">
-                    <button
-                      onClick={() => openEditModal(user)}
-                      className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-off-white dark:hover:bg-charcoal rounded-lg transition-colors"
-                    >
-                      <Edit2 className="w-4 h-4 text-medium-gray" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => openEditModal(user)}
+                        className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-off-white dark:hover:bg-charcoal rounded-lg transition-colors"
+                      >
+                        <Edit2 className="w-4 h-4 text-medium-gray" />
+                      </button>
+                      <button
+                        onClick={() => setDeletingUser(user)}
+                        className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-red-500/10 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4 text-medium-gray hover:text-red-500" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -364,7 +403,7 @@ export function UserManagement({ users, departments, reporters }: UserManagement
         {/* Mobile cards */}
         <div className="sm:hidden divide-y divide-off-white dark:divide-medium-gray/20">
           {sortedUsers.map((user) => (
-            <div key={user.id} className="p-4 space-y-2">
+            <div key={user.id} className="p-4 space-y-2 even:bg-off-white/40 dark:even:bg-charcoal/40">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange/20 to-orange/10 flex items-center justify-center">
@@ -385,12 +424,20 @@ export function UserManagement({ users, departments, reporters }: UserManagement
                     </span>
                   </div>
                 </div>
-                <button
-                  onClick={() => openEditModal(user)}
-                  className="p-2 hover:bg-off-white dark:hover:bg-charcoal rounded-lg transition-colors"
-                >
-                  <Edit2 className="w-4 h-4 text-medium-gray" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => openEditModal(user)}
+                    className="p-2 hover:bg-off-white dark:hover:bg-charcoal rounded-lg transition-colors"
+                  >
+                    <Edit2 className="w-4 h-4 text-medium-gray" />
+                  </button>
+                  <button
+                    onClick={() => setDeletingUser(user)}
+                    className="p-2 hover:bg-red-500/10 rounded-lg transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4 text-medium-gray hover:text-red-500" />
+                  </button>
+                </div>
               </div>
               <p className="text-sm text-medium-gray">{user.email}</p>
               <div className="flex items-center gap-3 text-sm">
@@ -412,8 +459,8 @@ export function UserManagement({ users, departments, reporters }: UserManagement
       {isAddOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeModal} />
-          <div className="relative w-full max-w-lg max-w-[95vw] rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-off-white dark:border-medium-gray/20">
+          <div className="relative w-full max-w-lg rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 shadow-2xl flex flex-col max-h-[calc(100vh-2rem)]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-off-white dark:border-medium-gray/20 shrink-0">
               <h2 className="text-lg font-semibold text-dark-gray dark:text-white">
                 {editingUser ? 'Edit User' : 'Add New User'}
               </h2>
@@ -422,7 +469,7 @@ export function UserManagement({ users, departments, reporters }: UserManagement
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[85vh] overflow-y-auto">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div>
                 <label className="block text-sm font-medium text-dark-gray dark:text-white mb-1">
                   Full Name *
@@ -444,11 +491,19 @@ export function UserManagement({ users, departments, reporters }: UserManagement
                 <input
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="john@company.com"
-                  className="w-full rounded-xl border border-off-white dark:border-medium-gray/20 bg-off-white dark:bg-charcoal px-4 py-3 text-dark-gray dark:text-white focus:border-orange focus:outline-none focus:ring-2 focus:ring-orange/20"
+                  onChange={(e) => {
+                    setFormData({ ...formData, email: e.target.value })
+                    if (emailError) setEmailError('')
+                  }}
+                  placeholder={`john${ALLOWED_EMAIL_DOMAIN}`}
+                  className={`w-full rounded-xl border ${emailError ? 'border-red-500' : 'border-off-white dark:border-medium-gray/20'} bg-off-white dark:bg-charcoal px-4 py-3 text-dark-gray dark:text-white focus:border-orange focus:outline-none focus:ring-2 focus:ring-orange/20`}
                   required
                 />
+                {emailError ? (
+                  <p className="text-xs text-red-500 mt-1">{emailError}</p>
+                ) : (
+                  <p className="text-xs text-medium-gray mt-1">Only {ALLOWED_EMAIL_DOMAIN} emails are allowed</p>
+                )}
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -610,6 +665,61 @@ export function UserManagement({ users, departments, reporters }: UserManagement
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Delete Confirmation Modal */}
+      {deletingUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !isDeleting && setDeletingUser(null)} />
+          <div className="relative w-full max-w-md rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 shadow-2xl p-6">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-6 h-6 text-red-500" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-dark-gray dark:text-white">Delete User</h2>
+                <p className="text-sm text-medium-gray">This action cannot be undone</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-red-500/5 border border-red-500/20 p-4 mb-6">
+              <p className="text-sm text-dark-gray dark:text-white mb-2">
+                Are you sure you want to permanently delete <strong>{deletingUser.name}</strong> ({deletingUser.email})?
+              </p>
+              <p className="text-xs text-medium-gray">
+                All associated data including meetings, recordings, to-dos, recurring schedules, and notifications will be permanently removed.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setDeletingUser(null)}
+                disabled={isDeleting}
+                className="px-5 py-2.5 text-sm font-medium text-medium-gray hover:text-dark-gray dark:hover:text-white transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium bg-red-500 text-white rounded-xl hover:bg-red-600 disabled:opacity-50 transition-colors"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Delete User
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

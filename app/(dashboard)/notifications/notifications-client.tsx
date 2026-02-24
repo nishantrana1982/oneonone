@@ -366,7 +366,7 @@ export function NotificationsClient() {
                   key={notification.id}
                   onClick={() => handleNotificationClick(notification)}
                   className={cn(
-                    'flex gap-3 px-4 sm:px-6 py-3 sm:py-4 cursor-pointer transition-colors group',
+                    'flex gap-3 px-4 sm:px-6 py-3 sm:py-4 cursor-pointer transition-colors group even:bg-off-white/40 dark:even:bg-charcoal/40',
                     notification.isRead
                       ? 'hover:bg-off-white/50 dark:hover:bg-charcoal/50'
                       : 'bg-blue-50/50 dark:bg-blue-500/5 hover:bg-blue-50 dark:hover:bg-blue-500/10'

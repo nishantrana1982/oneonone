@@ -25,6 +25,24 @@
   }
 }
 
+/*
+ * Global form-element border visibility fix.
+ * The Tailwind class `border-off-white` (#F5F5F7) is nearly invisible on
+ * white backgrounds, especially on mobile (Android Chrome).
+ * These rules use element+class specificity (0,1,1) to override the utility
+ * (0,1,0) and apply a visible border to all form controls.
+ */
+input.border-off-white,
+select.border-off-white,
+textarea.border-off-white {
+  border-color: rgba(171, 171, 171, 0.4);
+}
+.dark input.border-off-white,
+.dark select.border-off-white,
+.dark textarea.border-off-white {
+  border-color: rgba(119, 119, 119, 0.4);
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;

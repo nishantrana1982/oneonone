@@ -247,6 +247,7 @@ export function TodoDetail({ todo, currentUserId, userRole }: TodoDetailProps) {
           <button
             onClick={handleDelete}
             disabled={deleting}
+            title="Permanently delete this task"
             className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-red-600 dark:text-red-400 rounded-xl border border-red-200 dark:border-red-500/20 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors disabled:opacity-50"
           >
             {deleting ? (

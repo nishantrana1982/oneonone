@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { fromZonedTime, toZonedTime } from 'date-fns-tz'
-import { addDays, addWeeks, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns'
 import { prisma } from '@/lib/prisma'
-import { RecurringFrequency } from '@prisma/client'
 import { notifyMeetingProposed, notifyMeetingReminder, notifyFormReminder } from '@/lib/notifications'
 import { sendMeetingProposalEmail, sendMeetingReminderEmail, sendFormReminderEmail } from '@/lib/email'
+import { advanceToNextOccurrence } from '@/lib/recurring-dates'
 
 const FALLBACK_TZ = 'Asia/Kolkata'
+const LOOK_AHEAD_MS = 7 * 24 * 60 * 60 * 1000 // generate meetings 7 days before they're due
 
 // This endpoint should be called by a cron job (e.g., every hour)
 // Set up a cron job to call: POST /api/cron/meetings with header: x-cron-secret: YOUR_SECRET
@@ -53,12 +52,13 @@ export async function POST(request: NextRequest) {
 async function generateRecurringMeetings(results: { recurringMeetingsCreated: number; reminders24hSent: number; reminders1hSent: number; errors: string[] }) {
   const now = new Date()
   
-  // Find all active recurring schedules that need a new meeting
+  // Find all active recurring schedules that need a new meeting (look ahead 7 days)
+  const lookAhead = new Date(now.getTime() + LOOK_AHEAD_MS)
   const schedules = await prisma.recurringSchedule.findMany({
     where: {
       isActive: true,
       nextMeetingDate: {
-        lte: now,
+        lte: lookAhead,
       },
     },
     include: {
@@ -71,60 +71,135 @@ async function generateRecurringMeetings(results: { recurringMeetingsCreated: nu
     try {
       const meetingDate = schedule.nextMeetingDate || now
 
-      // Create the meeting as PROPOSED (requires employee acceptance)
+      const reporterTz = schedule.reporter?.timeZone || FALLBACK_TZ
+
+      // Guard: skip if a non-cancelled meeting already exists for this schedule at this date
+      const existingMeeting = await prisma.meeting.findFirst({
+        where: {
+          recurringScheduleId: schedule.id,
+          meetingDate,
+          status: { not: 'CANCELLED' },
+        },
+      })
+      if (existingMeeting) {
+        const nextDate = advanceToNextOccurrence(
+          schedule.dayOfWeek,
+          schedule.timeOfDay,
+          schedule.frequency,
+          meetingDate,
+          reporterTz
+        )
+        await prisma.recurringSchedule.update({
+          where: { id: schedule.id },
+          data: { nextMeetingDate: nextDate, lastGeneratedAt: now },
+        })
+        continue
+      }
+
+      // Check if the recurring schedule has been accepted before (any SCHEDULED or COMPLETED meeting)
+      const hasAcceptedMeeting = await prisma.meeting.findFirst({
+        where: {
+          recurringScheduleId: schedule.id,
+          status: { in: ['SCHEDULED', 'COMPLETED'] },
+        },
+        select: { id: true },
+      })
+      const autoSchedule = !!hasAcceptedMeeting
+
+      // Create the meeting — auto-schedule if the schedule was already accepted
       const meeting = await prisma.meeting.create({
         data: {
           employeeId: schedule.employeeId,
           reporterId: schedule.reporterId,
           meetingDate,
           recurringScheduleId: schedule.id,
-          status: 'PROPOSED',
+          status: autoSchedule ? 'SCHEDULED' : 'PROPOSED',
           proposedById: schedule.reporterId,
         },
       })
 
-      // Calculate next meeting date
-      const reporterTz = schedule.reporter?.timeZone || FALLBACK_TZ
-      const nextDate = calculateNextMeetingDate(
+      // Advance the schedule's nextMeetingDate
+      const nextDate = advanceToNextOccurrence(
         schedule.dayOfWeek,
         schedule.timeOfDay,
         schedule.frequency,
         meetingDate,
         reporterTz
       )
-
-      // Update the schedule
       await prisma.recurringSchedule.update({
         where: { id: schedule.id },
-        data: {
-          nextMeetingDate: nextDate,
-          lastGeneratedAt: now,
-        },
+        data: { nextMeetingDate: nextDate, lastGeneratedAt: now },
       })
 
-      // Send proposal email to the employee
-      try {
-        await sendMeetingProposalEmail(
-          schedule.employee.email,
-          schedule.employee.name,
-          schedule.reporter.name,
-          meetingDate,
-          meeting.id
-        )
-      } catch (emailError) {
-        console.error('Failed to send proposal email for recurring meeting:', emailError)
-      }
+      if (autoSchedule) {
+        // Book calendar event immediately for auto-scheduled meetings
+        try {
+          const { createCalendarEvent, isCalendarEnabled } = await import('@/lib/google-calendar')
+          const calendarEnabled = await isCalendarEnabled(schedule.reporterId)
+          if (calendarEnabled) {
+            await createCalendarEvent(
+              meeting.id,
+              schedule.employee.email,
+              schedule.reporter.email,
+              schedule.reporterId,
+              meetingDate,
+              schedule.employee.name,
+              schedule.reporter.name
+            )
+          }
+        } catch (calError) {
+          console.error('Failed to create calendar event for auto-scheduled recurring meeting:', calError)
+        }
 
-      // In-app notification for the employee
-      try {
-        await notifyMeetingProposed(
-          schedule.employeeId,
-          schedule.reporter.name || 'Your manager',
-          meetingDate,
-          meeting.id
-        )
-      } catch (notifError) {
-        console.error('Failed to send proposal notification:', notifError)
+        // Notify employee about the scheduled meeting
+        try {
+          const { sendMeetingAcceptedEmail } = await import('@/lib/email')
+          await sendMeetingAcceptedEmail(
+            schedule.employee.email,
+            schedule.employee.name,
+            schedule.reporter.name,
+            meetingDate,
+            meeting.id
+          )
+        } catch (emailError) {
+          console.error('Failed to send scheduled email for recurring meeting:', emailError)
+        }
+
+        try {
+          const { notifyMeetingAccepted } = await import('@/lib/notifications')
+          await notifyMeetingAccepted(
+            schedule.employeeId,
+            schedule.reporter.name || 'Your manager',
+            meetingDate,
+            meeting.id
+          )
+        } catch (notifError) {
+          console.error('Failed to send scheduled notification:', notifError)
+        }
+      } else {
+        // First-time proposal — send proposal email
+        try {
+          await sendMeetingProposalEmail(
+            schedule.employee.email,
+            schedule.employee.name,
+            schedule.reporter.name,
+            meetingDate,
+            meeting.id
+          )
+        } catch (emailError) {
+          console.error('Failed to send proposal email for recurring meeting:', emailError)
+        }
+
+        try {
+          await notifyMeetingProposed(
+            schedule.employeeId,
+            schedule.reporter.name || 'Your manager',
+            meetingDate,
+            meeting.id
+          )
+        } catch (notifError) {
+          console.error('Failed to send proposal notification:', notifError)
+        }
       }
 
       results.recurringMeetingsCreated++
@@ -336,38 +411,3 @@ async function sendFormReminders(results: { formRemindersSent: number; errors: s
   }
 }
 
-function calculateNextMeetingDate(
-  dayOfWeek: number,
-  timeOfDay: string,
-  frequency: RecurringFrequency,
-  lastDate: Date,
-  timeZone = FALLBACK_TZ
-): Date {
-  const [hours, minutes] = timeOfDay.split(':').map(Number)
-  let zoned = toZonedTime(lastDate, timeZone)
-
-  switch (frequency) {
-    case 'WEEKLY':
-      zoned = addDays(zoned, 7)
-      break
-    case 'BIWEEKLY':
-      zoned = addDays(zoned, 14)
-      break
-    case 'MONTHLY': {
-      zoned = new Date(zoned)
-      zoned.setMonth(zoned.getMonth() + 1)
-      const currentDay = zoned.getDay()
-      let daysUntil = dayOfWeek - currentDay
-      if (daysUntil < 0) daysUntil += 7
-      zoned = addDays(zoned, daysUntil)
-      break
-    }
-  }
-
-  zoned = setHours(zoned, hours)
-  zoned = setMinutes(zoned, minutes)
-  zoned = setSeconds(zoned, 0)
-  zoned = setMilliseconds(zoned, 0)
-
-  return fromZonedTime(zoned, timeZone)
-}

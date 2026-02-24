@@ -24,6 +24,8 @@ interface MeetingRecorderProps {
   hasExistingRecording: boolean
   recordingStatus?: string
   errorMessage?: string | null
+  meetingStatus?: string
+  maxRecordingMins?: number
 }
 
 const PROCESSING_STAGES = [
@@ -49,7 +51,7 @@ const LANGUAGE_OPTIONS = [
   { code: 'ur', label: 'Urdu (اردو)' },
 ]
 
-const MAX_DURATION = 25 * 60 // 25 minutes
+const DEFAULT_MAX_MINS = 25
 const CHUNK_UPLOAD_INTERVAL = 30_000 // Upload chunks every 30 seconds
 
 // ---------------------------------------------------------------------------
@@ -61,7 +63,10 @@ export function MeetingRecorder({
   hasExistingRecording,
   recordingStatus: initialStatus,
   errorMessage: initialError,
+  meetingStatus,
+  maxRecordingMins = DEFAULT_MAX_MINS,
 }: MeetingRecorderProps) {
+  const MAX_DURATION = maxRecordingMins * 60
   const router = useRouter()
 
   // Recording state
@@ -446,7 +451,41 @@ export function MeetingRecorder({
   }
 
   // ---------------------------------------------------------------------------
-  // Render: processing
+  // Render: stale UPLOADING state (recording was interrupted by navigating away)
+  // ---------------------------------------------------------------------------
+  const isStaleUpload =
+    currentStatus === 'UPLOADING' && !didStartUpload && hasExistingRecording
+
+  if (isStaleUpload) {
+    return (
+      <div className="rounded-2xl bg-amber-500/5 border border-amber-500/20 p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center">
+              <AlertCircle className="w-6 h-6 text-amber-500" />
+            </div>
+            <div>
+              <p className="font-medium text-dark-gray dark:text-white">Recording Interrupted</p>
+              <p className="text-sm text-medium-gray">
+                A previous recording session was not completed. Start a new recording to continue.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleRetry}
+            aria-label="Start new recording"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-orange hover:bg-orange/10 rounded-xl transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Start Over
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ---------------------------------------------------------------------------
+  // Render: processing (active upload or server-side processing)
   // ---------------------------------------------------------------------------
   const isProcessing = ['UPLOADING', 'UPLOADED', 'TRANSCRIBING', 'ANALYZING'].includes(
     currentStatus ?? ''
@@ -582,9 +621,18 @@ export function MeetingRecorder({
           Meeting Recording
         </h3>
         {!isRecording && !audioBlob && (
-          <span className="text-xs text-medium-gray">Max 25 minutes</span>
+          <span className="text-xs text-medium-gray">Max {maxRecordingMins} minutes</span>
         )}
       </div>
+
+      {meetingStatus === 'PROPOSED' && !isRecording && !audioBlob && !hasExistingRecording && (
+        <div className="mb-4 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-blue-500 flex-shrink-0" />
+          <p className="text-sm text-blue-600 dark:text-blue-400">
+            You can start recording even before the employee accepts the meeting request.
+          </p>
+        </div>
+      )}
 
       {submitError && !micBlocked && (
         <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20">

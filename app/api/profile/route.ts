@@ -48,13 +48,23 @@ export async function PATCH(request: NextRequest) {
     const { name, phone, title, bio, departmentId, reportsToId, country, timeZone, workDayStart, workDayEnd } = body
 
     // Validate name
-    if (name !== undefined && (!name || name.trim().length < 2)) {
-      return NextResponse.json({ error: 'Name must be at least 2 characters' }, { status: 400 })
+    if (name !== undefined && (!name || !name.trim())) {
+      return NextResponse.json({ error: 'Please enter your full name' }, { status: 400 })
+    }
+    if (name !== undefined && name.trim().length < 2) {
+      return NextResponse.json({ error: 'Full name must be at least 2 characters' }, { status: 400 })
     }
 
-    // Validate phone: only digits, +, -, spaces allowed
-    if (phone !== undefined && phone && !/^[0-9+\- ]+$/.test(phone.trim())) {
-      return NextResponse.json({ error: 'Phone number must contain only numbers, +, - and spaces' }, { status: 400 })
+    // Validate phone: only digits, +, -, spaces allowed; at least 10 digits
+    if (phone !== undefined && phone) {
+      const trimmed = phone.trim()
+      if (!/^[0-9+\- ]+$/.test(trimmed)) {
+        return NextResponse.json({ error: 'Phone number must contain only numbers, +, - and spaces' }, { status: 400 })
+      }
+      const digits = trimmed.replace(/\D/g, '')
+      if (digits.length < 10) {
+        return NextResponse.json({ error: 'Phone number must be at least 10 digits' }, { status: 400 })
+      }
     }
 
     // Prevent self-reporting

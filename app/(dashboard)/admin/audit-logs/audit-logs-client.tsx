@@ -252,7 +252,7 @@ export function AuditLogsClient() {
                     const colorClass = actionColors[log.action] || 'text-gray-500 bg-gray-500/10'
 
                     return (
-                      <tr key={log.id} className="hover:bg-off-white/50 dark:hover:bg-charcoal/50">
+                      <tr key={log.id} className="even:bg-off-white/40 dark:even:bg-charcoal/40 hover:bg-off-white/70 dark:hover:bg-charcoal/60 transition-colors">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-charcoal to-medium-gray flex items-center justify-center text-white text-sm font-medium">
@@ -314,7 +314,7 @@ export function AuditLogsClient() {
                 const Icon = actionIcons[log.action] || Shield
                 const colorClass = actionColors[log.action] || 'text-gray-500 bg-gray-500/10'
                 return (
-                  <div key={log.id} className="p-4 space-y-2">
+                  <div key={log.id} className="p-4 space-y-2 even:bg-off-white/40 dark:even:bg-charcoal/40">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${colorClass}`}>

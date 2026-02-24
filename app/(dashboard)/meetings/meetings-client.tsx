@@ -25,7 +25,7 @@ interface Meeting {
   id: string
   meetingDate: Date
   status: string
-  checkInPersonal: string | null
+  formSubmittedAt: Date | string | null
   employeeId: string
   recurringScheduleId?: string | null
   reporter?: { name: string | null; email: string | null } | null
@@ -101,7 +101,7 @@ export function MeetingsClient({
     (m) =>
       m.status === 'SCHEDULED' &&
       new Date(m.meetingDate) < now &&
-      !m.checkInPersonal
+      !m.formSubmittedAt
   )
 
   // Filter meetings by tab
@@ -212,7 +212,7 @@ export function MeetingsClient({
         return (
         <div
           key={schedule.id}
-          className="flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4"
+          className="flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4 even:bg-off-white/40 dark:even:bg-charcoal/40"
         >
           <div
             className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
@@ -449,7 +449,7 @@ export function MeetingsClient({
               const needsForm =
                 isPast &&
                 meeting.status === 'SCHEDULED' &&
-                !meeting.checkInPersonal
+                !meeting.formSubmittedAt
               const isEmployee = meeting.employeeId === currentUserId
               const otherPerson = isEmployee
                 ? meeting.reporter
@@ -459,7 +459,7 @@ export function MeetingsClient({
                 <Link
                   key={meeting.id}
                   href={`/meetings/${meeting.id}`}
-                  className="flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4 hover:bg-off-white/50 dark:hover:bg-charcoal/50 active:bg-off-white dark:active:bg-charcoal transition-colors"
+                  className="flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4 even:bg-off-white/40 dark:even:bg-charcoal/40 hover:bg-off-white/70 dark:hover:bg-charcoal/60 active:bg-off-white dark:active:bg-charcoal transition-colors"
                 >
                   <div
                     className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${

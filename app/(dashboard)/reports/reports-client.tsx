@@ -84,10 +84,17 @@ export function ReportsClient({ departments }: ReportsClientProps) {
 
   const exportCSV = async () => {
     try {
-      const response = await fetch(`/api/reports?${buildQueryParams()}&format=csv`)
-      if (!response.ok) throw new Error('Failed to export')
+      // Refresh the report data in parallel so the UI stays in sync with the CSV
+      const [csvResponse] = await Promise.all([
+        fetch(`/api/reports?${buildQueryParams()}&format=csv`),
+        fetch(`/api/reports?${buildQueryParams()}`)
+          .then(r => r.ok ? r.json() : null)
+          .then(data => { if (data) setReportData(data) })
+          .catch(() => {}),
+      ])
+      if (!csvResponse.ok) throw new Error('Failed to export')
       
-      const blob = await response.blob()
+      const blob = await csvResponse.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -466,7 +473,7 @@ export function ReportsClient({ departments }: ReportsClientProps) {
                   {reportData.meetings.map((meeting) => (
                     <tr
                       key={meeting.id}
-                      className="border-b border-off-white/50 dark:border-medium-gray/10 hover:bg-off-white/50 dark:hover:bg-charcoal/50"
+                      className="border-b border-off-white/50 dark:border-medium-gray/10 even:bg-off-white/40 dark:even:bg-charcoal/40 hover:bg-off-white/70 dark:hover:bg-charcoal/60 transition-colors"
                     >
                       <td className="py-3 px-6 text-sm text-dark-gray dark:text-white">
                         {new Date(meeting.date).toLocaleDateString()}
@@ -501,7 +508,7 @@ export function ReportsClient({ departments }: ReportsClientProps) {
             {/* Mobile cards */}
             <div className="sm:hidden divide-y divide-off-white dark:divide-medium-gray/20">
               {reportData.meetings.map((meeting) => (
-                <div key={meeting.id} className="p-4 space-y-2">
+                <div key={meeting.id} className="p-4 space-y-2 even:bg-off-white/40 dark:even:bg-charcoal/40">
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-dark-gray dark:text-white">{meeting.employee}</span>
                     <span className="text-sm text-medium-gray">

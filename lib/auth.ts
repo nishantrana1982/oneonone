@@ -59,11 +59,19 @@ export const authOptions: NextAuthOptions = {
         return false
       }
 
+      // Block inactive users from signing in
+      const existingUser = await prisma.user.findUnique({
+        where: { email },
+        select: { isActive: true },
+      })
+      if (existingUser && !existingUser.isActive) {
+        return '/auth/signin?error=AccountInactive'
+      }
+
       return true
     },
     async session({ session, user }) {
       if (session.user) {
-        // Fetch user from database to get role and other details
         const dbUser = await prisma.user.findUnique({
           where: { email: user.email! },
           select: {
@@ -74,8 +82,17 @@ export const authOptions: NextAuthOptions = {
             avatar: true,
             departmentId: true,
             reportsToId: true,
+            isActive: true,
           },
         })
+
+        if (dbUser && !dbUser.isActive) {
+          // Purge all sessions for this inactive user so they are forced out
+          await prisma.session.deleteMany({ where: { userId: dbUser.id } })
+          // Return session without user data — auth helpers will treat as unauthenticated
+          session.user = undefined as never
+          return session
+        }
 
         if (dbUser) {
           session.user.id = dbUser.id

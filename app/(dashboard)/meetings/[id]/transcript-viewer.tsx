@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { 
   FileText, 
   Lightbulb, 
@@ -75,6 +75,13 @@ export function TranscriptViewer({ recording, employeeId, reporterId }: Transcri
   const [audioUrl, setAudioUrl] = useState<string | null>(recording.audioPlaybackUrl)
   const [addedTodos, setAddedTodos] = useState<Set<number>>(new Set())
   const [addingTodo, setAddingTodo] = useState<number | null>(null)
+  const audioRef = useRef<HTMLAudioElement>(null)
+
+  const handleAudioEnded = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0
+    }
+  }, [])
 
   // Fetch signed audio URL on mount
   useEffect(() => {
@@ -242,7 +249,13 @@ export function TranscriptViewer({ recording, employeeId, reporterId }: Transcri
       {/* Audio Player */}
       {audioUrl && (
         <div className="rounded-xl bg-off-white dark:bg-charcoal p-4">
-          <audio controls src={audioUrl} className="w-full" />
+          <audio
+            ref={audioRef}
+            controls
+            src={audioUrl}
+            className="w-full"
+            onEnded={handleAudioEnded}
+          />
         </div>
       )}
 

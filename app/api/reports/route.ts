@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
-import { UserRole } from '@prisma/client'
+import { UserRole, Prisma } from '@prisma/client'
 
 // Simple sentiment keywords
 const positiveWords = ['great', 'excellent', 'good', 'amazing', 'fantastic', 'happy', 'success', 'achieved', 'completed', 'progress', 'improved', 'better', 'love', 'excited', 'proud', 'wonderful', 'awesome']
@@ -101,32 +101,54 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate')
     const format = searchParams.get('format') // 'json' or 'csv'
 
-    // Build filters
-    const meetingWhere: { meetingDate?: { gte?: Date; lte?: Date }; employeeId?: { in: string[] } } = {}
-    const todoWhere: { assignedToId?: { in: string[] } } = {}
-    const userWhere: { isActive: boolean; departmentId?: string } = { isActive: true }
+    // Build date range filter
+    const dateFilter: { gte?: Date; lt?: Date } = {}
+    if (startDate) {
+      dateFilter.gte = new Date(startDate)
+    }
+    if (endDate) {
+      const endDt = new Date(endDate)
+      endDt.setUTCDate(endDt.getUTCDate() + 1)
+      dateFilter.lt = endDt
+    }
 
+    // Scope: active users, optionally filtered by department (for employee count + todos)
+    const userWhere: { isActive: boolean; departmentId?: string } = { isActive: true }
     if (departmentId) {
       userWhere.departmentId = departmentId
     }
 
-    if (startDate || endDate) {
-      meetingWhere.meetingDate = {}
-      if (startDate) meetingWhere.meetingDate.gte = new Date(startDate)
-      if (endDate) meetingWhere.meetingDate.lte = new Date(endDate)
-    }
-
-    // Get users in scope
     const usersInScope = await prisma.user.findMany({
       where: userWhere,
       select: { id: true, name: true, email: true, department: { select: { name: true } } },
     })
-
     const userIds = usersInScope.map(u => u.id)
-    meetingWhere.employeeId = { in: userIds }
-    todoWhere.assignedToId = { in: userIds }
 
-    // Get meetings with form data
+    // Build meeting query: include meetings where either the employee OR the
+    // reporter is in scope so recurring-originated and cross-role meetings are
+    // never missed.  For REPORTER users, additionally restrict to their own
+    // meetings (matching the meetings page behaviour).
+    const participantFilter: Prisma.MeetingWhereInput[] = [
+      { employeeId: { in: userIds } },
+      { reporterId: { in: userIds } },
+    ]
+
+    const meetingWhere: Prisma.MeetingWhereInput = {
+      ...(Object.keys(dateFilter).length > 0 ? { meetingDate: dateFilter } : {}),
+      OR: participantFilter,
+    }
+
+    if (user.role === UserRole.REPORTER) {
+      meetingWhere.OR = [
+        { reporterId: user.id },
+        { employeeId: user.id },
+      ]
+      if (Object.keys(dateFilter).length > 0) {
+        meetingWhere.meetingDate = dateFilter
+      }
+    }
+
+    // Get meetings
     const meetings = await prisma.meeting.findMany({
       where: meetingWhere,
       include: {
@@ -136,7 +158,8 @@ export async function GET(request: NextRequest) {
       orderBy: { meetingDate: 'desc' },
     })
 
-    // Get todos
+    // Get todos for users in scope
+    const todoWhere: Prisma.TodoWhereInput = { assignedToId: { in: userIds } }
     const todos = await prisma.todo.findMany({
       where: todoWhere,
       include: {
@@ -205,7 +228,7 @@ export async function GET(request: NextRequest) {
         department: m.employee.department?.name || 'N/A',
         reporter: m.reporter.name,
         status: m.status,
-        hasFormData: !!(m.checkInPersonal || m.checkInProfessional),
+        hasFormData: !!m.formSubmittedAt,
       })),
     }
 
@@ -237,7 +260,7 @@ export async function GET(request: NextRequest) {
           m.employee.department?.name || 'N/A',
           m.reporter.name,
           m.status,
-          m.checkInPersonal ? 'Yes' : 'No',
+          m.formSubmittedAt ? 'Yes' : 'No',
         ]),
       ]
 

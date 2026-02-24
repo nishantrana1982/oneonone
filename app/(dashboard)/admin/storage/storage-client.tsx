@@ -188,7 +188,7 @@ export function StorageClient() {
                 </tr>
               ) : (
                 recordings.map((r) => (
-                  <tr key={r.id} className="border-b border-off-white dark:border-medium-gray/20">
+                  <tr key={r.id} className="border-b border-off-white dark:border-medium-gray/20 even:bg-off-white/40 dark:even:bg-charcoal/40 hover:bg-off-white/70 dark:hover:bg-charcoal/60 transition-colors">
                     <td className="px-6 py-3 text-dark-gray dark:text-white">
                       {formatDate(r.meetingDate)}
                     </td>
@@ -244,7 +244,7 @@ export function StorageClient() {
             <div className="p-6 text-center text-medium-gray">No recordings yet</div>
           ) : (
             recordings.map((r) => (
-              <div key={r.id} className="p-4 space-y-2">
+              <div key={r.id} className="p-4 space-y-2 even:bg-off-white/40 dark:even:bg-charcoal/40">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium text-dark-gray dark:text-white">{formatDate(r.meetingDate)}</p>

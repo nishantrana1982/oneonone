@@ -241,7 +241,7 @@ export function DashboardWidgets({
                 </div>
               ) : (
                 recentMeetings.slice(0, 5).map((meeting) => (
-                  <Link key={meeting.id} href={`/meetings/${meeting.id}`} className="block px-6 py-4 hover:bg-off-white dark:hover:bg-charcoal transition-colors">
+                  <Link key={meeting.id} href={`/meetings/${meeting.id}`} className="block px-6 py-4 even:bg-off-white/40 dark:even:bg-charcoal/40 hover:bg-off-white/70 dark:hover:bg-charcoal/60 transition-colors">
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
                         <Calendar className="w-5 h-5 text-blue-500" />

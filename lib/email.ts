@@ -637,12 +637,10 @@ export async function sendRecurringScheduleUpdatedEmail(
   const mgrName = managerName || 'Your manager'
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
   const dayName = dayNames[dayOfWeek] || 'Unknown'
-  const formattedTime = new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-    timeZone: EMAIL_TIMEZONE,
-  }).format(new Date(`2000-01-01T${timeOfDay}:00`))
+  const [hh, mm] = timeOfDay.split(':').map(Number)
+  const period = hh >= 12 ? 'PM' : 'AM'
+  const hour12 = hh % 12 || 12
+  const formattedTime = `${hour12}:${String(mm).padStart(2, '0')} ${period}`
   const freqLabel = frequency === 'WEEKLY' ? 'Weekly' : frequency === 'BIWEEKLY' ? 'Every 2 Weeks' : 'Monthly'
 
   const html = emailLayout({

@@ -23,7 +23,7 @@ export default async function EmployeesPage() {
           id: true,
           status: true,
           meetingDate: true,
-          checkInPersonal: true,
+          formSubmittedAt: true,
           recording: { select: { id: true, status: true } },
         },
       },
@@ -129,7 +129,7 @@ export default async function EmployeesPage() {
               <Link
                 key={person.id}
                 href={`/employees/${person.id}`}
-                className="flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4 hover:bg-off-white/50 dark:hover:bg-charcoal/50 active:bg-off-white dark:active:bg-charcoal active:scale-[0.98] transition-colors"
+                className="flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4 even:bg-off-white/40 dark:even:bg-charcoal/40 hover:bg-off-white/70 dark:hover:bg-charcoal/60 active:bg-off-white dark:active:bg-charcoal active:scale-[0.98] transition-colors"
               >
                 {/* Avatar */}
                 <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-off-white dark:bg-dark-gray flex items-center justify-center flex-shrink-0">

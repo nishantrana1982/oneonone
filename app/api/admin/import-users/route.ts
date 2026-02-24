@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
 import { logBulkImport } from '@/lib/audit'
 
+const ALLOWED_EMAIL_DOMAIN = '@whitelabeliq.com'
+
 interface ImportUser {
   name: string
   email: string
@@ -55,6 +57,13 @@ export async function POST(request: NextRequest) {
           continue
         }
 
+        // Validate email domain
+        if (!userData.email.toLowerCase().endsWith(ALLOWED_EMAIL_DOMAIN)) {
+          results.failed++
+          results.errors.push(`Only ${ALLOWED_EMAIL_DOMAIN} emails allowed: ${userData.email}`)
+          continue
+        }
+
         // Check for existing user
         if (userMap.has(userData.email.toLowerCase())) {
           results.failed++
@@ -94,6 +103,17 @@ export async function POST(request: NextRequest) {
           reportsToId = userMap.get(userData.reportsTo.toLowerCase()) || null
         }
 
+        // Validate phone if provided
+        let phone: string | null = userData.phone?.trim() || null
+        if (phone) {
+          const phoneDigits = phone.replace(/\D/g, '')
+          if (phoneDigits.length < 10) {
+            results.failed++
+            results.errors.push(`Phone number must be at least 10 digits for: ${userData.email}`)
+            continue
+          }
+        }
+
         // Create user
         const newUser = await prisma.user.create({
           data: {
@@ -103,7 +123,7 @@ export async function POST(request: NextRequest) {
             departmentId,
             reportsToId,
             title: userData.title?.trim() || null,
-            phone: userData.phone?.trim() || null,
+            phone,
           },
         })
 

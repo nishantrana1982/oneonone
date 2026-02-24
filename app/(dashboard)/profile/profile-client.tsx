@@ -82,9 +82,21 @@ export function ProfileClient({ user, departments, managers }: ProfileClientProp
   })
 
   const handleSave = async () => {
-    if (!formData.name || formData.name.trim().length < 2) {
-      toastError('Name must be at least 2 characters')
+    if (!formData.name || !formData.name.trim()) {
+      toastError('Please enter your full name')
       return
+    }
+    if (formData.name.trim().length < 2) {
+      toastError('Full name must be at least 2 characters')
+      return
+    }
+
+    if (localNumber) {
+      const digitsOnly = localNumber.replace(/\D/g, '')
+      if (digitsOnly.length < 10) {
+        toastError('Phone number must be at least 10 digits')
+        return
+      }
     }
 
     setSaving(true)
@@ -157,7 +169,10 @@ export function ProfileClient({ user, departments, managers }: ProfileClientProp
         {/* Header with avatar */}
         <div className="relative h-28 sm:h-32 bg-gradient-to-r from-charcoal to-dark-gray">
           <div className="absolute -bottom-10 sm:-bottom-12 left-4 sm:left-6">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-gradient-to-br from-charcoal to-medium-gray dark:from-medium-gray dark:to-charcoal border-4 border-white dark:border-dark-gray flex items-center justify-center text-white text-2xl sm:text-3xl font-bold">
+            <div
+              className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-gradient-to-br from-charcoal to-medium-gray dark:from-medium-gray dark:to-charcoal border-4 border-white dark:border-dark-gray flex items-center justify-center text-white text-2xl sm:text-3xl font-bold cursor-not-allowed"
+              title="Profile image cannot be changed"
+            >
               {user.name.charAt(0).toUpperCase()}
             </div>
           </div>
@@ -166,7 +181,7 @@ export function ProfileClient({ user, departments, managers }: ProfileClientProp
         <div className="pt-14 sm:pt-16 p-4 sm:p-6">
           {/* Read-only info */}
           <div className="mb-6 grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
-            <div className="rounded-xl bg-off-white dark:bg-dark-gray p-3 sm:p-4">
+            <div className="rounded-xl bg-off-white dark:bg-dark-gray p-3 sm:p-4 cursor-not-allowed" title="Email cannot be changed">
               <div className="flex items-center gap-2 text-medium-gray mb-1">
                 <Mail className="w-4 h-4" />
                 <span className="text-xs font-medium">Email</span>
@@ -174,7 +189,7 @@ export function ProfileClient({ user, departments, managers }: ProfileClientProp
               <p className="text-dark-gray dark:text-white font-medium text-sm sm:text-base truncate">{user.email}</p>
             </div>
 
-            <div className="rounded-xl bg-off-white dark:bg-dark-gray p-3 sm:p-4">
+            <div className="rounded-xl bg-off-white dark:bg-dark-gray p-3 sm:p-4 cursor-not-allowed" title="Role cannot be changed">
               <div className="flex items-center gap-2 text-medium-gray mb-1">
                 <User className="w-4 h-4" />
                 <span className="text-xs font-medium">Role</span>
@@ -182,7 +197,7 @@ export function ProfileClient({ user, departments, managers }: ProfileClientProp
               <p className="text-dark-gray dark:text-white font-medium text-sm sm:text-base">{roleLabels[user.role]}</p>
             </div>
 
-            <div className="rounded-xl bg-off-white dark:bg-dark-gray p-3 sm:p-4">
+            <div className="rounded-xl bg-off-white dark:bg-dark-gray p-3 sm:p-4 cursor-not-allowed" title="Member since date cannot be changed">
               <div className="flex items-center gap-2 text-medium-gray mb-1">
                 <Calendar className="w-4 h-4" />
                 <span className="text-xs font-medium">Member Since</span>

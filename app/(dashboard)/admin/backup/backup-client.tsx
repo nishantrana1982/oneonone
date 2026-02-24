@@ -244,7 +244,7 @@ export function BackupClient({ initialBackups }: BackupClientProps) {
               const colorClass = statusColors[backup.status]
 
               return (
-                <div key={backup.id} className="flex items-center gap-4 px-6 py-4">
+                <div key={backup.id} className="flex items-center gap-4 px-6 py-4 even:bg-off-white/40 dark:even:bg-charcoal/40">
                   <div className="w-10 h-10 rounded-xl bg-off-white dark:bg-charcoal flex items-center justify-center">
                     <FileJson className="w-5 h-5 text-medium-gray" />
                   </div>

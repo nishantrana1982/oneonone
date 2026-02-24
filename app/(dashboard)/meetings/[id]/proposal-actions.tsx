@@ -41,8 +41,12 @@ export function ProposalActions({
   const [slots, setSlots] = useState<FreeSlot[]>([])
   const [slotsLoading, setSlotsLoading] = useState(false)
   const [calendarUnavailable, setCalendarUnavailable] = useState(false)
+  const [workingHoursLabel, setWorkingHoursLabel] = useState<string | null>(null)
 
-  const formattedDate = new Date(meetingDate).toLocaleDateString('en-US', {
+  const meetingDateObj = new Date(meetingDate)
+  const isPast = meetingDateObj.getTime() < Date.now()
+
+  const formattedDate = meetingDateObj.toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
@@ -94,26 +98,32 @@ export function ProposalActions({
     }
   }
 
-  // Fetch availability when date changes in suggest flow
+  // Fetch real mutual availability for this meeting's participants
   const fetchSlots = useCallback(async (date: string) => {
     setSlotsLoading(true)
     setSlots([])
     setCalendarUnavailable(false)
+    setWorkingHoursLabel(null)
     setSuggestTime('')
 
     try {
-      // We don't have the employeeId here directly, but the availability API uses
-      // the current user's perspective. We'll pass the meeting endpoint instead.
-      // Actually the availability API needs employeeId + date. We'll use a different
-      // approach: pass the meeting ID to a dedicated endpoint, or just let the user
-      // pick any time and the backend validates. For now, show all business-hour slots.
-      setCalendarUnavailable(true)
+      const res = await fetch(
+        `/api/meetings/${meetingId}/availability?date=${encodeURIComponent(date)}`
+      )
+      const data = await res.json()
+
+      if (data.calendarUnavailable) {
+        setCalendarUnavailable(true)
+      } else {
+        setSlots(data.slots ?? [])
+        setWorkingHoursLabel(data.workingHoursLabel ?? null)
+      }
     } catch {
       setCalendarUnavailable(true)
     } finally {
       setSlotsLoading(false)
     }
-  }, [])
+  }, [meetingId])
 
   useEffect(() => {
     if (suggestDate) {
@@ -147,38 +157,150 @@ export function ProposalActions({
     }
   }
 
+  function formatSlotTime(isoString: string) {
+    return new Date(isoString).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
+  }
+
+  function isSlotInPast(slotDate: Date) {
+    return slotDate.getTime() <= Date.now()
+  }
+
+  // Shared slot-picker UI used by both receiver and proposer panels
+  const slotPicker = (
+    <div className="space-y-4">
+      <DatePicker
+        label="Date"
+        value={suggestDate}
+        onChange={setSuggestDate}
+        min={minDate}
+        placeholder="Pick a date"
+      />
+
+      {suggestDate && (
+        <div>
+          <label className="flex items-center gap-2 text-sm font-medium text-dark-gray dark:text-white mb-2">
+            <Clock className="w-4 h-4 text-medium-gray" />
+            Select a time
+            {workingHoursLabel && (
+              <span className="font-normal text-medium-gray ml-1">
+                — {workingHoursLabel}
+              </span>
+            )}
+          </label>
+          {slotsLoading ? (
+            <div className="flex items-center gap-2 py-6 justify-center text-medium-gray">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-sm">Loading available slots...</span>
+            </div>
+          ) : calendarUnavailable ? (
+            <div className="flex items-start gap-3 py-4 px-2">
+              <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+              <p className="text-sm text-medium-gray">
+                Calendar not connected for one or both participants. Please connect Google Calendar to see mutual availability.
+              </p>
+            </div>
+          ) : slots.length === 0 ? (
+            <div className="text-center py-6">
+              <Calendar className="w-10 h-10 text-light-gray mx-auto mb-2" />
+              <p className="text-sm font-medium text-dark-gray dark:text-white mb-1">No available slots</p>
+              <p className="text-sm text-medium-gray">Both calendars are fully booked on this date. Try another day.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              {slots.map((slot) => {
+                const past = isSuggestDateToday && isSlotInPast(new Date(slot.start))
+                return (
+                  <button
+                    key={slot.start}
+                    type="button"
+                    disabled={past}
+                    onClick={() => setSuggestTime(slot.start)}
+                    className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                      past
+                        ? 'bg-off-white dark:bg-dark-gray text-light-gray dark:text-medium-gray/40 cursor-not-allowed line-through'
+                        : suggestTime === slot.start
+                          ? 'bg-dark-gray dark:bg-white text-white dark:text-dark-gray'
+                          : 'bg-off-white dark:bg-dark-gray text-dark-gray dark:text-white hover:bg-dark-gray/10 dark:hover:bg-white/10'
+                    }`}
+                  >
+                    {formatSlotTime(slot.start)}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="flex justify-end gap-3 pt-2">
+        <button
+          onClick={() => setShowSuggest(false)}
+          className="px-4 py-2.5 text-medium-gray hover:text-dark-gray dark:hover:text-white transition-colors min-h-[44px]"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSuggest}
+          disabled={submittingSuggest || !suggestTime}
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-dark-gray dark:bg-white text-white dark:text-dark-gray rounded-xl font-medium hover:bg-charcoal dark:hover:bg-off-white disabled:opacity-50 transition-all min-h-[44px]"
+        >
+          {submittingSuggest ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Calendar className="w-4 h-4" />
+          )}
+          {isProposer ? 'Update Proposed Time' : 'Suggest This Time'}
+        </button>
+      </div>
+    </div>
+  )
+
   // Receiver view: can accept or suggest
   if (isReceiver) {
     return (
       <div className="space-y-4">
-        <div className="rounded-2xl bg-amber-500/10 border-2 border-amber-500/30 p-5 sm:p-6">
+        <div className={`rounded-2xl ${isPast ? 'bg-red-500/10 border-2 border-red-500/30' : 'bg-amber-500/10 border-2 border-amber-500/30'} p-5 sm:p-6`}>
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-              <AlertCircle className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+            <div className={`w-12 h-12 rounded-full ${isPast ? 'bg-red-500/20' : 'bg-amber-500/20'} flex items-center justify-center flex-shrink-0`}>
+              <AlertCircle className={`w-6 h-6 ${isPast ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-dark-gray dark:text-white text-lg">Meeting Request</p>
+              <p className="font-semibold text-dark-gray dark:text-white text-lg">
+                {isPast ? 'Meeting Time Passed' : 'Meeting Request'}
+              </p>
               <p className="text-medium-gray mt-1">
-                <strong>{proposedByName}</strong> has proposed a one-on-one meeting for{' '}
+                <strong>{proposedByName}</strong> {isPast ? 'had proposed' : 'has proposed'} a one-on-one meeting for{' '}
                 <strong>{formattedDate}</strong>.
               </p>
-              <p className="text-sm text-medium-gray mt-2">
-                Accept the proposed time or suggest an alternative.
-              </p>
+              {isPast ? (
+                <p className="text-sm text-red-600 dark:text-red-400 mt-2">
+                  The proposed time has passed. You can suggest a new time below.
+                </p>
+              ) : (
+                <p className="text-sm text-medium-gray mt-2">
+                  Accept the proposed time or suggest an alternative.
+                </p>
+              )}
 
               <div className="flex flex-wrap gap-3 mt-4">
-                <button
-                  onClick={handleAccept}
-                  disabled={accepting}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700 disabled:opacity-50 transition-all min-h-[44px]"
-                >
-                  {accepting ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Check className="w-4 h-4" />
-                  )}
-                  Accept
-                </button>
+                {!isPast && (
+                  <button
+                    onClick={handleAccept}
+                    disabled={accepting}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700 disabled:opacity-50 transition-all min-h-[44px]"
+                  >
+                    {accepting ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Check className="w-4 h-4" />
+                    )}
+                    Accept
+                  </button>
+                )}
                 <button
                   onClick={() => setShowSuggest(!showSuggest)}
                   className="inline-flex items-center gap-2 px-5 py-2.5 bg-off-white dark:bg-dark-gray text-dark-gray dark:text-white rounded-xl font-medium hover:bg-dark-gray/10 dark:hover:bg-white/10 transition-all min-h-[44px]"
@@ -191,84 +313,10 @@ export function ProposalActions({
           </div>
         </div>
 
-        {/* Suggest time panel */}
         {showSuggest && (
           <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-5 sm:p-6">
             <h3 className="font-semibold text-dark-gray dark:text-white mb-4">Suggest a different time</h3>
-            <div className="space-y-4">
-              <DatePicker
-                label="Date"
-                value={suggestDate}
-                onChange={setSuggestDate}
-                min={minDate}
-                placeholder="Pick a date"
-              />
-
-              {suggestDate && (
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-dark-gray dark:text-white mb-2">
-                    <Clock className="w-4 h-4 text-medium-gray" />
-                    Select a time
-                  </label>
-                  {slotsLoading ? (
-                    <div className="flex items-center gap-2 py-4 text-medium-gray">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="text-sm">Loading slots...</span>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                      {Array.from({ length: 20 }, (_, i) => {
-                        const hour = 9 + Math.floor(i / 2)
-                        const min = i % 2 === 0 ? '00' : '30'
-                        const [year, month, day] = suggestDate.split('-').map(Number)
-                        const dt = new Date(year, month - 1, day, hour, parseInt(min))
-                        const iso = dt.toISOString()
-                        const display = dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
-                        const past = isSuggestDateToday && dt.getTime() <= Date.now()
-                        return (
-                          <button
-                            key={iso}
-                            type="button"
-                            disabled={past}
-                            onClick={() => setSuggestTime(iso)}
-                            className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                              past
-                                ? 'bg-off-white dark:bg-dark-gray text-light-gray dark:text-medium-gray/40 cursor-not-allowed line-through'
-                                : suggestTime === iso
-                                  ? 'bg-dark-gray dark:bg-white text-white dark:text-dark-gray'
-                                  : 'bg-off-white dark:bg-dark-gray text-dark-gray dark:text-white hover:bg-dark-gray/10 dark:hover:bg-white/10'
-                            }`}
-                          >
-                            {display}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  onClick={() => setShowSuggest(false)}
-                  className="px-4 py-2.5 text-medium-gray hover:text-dark-gray dark:hover:text-white transition-colors min-h-[44px]"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSuggest}
-                  disabled={submittingSuggest || !suggestTime}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-dark-gray dark:bg-white text-white dark:text-dark-gray rounded-xl font-medium hover:bg-charcoal dark:hover:bg-off-white disabled:opacity-50 transition-all min-h-[44px]"
-                >
-                  {submittingSuggest ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Calendar className="w-4 h-4" />
-                  )}
-                  Suggest This Time
-                </button>
-              </div>
-            </div>
+            {slotPicker}
           </div>
         )}
       </div>
@@ -279,17 +327,26 @@ export function ProposalActions({
   if (isProposer) {
     return (
       <div className="space-y-4">
-        <div className="rounded-2xl bg-blue-500/10 border-2 border-blue-500/30 p-5 sm:p-6">
+        <div className={`rounded-2xl ${isPast ? 'bg-red-500/10 border-2 border-red-500/30' : 'bg-blue-500/10 border-2 border-blue-500/30'} p-5 sm:p-6`}>
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-              <Clock className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            <div className={`w-12 h-12 rounded-full ${isPast ? 'bg-red-500/20' : 'bg-blue-500/20'} flex items-center justify-center flex-shrink-0`}>
+              <Clock className={`w-6 h-6 ${isPast ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-dark-gray dark:text-white text-lg">Awaiting Response</p>
-              <p className="text-medium-gray mt-1">
-                You proposed this meeting for <strong>{formattedDate}</strong>. Waiting for{' '}
-                <strong>{otherPartyName}</strong> to accept or suggest a new time.
+              <p className="font-semibold text-dark-gray dark:text-white text-lg">
+                {isPast ? 'Proposed Time Passed' : 'Awaiting Response'}
               </p>
+              <p className="text-medium-gray mt-1">
+                You proposed this meeting for <strong>{formattedDate}</strong>.{' '}
+                {isPast
+                  ? `${otherPartyName} did not respond in time. Change the time or cancel the proposal.`
+                  : `Waiting for ${otherPartyName} to accept or suggest a new time.`}
+              </p>
+              {isPast && (
+                <p className="text-sm text-red-600 dark:text-red-400 mt-2">
+                  The proposed time has passed. Please reschedule or cancel.
+                </p>
+              )}
 
               <div className="flex flex-wrap gap-3 mt-4">
                 <button
@@ -316,77 +373,10 @@ export function ProposalActions({
           </div>
         </div>
 
-        {/* Change time panel */}
         {showSuggest && (
           <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-5 sm:p-6">
             <h3 className="font-semibold text-dark-gray dark:text-white mb-4">Change proposed time</h3>
-            <div className="space-y-4">
-              <DatePicker
-                label="Date"
-                value={suggestDate}
-                onChange={setSuggestDate}
-                min={minDate}
-                placeholder="Pick a date"
-              />
-
-              {suggestDate && (
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-dark-gray dark:text-white mb-2">
-                    <Clock className="w-4 h-4 text-medium-gray" />
-                    Select a time
-                  </label>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                    {Array.from({ length: 20 }, (_, i) => {
-                      const hour = 9 + Math.floor(i / 2)
-                      const min = i % 2 === 0 ? '00' : '30'
-                      const [year, month, day] = suggestDate.split('-').map(Number)
-                      const dt = new Date(year, month - 1, day, hour, parseInt(min))
-                      const iso = dt.toISOString()
-                      const display = dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
-                      const past = isSuggestDateToday && dt.getTime() <= Date.now()
-                      return (
-                        <button
-                          key={iso}
-                          type="button"
-                          disabled={past}
-                          onClick={() => setSuggestTime(iso)}
-                          className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                            past
-                              ? 'bg-off-white dark:bg-dark-gray text-light-gray dark:text-medium-gray/40 cursor-not-allowed line-through'
-                              : suggestTime === iso
-                                ? 'bg-dark-gray dark:bg-white text-white dark:text-dark-gray'
-                                : 'bg-off-white dark:bg-dark-gray text-dark-gray dark:text-white hover:bg-dark-gray/10 dark:hover:bg-white/10'
-                          }`}
-                        >
-                          {display}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  onClick={() => setShowSuggest(false)}
-                  className="px-4 py-2.5 text-medium-gray hover:text-dark-gray dark:hover:text-white transition-colors min-h-[44px]"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSuggest}
-                  disabled={submittingSuggest || !suggestTime}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-dark-gray dark:bg-white text-white dark:text-dark-gray rounded-xl font-medium hover:bg-charcoal dark:hover:bg-off-white disabled:opacity-50 transition-all min-h-[44px]"
-                >
-                  {submittingSuggest ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Calendar className="w-4 h-4" />
-                  )}
-                  Update Proposed Time
-                </button>
-              </div>
-            </div>
+            {slotPicker}
           </div>
         )}
       </div>

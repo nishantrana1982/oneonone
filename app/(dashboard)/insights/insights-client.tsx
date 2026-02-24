@@ -13,6 +13,8 @@ import {
   Loader2,
   Building2,
   Calendar,
+  CalendarCheck,
+  Clock,
   Lightbulb,
   Target,
   MessageSquare,
@@ -35,6 +37,13 @@ interface InsightsClientProps {
 
 interface InsightsData {
   period: number
+  meetingOverview?: {
+    total: number
+    upcoming: number
+    completed: number
+    proposed: number
+    cancelled: number
+  }
   stats: {
     totalMeetings: number
     totalRecordings: number
@@ -539,9 +548,9 @@ export function InsightsClient({ departments, isSuperAdmin }: InsightsClientProp
       )}
 
       {/* Overview Tab */}
-      {activeTab === 'overview' && insights && (
+      {activeTab === 'overview' && !loading && insights && (
         <div className="space-y-6">
-          {/* Quick Stats */}
+          {/* Meeting Overview Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-5">
               <div className="flex items-center gap-3 mb-3">
@@ -549,223 +558,269 @@ export function InsightsClient({ departments, isSuperAdmin }: InsightsClientProp
                   <Users className="w-5 h-5 text-blue-500" />
                 </div>
               </div>
-              <p className="text-3xl font-bold text-dark-gray dark:text-white">{insights.stats.totalMeetings}</p>
+              <p className="text-3xl font-bold text-dark-gray dark:text-white">{insights.meetingOverview?.total ?? 0}</p>
               <p className="text-sm text-medium-gray">Total Meetings</p>
             </div>
 
             <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-5">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-xl bg-off-white dark:bg-dark-gray flex items-center justify-center">
-                  <BarChart3 className="w-5 h-5 text-dark-gray dark:text-white" />
+                <div className="w-10 h-10 rounded-xl bg-orange/10 flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-orange" />
                 </div>
               </div>
-              <p className="text-3xl font-bold text-dark-gray dark:text-white">{insights.stats.totalRecordings}</p>
-              <p className="text-sm text-medium-gray">Recordings Analyzed</p>
-            </div>
-
-            <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center">
-                  <Star className="w-5 h-5 text-yellow-500" />
-                </div>
-              </div>
-              <p className="text-3xl font-bold text-dark-gray dark:text-white">{insights.stats.avgQualityScore || 'N/A'}</p>
-              <p className="text-sm text-medium-gray">Avg Quality Score</p>
+              <p className="text-3xl font-bold text-dark-gray dark:text-white">{insights.meetingOverview?.upcoming ?? 0}</p>
+              <p className="text-sm text-medium-gray">Upcoming</p>
             </div>
 
             <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-5">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
-                  <Target className="w-5 h-5 text-green-500" />
+                  <CalendarCheck className="w-5 h-5 text-green-500" />
                 </div>
               </div>
-              <p className="text-3xl font-bold text-dark-gray dark:text-white">
-                {insights.aiInsights?.overallScore || 'N/A'}
-              </p>
-              <p className="text-sm text-medium-gray">Organization Score</p>
+              <p className="text-3xl font-bold text-dark-gray dark:text-white">{insights.meetingOverview?.completed ?? 0}</p>
+              <p className="text-sm text-medium-gray">Completed</p>
+            </div>
+
+            <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-yellow-500" />
+                </div>
+              </div>
+              <p className="text-3xl font-bold text-dark-gray dark:text-white">{insights.meetingOverview?.proposed ?? 0}</p>
+              <p className="text-sm text-medium-gray">Pending</p>
             </div>
           </div>
 
-          {/* AI Insights */}
-          {insights.aiInsights && (
-            <div className="grid lg:grid-cols-2 gap-6">
-              {/* Top Issues */}
-              <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-6">
-                <h3 className="font-semibold text-dark-gray dark:text-white mb-4 flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5 text-red-500" />
-                  Top Issues
-                </h3>
-                <ul className="space-y-3">
-                  {insights.aiInsights.topIssues.map((issue, i) => (
-                    <li key={i} className="flex items-start gap-3">
-                      <span className="w-6 h-6 rounded-full bg-red-500/10 text-red-500 text-xs font-medium flex items-center justify-center flex-shrink-0">
-                        {i + 1}
-                      </span>
-                      <span className="text-charcoal dark:text-light-gray">{issue}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+          {/* Recording Analytics Section */}
+          {insights.stats.totalRecordings > 0 ? (
+            <>
+              {/* Recording Stats */}
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-off-white dark:bg-dark-gray flex items-center justify-center">
+                      <BarChart3 className="w-5 h-5 text-dark-gray dark:text-white" />
+                    </div>
+                  </div>
+                  <p className="text-3xl font-bold text-dark-gray dark:text-white">{insights.stats.totalRecordings}</p>
+                  <p className="text-sm text-medium-gray">Recordings Analyzed</p>
+                </div>
 
-              {/* Top Strengths */}
-              <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-6">
-                <h3 className="font-semibold text-dark-gray dark:text-white mb-4 flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-green-500" />
-                  Top Strengths
-                </h3>
-                <ul className="space-y-3">
-                  {insights.aiInsights.topStrengths.map((strength, i) => (
-                    <li key={i} className="flex items-start gap-3">
-                      <span className="w-6 h-6 rounded-full bg-green-500/10 text-green-500 text-xs font-medium flex items-center justify-center flex-shrink-0">
-                        {i + 1}
-                      </span>
-                      <span className="text-charcoal dark:text-light-gray">{strength}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+                <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center">
+                      <Star className="w-5 h-5 text-yellow-500" />
+                    </div>
+                  </div>
+                  <p className="text-3xl font-bold text-dark-gray dark:text-white">{insights.stats.avgQualityScore || 'N/A'}</p>
+                  <p className="text-sm text-medium-gray">Avg Quality Score</p>
+                </div>
 
-              {/* Recommendations */}
-              <div className="lg:col-span-2 rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-6">
-                <h3 className="font-semibold text-dark-gray dark:text-white mb-4 flex items-center gap-2">
-                  <Lightbulb className="w-5 h-5 text-orange" />
-                  Recommendations
-                </h3>
-                <ul className="space-y-3">
-                  {insights.aiInsights.recommendations.map((rec, i) => (
-                    <li key={i} className="flex items-start gap-3 p-3 rounded-xl bg-orange/5">
-                      <span className="w-6 h-6 rounded-full bg-orange/10 text-orange text-xs font-medium flex items-center justify-center flex-shrink-0">
-                        {i + 1}
-                      </span>
-                      <span className="text-charcoal dark:text-light-gray">{rec}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Trend Analysis */}
-              {insights.aiInsights.trendAnalysis && (
-                <div className="lg:col-span-2 rounded-2xl bg-blue-500/5 border border-blue-500/20 p-6">
-                  <h3 className="font-semibold text-dark-gray dark:text-white mb-3 flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-blue-500" />
-                    Trend Analysis
-                  </h3>
-                  <p className="text-charcoal dark:text-light-gray leading-relaxed">
-                    {insights.aiInsights.trendAnalysis}
+                <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
+                      <Target className="w-5 h-5 text-green-500" />
+                    </div>
+                  </div>
+                  <p className="text-3xl font-bold text-dark-gray dark:text-white">
+                    {insights.aiInsights?.overallScore || 'N/A'}
                   </p>
+                  <p className="text-sm text-medium-gray">Organization Score</p>
                 </div>
-              )}
-            </div>
-          )}
-
-          {/* Sentiment & Language Distribution */}
-          <div className="grid lg:grid-cols-2 gap-6">
-            {/* Sentiment Distribution */}
-            <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-6">
-              <h3 className="font-semibold text-dark-gray dark:text-white mb-4 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-dark-gray dark:text-white" />
-                Sentiment Distribution
-              </h3>
-              <div className="space-y-4">
-                {Object.entries(insights.sentimentDistribution).map(([label, count]) => {
-                  const total = Object.values(insights.sentimentDistribution).reduce((a, b) => a + b, 0)
-                  const percentage = total > 0 ? Math.round((count / total) * 100) : 0
-                  return (
-                    <div key={label}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className={`text-sm font-medium capitalize ${getSentimentColor(label).split(' ')[0]}`}>
-                          {label}
-                        </span>
-                        <span className="text-sm text-medium-gray">{count} ({percentage}%)</span>
-                      </div>
-                      <div className="h-2 bg-off-white dark:bg-charcoal rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full transition-all ${
-                            label === 'positive' ? 'bg-green-500' :
-                            label === 'negative' ? 'bg-red-500' :
-                            'bg-yellow-500'
-                          }`}
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                    </div>
-                  )
-                })}
               </div>
-            </div>
 
-            {/* Language Distribution */}
-            <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-6">
-              <h3 className="font-semibold text-dark-gray dark:text-white mb-4 flex items-center gap-2">
-                <Globe className="w-5 h-5 text-blue-500" />
-                Language Distribution
-              </h3>
-              <div className="space-y-4">
-                {Object.entries(insights.languageDistribution).map(([lang, count]) => {
-                  const total = Object.values(insights.languageDistribution).reduce((a, b) => a + b, 0)
-                  const percentage = total > 0 ? Math.round((count / total) * 100) : 0
-                  return (
-                    <div key={lang}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-dark-gray dark:text-white">
-                          {languageNames[lang] || lang}
-                        </span>
-                        <span className="text-sm text-medium-gray">{count} ({percentage}%)</span>
-                      </div>
-                      <div className="h-2 bg-off-white dark:bg-charcoal rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-blue-500 rounded-full transition-all"
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
+              {/* AI Insights */}
+              {insights.aiInsights && (
+                <div className="grid lg:grid-cols-2 gap-6">
+                  {/* Top Issues */}
+                  <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-6">
+                    <h3 className="font-semibold text-dark-gray dark:text-white mb-4 flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5 text-red-500" />
+                      Top Issues
+                    </h3>
+                    <ul className="space-y-3">
+                      {insights.aiInsights.topIssues.map((issue, i) => (
+                        <li key={i} className="flex items-start gap-3">
+                          <span className="w-6 h-6 rounded-full bg-red-500/10 text-red-500 text-xs font-medium flex items-center justify-center flex-shrink-0">
+                            {i + 1}
+                          </span>
+                          <span className="text-charcoal dark:text-light-gray">{issue}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
 
-          {/* Recent Meetings */}
-          {insights.recentMeetings.length > 0 && (
-            <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-hidden">
-              <div className="p-4 border-b border-off-white dark:border-medium-gray/20">
-                <h3 className="font-semibold text-dark-gray dark:text-white flex items-center gap-2">
-                  <Calendar className="w-5 h-5" />
-                  Recent Analyzed Meetings
-                </h3>
-              </div>
-              <div className="divide-y divide-off-white dark:divide-medium-gray/20">
-                {insights.recentMeetings.map((meeting) => (
-                  <a
-                    key={meeting.id}
-                    href={`/meetings/${meeting.id}`}
-                    className="flex items-center justify-between p-4 hover:bg-off-white/50 dark:hover:bg-charcoal/50 transition-colors"
-                  >
-                    <div>
-                      <p className="font-medium text-dark-gray dark:text-white">{meeting.employee}</p>
-                      <p className="text-sm text-medium-gray">
-                        {meeting.department} • {new Date(meeting.date).toLocaleDateString()}
+                  {/* Top Strengths */}
+                  <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-6">
+                    <h3 className="font-semibold text-dark-gray dark:text-white mb-4 flex items-center gap-2">
+                      <CheckCircle2 className="w-5 h-5 text-green-500" />
+                      Top Strengths
+                    </h3>
+                    <ul className="space-y-3">
+                      {insights.aiInsights.topStrengths.map((strength, i) => (
+                        <li key={i} className="flex items-start gap-3">
+                          <span className="w-6 h-6 rounded-full bg-green-500/10 text-green-500 text-xs font-medium flex items-center justify-center flex-shrink-0">
+                            {i + 1}
+                          </span>
+                          <span className="text-charcoal dark:text-light-gray">{strength}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Recommendations */}
+                  <div className="lg:col-span-2 rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-6">
+                    <h3 className="font-semibold text-dark-gray dark:text-white mb-4 flex items-center gap-2">
+                      <Lightbulb className="w-5 h-5 text-orange" />
+                      Recommendations
+                    </h3>
+                    <ul className="space-y-3">
+                      {insights.aiInsights.recommendations.map((rec, i) => (
+                        <li key={i} className="flex items-start gap-3 p-3 rounded-xl bg-orange/5">
+                          <span className="w-6 h-6 rounded-full bg-orange/10 text-orange text-xs font-medium flex items-center justify-center flex-shrink-0">
+                            {i + 1}
+                          </span>
+                          <span className="text-charcoal dark:text-light-gray">{rec}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Trend Analysis */}
+                  {insights.aiInsights.trendAnalysis && (
+                    <div className="lg:col-span-2 rounded-2xl bg-blue-500/5 border border-blue-500/20 p-6">
+                      <h3 className="font-semibold text-dark-gray dark:text-white mb-3 flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5 text-blue-500" />
+                        Trend Analysis
+                      </h3>
+                      <p className="text-charcoal dark:text-light-gray leading-relaxed">
+                        {insights.aiInsights.trendAnalysis}
                       </p>
                     </div>
-                    <div className="flex items-center gap-3">
-                      {meeting.sentiment && (
-                        <span className={`px-2.5 py-1 text-xs font-medium rounded-full capitalize ${getSentimentColor(meeting.sentiment)}`}>
-                          {meeting.sentiment}
-                        </span>
-                      )}
-                      {meeting.qualityScore && (
-                        <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${
-                          meeting.qualityScore >= 80 ? 'bg-green-500/10 text-green-500' :
-                          meeting.qualityScore >= 60 ? 'bg-yellow-500/10 text-yellow-500' :
-                          'bg-red-500/10 text-red-500'
-                        }`}>
-                          {meeting.qualityScore}
-                        </span>
-                      )}
-                    </div>
-                  </a>
-                ))}
+                  )}
+                </div>
+              )}
+
+              {/* Sentiment & Language Distribution */}
+              <div className="grid lg:grid-cols-2 gap-6">
+                {/* Sentiment Distribution */}
+                <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-6">
+                  <h3 className="font-semibold text-dark-gray dark:text-white mb-4 flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-dark-gray dark:text-white" />
+                    Sentiment Distribution
+                  </h3>
+                  <div className="space-y-4">
+                    {Object.entries(insights.sentimentDistribution).map(([label, count]) => {
+                      const total = Object.values(insights.sentimentDistribution).reduce((a, b) => a + b, 0)
+                      const percentage = total > 0 ? Math.round((count / total) * 100) : 0
+                      return (
+                        <div key={label}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className={`text-sm font-medium capitalize ${getSentimentColor(label).split(' ')[0]}`}>
+                              {label}
+                            </span>
+                            <span className="text-sm text-medium-gray">{count} ({percentage}%)</span>
+                          </div>
+                          <div className="h-2 bg-off-white dark:bg-charcoal rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full rounded-full transition-all ${
+                                label === 'positive' ? 'bg-green-500' :
+                                label === 'negative' ? 'bg-red-500' :
+                                'bg-yellow-500'
+                              }`}
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Language Distribution */}
+                <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-6">
+                  <h3 className="font-semibold text-dark-gray dark:text-white mb-4 flex items-center gap-2">
+                    <Globe className="w-5 h-5 text-blue-500" />
+                    Language Distribution
+                  </h3>
+                  <div className="space-y-4">
+                    {Object.entries(insights.languageDistribution).map(([lang, count]) => {
+                      const total = Object.values(insights.languageDistribution).reduce((a, b) => a + b, 0)
+                      const percentage = total > 0 ? Math.round((count / total) * 100) : 0
+                      return (
+                        <div key={lang}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-medium text-dark-gray dark:text-white">
+                              {languageNames[lang] || lang}
+                            </span>
+                            <span className="text-sm text-medium-gray">{count} ({percentage}%)</span>
+                          </div>
+                          <div className="h-2 bg-off-white dark:bg-charcoal rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-blue-500 rounded-full transition-all"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
               </div>
+
+              {/* Recent Meetings */}
+              {insights.recentMeetings.length > 0 && (
+                <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-hidden">
+                  <div className="p-4 border-b border-off-white dark:border-medium-gray/20">
+                    <h3 className="font-semibold text-dark-gray dark:text-white flex items-center gap-2">
+                      <Calendar className="w-5 h-5" />
+                      Recent Analyzed Meetings
+                    </h3>
+                  </div>
+                  <div className="divide-y divide-off-white dark:divide-medium-gray/20">
+                    {insights.recentMeetings.map((meeting) => (
+                      <a
+                        key={meeting.id}
+                        href={`/meetings/${meeting.id}`}
+                        className="flex items-center justify-between p-4 even:bg-off-white/40 dark:even:bg-charcoal/40 hover:bg-off-white/70 dark:hover:bg-charcoal/60 transition-colors"
+                      >
+                        <div>
+                          <p className="font-medium text-dark-gray dark:text-white">{meeting.employee}</p>
+                          <p className="text-sm text-medium-gray">
+                            {meeting.department} • {new Date(meeting.date).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {meeting.sentiment && (
+                            <span className={`px-2.5 py-1 text-xs font-medium rounded-full capitalize ${getSentimentColor(meeting.sentiment)}`}>
+                              {meeting.sentiment}
+                            </span>
+                          )}
+                          {meeting.qualityScore && (
+                            <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${
+                              meeting.qualityScore >= 80 ? 'bg-green-500/10 text-green-500' :
+                              meeting.qualityScore >= 60 ? 'bg-yellow-500/10 text-yellow-500' :
+                              'bg-red-500/10 text-red-500'
+                            }`}>
+                              {meeting.qualityScore}
+                            </span>
+                          )}
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-8 text-center">
+              <BarChart3 className="w-12 h-12 text-light-gray mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-dark-gray dark:text-white mb-2">No recording insights yet</h3>
+              <p className="text-medium-gray max-w-md mx-auto">
+                Recording analytics such as sentiment, quality scores, and AI insights will appear here once meetings are recorded and analyzed.
+              </p>
             </div>
           )}
         </div>
@@ -839,7 +894,7 @@ export function InsightsClient({ departments, isSuperAdmin }: InsightsClientProp
       )}
 
       {/* Departments Tab */}
-      {activeTab === 'departments' && insights && (
+      {activeTab === 'departments' && !loading && insights && Object.keys(insights.departmentStats).length > 0 && (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Object.entries(insights.departmentStats).map(([dept, stats]) => (
             <div
@@ -902,8 +957,20 @@ export function InsightsClient({ departments, isSuperAdmin }: InsightsClientProp
         </div>
       )}
 
-      {/* Loading State for Overview */}
-      {loading && activeTab === 'overview' && (
+      {/* Departments Tab – Empty State */}
+      {activeTab === 'departments' && !loading && insights && Object.keys(insights.departmentStats).length === 0 && (
+        <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 p-12 text-center">
+          <Building2 className="w-12 h-12 text-light-gray mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-dark-gray dark:text-white mb-2">No data found</h3>
+          <p className="text-medium-gray max-w-md mx-auto">
+            No department insights are available for the selected period. Try selecting a longer time range or check back after more meetings have been recorded.
+          </p>
+        </div>
+      )}
+
+
+      {/* Loading State */}
+      {loading && (activeTab === 'overview' || activeTab === 'departments') && (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 text-orange animate-spin" />
         </div>

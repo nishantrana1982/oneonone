@@ -48,76 +48,68 @@ export function FileAttachments({ meetingId, initialAttachments, canUpload }: Fi
   const [downloading, setDownloading] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
+  const uploadSingleFile = async (file: File): Promise<Attachment | null> => {
     if (file.size > 10 * 1024 * 1024) {
-      toastError('File size must be less than 10MB')
-      return
+      toastError(`${file.name}: File size must be less than 10MB`)
+      return null
     }
 
-    setUploading(true)
-
-    try {
-      // Get presigned URL
-      const response = await fetch(`/api/meetings/${meetingId}/attachments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileName: file.name,
-          fileType: file.type,
-          fileSize: file.size,
-        }),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to upload')
-      }
-
-      const { uploadUrl, attachmentId, skipUpload } = await response.json()
-
-      // Upload to S3 if URL provided
-      if (uploadUrl && !skipUpload) {
-        await new Promise<void>((resolve, reject) => {
-          const xhr = new XMLHttpRequest()
-          
-          xhr.open('PUT', uploadUrl, true)
-          xhr.setRequestHeader('Content-Type', file.type)
-          
-          xhr.onload = () => {
-            // S3 returns 200 for successful uploads
-            if (xhr.status >= 200 && xhr.status < 300) {
-              resolve()
-            } else {
-              // Some S3 responses may not have ok status but upload succeeds
-              console.warn('XHR status not ok but may have succeeded:', xhr.status)
-              resolve()
-            }
-          }
-          
-          xhr.onerror = () => {
-            // Network error, but file might still be uploaded
-            console.warn('XHR onerror - but file may have uploaded successfully')
-            resolve()
-          }
-          
-          xhr.send(file)
-        })
-      }
-
-      // Add to list
-      const newAttachment: Attachment = {
-        id: attachmentId,
+    const response = await fetch(`/api/meetings/${meetingId}/attachments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         fileName: file.name,
         fileType: file.type,
         fileSize: file.size,
-        createdAt: new Date().toISOString(),
+      }),
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || `Failed to upload ${file.name}`)
+    }
+
+    const { uploadUrl, attachmentId, skipUpload } = await response.json()
+
+    if (uploadUrl && !skipUpload) {
+      await new Promise<void>((resolve) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open('PUT', uploadUrl, true)
+        xhr.setRequestHeader('Content-Type', file.type)
+        xhr.onload = () => resolve()
+        xhr.onerror = () => resolve()
+        xhr.send(file)
+      })
+    }
+
+    return {
+      id: attachmentId,
+      fileName: file.name,
+      fileType: file.type,
+      fileSize: file.size,
+      createdAt: new Date().toISOString(),
+    }
+  }
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    setUploading(true)
+    const uploaded: Attachment[] = []
+
+    try {
+      for (const file of Array.from(files)) {
+        try {
+          const attachment = await uploadSingleFile(file)
+          if (attachment) uploaded.push(attachment)
+        } catch (error: unknown) {
+          toastError(error instanceof Error ? error.message : `Failed to upload ${file.name}`)
+        }
       }
-      setAttachments([newAttachment, ...attachments])
-    } catch (error: unknown) {
-      toastError(error instanceof Error ? error.message : 'Failed to upload file')
+      if (uploaded.length > 0) {
+        setAttachments((prev) => [...uploaded.reverse(), ...prev])
+      }
     } finally {
       setUploading(false)
       if (fileInputRef.current) {
@@ -140,9 +132,10 @@ export function FileAttachments({ meetingId, initialAttachments, canUpload }: Fi
       if (response.ok) {
         setAttachments(attachments.filter((a) => a.id !== attachmentId))
       } else {
-        toastError('Failed to delete file')
+        const data = await response.json().catch(() => ({}))
+        toastError(data.error || 'Failed to delete file')
       }
-    } catch (error) {
+    } catch {
       toastError('Failed to delete file')
     } finally {
       setDeleting(null)
@@ -194,6 +187,7 @@ export function FileAttachments({ meetingId, initialAttachments, canUpload }: Fi
             <input
               ref={fileInputRef}
               type="file"
+              multiple
               onChange={handleFileSelect}
               className="hidden"
               accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip"
@@ -218,6 +212,11 @@ export function FileAttachments({ meetingId, initialAttachments, canUpload }: Fi
           </>
         )}
       </div>
+      {canUpload && (
+        <div className="mx-6 mt-4 px-3 py-2.5 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-xs text-blue-600 dark:text-blue-400">
+          Max 10 MB per file · Supported formats: Images, PDF, Word, Excel, PowerPoint, TXT, ZIP
+        </div>
+      )}
       <div className="p-6">
         {attachments.length === 0 ? (
           <div className="text-center py-8">

@@ -85,9 +85,9 @@ export function BulkImport() {
 
   const downloadTemplate = () => {
     const template = `name,email,role,department,reportsTo,title,phone
-John Doe,john@company.com,EMPLOYEE,Engineering,jane@company.com,Software Engineer,+1234567890
-Jane Smith,jane@company.com,REPORTER,Engineering,,Engineering Manager,+0987654321
-Admin User,admin@company.com,SUPER_ADMIN,,,CEO,`
+John Doe,john@whitelabeliq.com,EMPLOYEE,Engineering,jane@whitelabeliq.com,Software Engineer,+1234567890
+Jane Smith,jane@whitelabeliq.com,REPORTER,Engineering,,Engineering Manager,+0987654321
+Admin User,admin@whitelabeliq.com,SUPER_ADMIN,,,CEO,`
 
     const blob = new Blob([template], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)

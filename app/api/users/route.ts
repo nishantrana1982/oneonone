@@ -20,11 +20,20 @@ export async function GET(request: NextRequest) {
   }
 }
 
+const ALLOWED_EMAIL_DOMAIN = '@whitelabeliq.com'
+
 export async function POST(request: NextRequest) {
   try {
     const admin = await requireAdmin()
     const body = await request.json()
     const { email, name, role, departmentId, reportsToId, country, timeZone, workDayStart, workDayEnd } = body
+
+    if (!email || !email.toLowerCase().endsWith(ALLOWED_EMAIL_DOMAIN)) {
+      return NextResponse.json(
+        { error: `Only ${ALLOWED_EMAIL_DOMAIN} email addresses are allowed` },
+        { status: 400 }
+      )
+    }
 
     const user = await prisma.user.create({
       data: {

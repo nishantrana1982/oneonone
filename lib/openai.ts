@@ -57,34 +57,117 @@ export interface AnalysisResult {
   commonThemes: string[]
 }
 
+const WHISPER_MAX_SIZE = 24 * 1024 * 1024 // 24 MB (Whisper limit is 25 MB, leave buffer)
+
+const WHISPER_SUPPORTED_LANGUAGES = [
+  'af','ar','hy','az','be','bs','bg','ca','zh','hr','cs','da','nl','en','et',
+  'fi','fr','gl','de','el','he','hi','hu','is','id','it','ja','kk','ko','lv',
+  'lt','mk','ms','mr','mi','ne','no','fa','pl','pt','ro','ru','sr','sk','sl',
+  'es','sw','sv','tl','ta','th','tr','uk','ur','vi','cy',
+]
+
+/**
+ * Compress audio to MP3 via ffmpeg so it fits within Whisper's 25 MB limit.
+ * Returns the path to the compressed file, or null if compression is unavailable.
+ */
+async function compressAudioForWhisper(inputPath: string): Promise<string | null> {
+  const fs = await import('fs')
+  const path = await import('path')
+  const { execFile } = await import('child_process')
+  const { promisify } = await import('util')
+  const execFileAsync = promisify(execFile)
+
+  const outputPath = inputPath.replace(/\.\w+$/, '') + '_compressed.mp3'
+
+  // Find ffmpeg binary: prefer system ffmpeg, fall back to ffmpeg-static
+  let ffmpegPath = 'ffmpeg'
+  try {
+    await execFileAsync('which', ['ffmpeg'])
+  } catch {
+    try {
+      ffmpegPath = require('ffmpeg-static') as string
+    } catch {
+      console.warn('[OpenAI] ffmpeg not available — cannot compress audio')
+      return null
+    }
+  }
+
+  try {
+    // Convert to mono MP3, 16kHz, 48kbps — optimized for speech, very small files
+    await execFileAsync(ffmpegPath, [
+      '-i', inputPath,
+      '-vn',                   // no video
+      '-ac', '1',              // mono
+      '-ar', '16000',          // 16 kHz sample rate (sufficient for speech)
+      '-b:a', '48k',           // 48 kbps bitrate
+      '-f', 'mp3',
+      '-y',                    // overwrite
+      outputPath,
+    ], { timeout: 120_000 })
+
+    const stats = await fs.promises.stat(outputPath)
+    console.log(`[OpenAI] Compressed audio: ${inputPath} → ${outputPath} (${(stats.size / 1024 / 1024).toFixed(2)} MB)`)
+    return outputPath
+  } catch (err) {
+    console.error('[OpenAI] ffmpeg compression failed:', err)
+    try { await fs.promises.unlink(outputPath) } catch { /* ignore */ }
+    return null
+  }
+}
+
 export async function transcribeAudio(audioBuffer: Buffer, filename: string, language?: string): Promise<TranscriptionResult> {
+  const fs = await import('fs')
+  const path = await import('path')
+  const os = await import('os')
+  const tempDir = os.tmpdir()
+  const tempFiles: string[] = []
+
   try {
     const openai = await getOpenAIClient()
     const models = await getModels()
-    
+    const sizeMB = (audioBuffer.length / 1024 / 1024).toFixed(2)
+
     console.log(`[OpenAI] Starting transcription with model: ${models.whisperModel}, language: ${language || 'auto-detect'}`)
-    console.log(`[OpenAI] Audio buffer size: ${audioBuffer.length} bytes`)
+    console.log(`[OpenAI] Audio buffer size: ${sizeMB} MB`)
 
-    // Create a Blob-like object that OpenAI SDK can handle in Node.js
-    // The SDK accepts: File, Blob, or Uploadable (which includes Buffer with name)
-    const fs = await import('fs')
-    const path = await import('path')
-    const os = await import('os')
-    
-    // Write buffer to temp file and create a readable stream
-    const tempDir = os.tmpdir()
-    const tempFilePath = path.join(tempDir, `recording_${Date.now()}.webm`)
-    await fs.promises.writeFile(tempFilePath, audioBuffer)
-    
-    // Verify file was written correctly
-    const stats = await fs.promises.stat(tempFilePath)
-    const verifyBuffer = await fs.promises.readFile(tempFilePath)
-    console.log(`[OpenAI] Wrote temp file: ${tempFilePath} (${audioBuffer.length} bytes)`)
-    
-    // Create a readable stream from the file
-    const fileStream = fs.createReadStream(tempFilePath)
+    // Write original buffer to temp file
+    const originalPath = path.join(tempDir, `recording_${Date.now()}.webm`)
+    await fs.promises.writeFile(originalPath, audioBuffer)
+    tempFiles.push(originalPath)
 
-    // Build transcription options - include language if specified
+    // Determine which file to send to Whisper
+    let transcriptionPath = originalPath
+    let transcriptionFilename = 'recording.webm'
+
+    if (audioBuffer.length > WHISPER_MAX_SIZE) {
+      console.log(`[OpenAI] File exceeds ${(WHISPER_MAX_SIZE / 1024 / 1024).toFixed(0)} MB — compressing with ffmpeg...`)
+      const compressedPath = await compressAudioForWhisper(originalPath)
+
+      if (compressedPath) {
+        const compressedStats = await fs.promises.stat(compressedPath)
+        tempFiles.push(compressedPath)
+
+        if (compressedStats.size <= WHISPER_MAX_SIZE) {
+          transcriptionPath = compressedPath
+          transcriptionFilename = 'recording.mp3'
+          console.log(`[OpenAI] Using compressed file (${(compressedStats.size / 1024 / 1024).toFixed(2)} MB)`)
+        } else {
+          throw new Error(
+            `Recording is too large for transcription even after compression (${(compressedStats.size / 1024 / 1024).toFixed(1)} MB). ` +
+            `Maximum supported duration is approximately 2 hours. Please record a shorter meeting.`
+          )
+        }
+      } else {
+        throw new Error(
+          `Recording file is ${sizeMB} MB which exceeds the 25 MB transcription limit. ` +
+          `Install ffmpeg on the server to enable automatic compression: sudo apt install ffmpeg`
+        )
+      }
+    }
+
+    // Create a readable stream for the Whisper API
+    const fileStream = fs.createReadStream(transcriptionPath)
+
     const transcriptionOptions: {
       file: typeof fileStream
       model: string
@@ -95,27 +178,16 @@ export async function transcribeAudio(audioBuffer: Buffer, filename: string, lan
       model: models.whisperModel,
       response_format: 'verbose_json',
     }
-    
-    // If language is specified, pass it to Whisper to improve accuracy
-    // Note: OpenAI Whisper API only supports certain languages as explicit hints
-    // Supported: af, ar, hy, az, be, bs, bg, ca, zh, hr, cs, da, nl, en, et, fi, fr, gl, de, el, he, hi, hu, is, id, it, ja, kk, ko, lv, lt, mk, ms, mr, mi, ne, no, fa, pl, pt, ro, ru, sr, sk, sl, es, sw, sv, tl, ta, th, tr, uk, ur, vi, cy
-    // For unsupported languages (like Gujarati 'gu'), we let Whisper auto-detect
-    const supportedLanguages = ['af', 'ar', 'hy', 'az', 'be', 'bs', 'bg', 'ca', 'zh', 'hr', 'cs', 'da', 'nl', 'en', 'et', 'fi', 'fr', 'gl', 'de', 'el', 'he', 'hi', 'hu', 'is', 'id', 'it', 'ja', 'kk', 'ko', 'lv', 'lt', 'mk', 'ms', 'mr', 'mi', 'ne', 'no', 'fa', 'pl', 'pt', 'ro', 'ru', 'sr', 'sk', 'sl', 'es', 'sw', 'sv', 'tl', 'ta', 'th', 'tr', 'uk', 'ur', 'vi', 'cy']
-    if (language && language !== 'auto' && supportedLanguages.includes(language)) {
+
+    if (language && language !== 'auto' && WHISPER_SUPPORTED_LANGUAGES.includes(language)) {
       transcriptionOptions.language = language
     }
 
-    const response = await openai.audio.transcriptions.create(transcriptionOptions) as { text: string; language?: string; duration?: number }
-    console.log(`[OpenAI] Transcription successful. Text length: ${response.text?.length || 0}`)
-    
-    // Clean up temp file
-    try {
-      await fs.promises.unlink(tempFilePath)
-    } catch (e) {
-      // Ignore cleanup errors
+    const response = await openai.audio.transcriptions.create(transcriptionOptions) as {
+      text: string; language?: string; duration?: number
     }
+    console.log(`[OpenAI] Transcription successful. Text length: ${response.text?.length || 0}`)
 
-    // verbose_json format returns language and duration, but TypeScript types don't include them
     return {
       text: response.text,
       language: response.language || language || 'en',
@@ -130,8 +202,7 @@ export async function transcribeAudio(audioBuffer: Buffer, filename: string, lan
       code: err.code,
       type: err.type,
     }))
-    
-    // Provide helpful error messages
+
     if (err.message?.includes('API key')) {
       throw new Error('OpenAI API key is invalid or not configured. Please check Admin > Settings.')
     }
@@ -141,12 +212,22 @@ export async function transcribeAudio(audioBuffer: Buffer, filename: string, lan
     if (err.status === 429) {
       throw new Error('OpenAI rate limit exceeded. Please try again later.')
     }
+    if (err.status === 413 || err.message?.includes('size') || err.message?.includes('large')) {
+      throw new Error(
+        'Recording file is too large for transcription. Install ffmpeg on the server (sudo apt install ffmpeg) to enable automatic compression.'
+      )
+    }
     if (err.status === 400) {
       const details = err.message || err.error?.message || 'Unknown error'
       throw new Error(`Invalid audio file: ${details}`)
     }
-    
+
     throw error
+  } finally {
+    // Clean up all temp files
+    for (const f of tempFiles) {
+      try { await fs.promises.unlink(f) } catch { /* ignore */ }
+    }
   }
 }
 

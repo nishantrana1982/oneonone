@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
@@ -18,6 +18,7 @@ import {
   X,
   ChevronDown,
   AlertCircle,
+  Search,
 } from 'lucide-react'
 import { RecurringFrequency } from '@prisma/client'
 import { useToast } from '@/components/ui/toast'
@@ -55,12 +56,6 @@ const frequencyLabels: Record<RecurringFrequency, string> = {
   MONTHLY: 'Monthly',
 }
 
-const timeOptions = Array.from({ length: 20 }, (_, i) => {
-  const hour = 9 + Math.floor(i / 2)
-  const minute = i % 2 === 0 ? '00' : '30'
-  return `${String(hour).padStart(2, '0')}:${minute}`
-})
-
 function formatTime(time: string) {
   return new Date(`2000-01-01T${time}:00`).toLocaleTimeString('en-US', {
     hour: 'numeric',
@@ -82,7 +77,10 @@ function getNextOccurrenceDate(dayOfWeek: number): string {
   if (daysUntil < 0 || (daysUntil === 0 && now.getHours() >= 18)) daysUntil += 7
   const next = new Date(now)
   next.setDate(now.getDate() + daysUntil)
-  return next.toISOString().slice(0, 10)
+  const y = next.getFullYear()
+  const m = String(next.getMonth() + 1).padStart(2, '0')
+  const d = String(next.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 /** Format slot start (ISO) to HH:mm in the given timezone. */
@@ -118,6 +116,10 @@ export function RecurringSchedulesClient({ employees, initialSchedules }: Props)
     timeOfDay: string
   } | null>(null)
   const [editLoading, setEditLoading] = useState(false)
+  const [editSlots, setEditSlots] = useState<FreeSlot[]>([])
+  const [editSlotsLoading, setEditSlotsLoading] = useState(false)
+  const [editWorkingHoursLabel, setEditWorkingHoursLabel] = useState<string | null>(null)
+  const [editReporterTimeZone, setEditReporterTimeZone] = useState<string>('Asia/Kolkata')
   const [formData, setFormData] = useState({
     employeeId: '',
     frequency: 'BIWEEKLY' as RecurringFrequency,
@@ -134,6 +136,7 @@ export function RecurringSchedulesClient({ employees, initialSchedules }: Props)
   const [recurringSlotsLoading, setRecurringSlotsLoading] = useState(false)
   const [recurringWorkingHoursLabel, setRecurringWorkingHoursLabel] = useState<string | null>(null)
   const [reporterTimeZone, setReporterTimeZone] = useState<string>('Asia/Kolkata')
+  const [employeeSearch, setEmployeeSearch] = useState('')
 
   useEffect(() => {
     setFormData((prev) => ({ ...prev, timeOfDay: '' }))
@@ -193,9 +196,51 @@ export function RecurringSchedulesClient({ employees, initialSchedules }: Props)
     return () => { cancelled = true }
   }, [formData.employeeId, formData.dayOfWeek, formData.timeOfDay, formData.frequency])
 
+  // Fetch available slots when editing a schedule (employee + day change)
+  useEffect(() => {
+    if (!editingId || !editData) {
+      setEditSlots([])
+      setEditWorkingHoursLabel(null)
+      return
+    }
+    const schedule = schedules.find((s) => s.id === editingId)
+    if (!schedule) return
+
+    let cancelled = false
+    setEditSlotsLoading(true)
+    setEditSlots([])
+    setEditWorkingHoursLabel(null)
+    // Clear time selection when day changes (keep it if only frequency changed)
+    const date = getNextOccurrenceDate(editData.dayOfWeek)
+    fetch(`/api/meetings/availability?employeeId=${encodeURIComponent(schedule.employeeId)}&date=${encodeURIComponent(date)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return
+        if (!data.calendarUnavailable && Array.isArray(data.slots)) {
+          setEditSlots(data.slots)
+          setEditWorkingHoursLabel(data.workingHoursLabel ?? null)
+          setEditReporterTimeZone(data.reporterTimeZone ?? 'Asia/Kolkata')
+        } else {
+          setEditSlots([])
+          setEditWorkingHoursLabel(null)
+        }
+      })
+      .finally(() => { if (!cancelled) setEditSlotsLoading(false) })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingId, editData?.dayOfWeek])
+
   const availableEmployees = employees.filter(
     (emp) => !schedules.some((s) => s.employeeId === emp.id && s.isActive)
   )
+
+  const filteredAvailableEmployees = useMemo(() => {
+    const q = employeeSearch.trim().toLowerCase()
+    if (!q) return availableEmployees
+    return availableEmployees.filter(
+      (e) => e.name.toLowerCase().includes(q) || e.email.toLowerCase().includes(q)
+    )
+  }, [availableEmployees, employeeSearch])
 
   const handleCreate = async () => {
     if (!formData.employeeId) return
@@ -216,6 +261,7 @@ export function RecurringSchedulesClient({ employees, initialSchedules }: Props)
           ...schedules,
         ])
         setShowForm(false)
+        setEmployeeSearch('')
         setFormData({
           employeeId: '',
           frequency: 'BIWEEKLY',
@@ -427,26 +473,73 @@ export function RecurringSchedulesClient({ employees, initialSchedules }: Props)
           <h3 className="font-semibold text-dark-gray dark:text-white mb-4">
             Create Recurring Schedule
           </h3>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div>
-              <label className="block text-sm font-medium text-dark-gray dark:text-white mb-2">
-                Team Member
-              </label>
-              <div className="relative">
-                <select
-                  value={formData.employeeId}
-                  onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
-                  className={selectClass}
-                >
-                  <option value="">Select...</option>
-                  {availableEmployees.map((emp) => (
-                    <option key={emp.id} value={emp.id}>{emp.name}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-medium-gray pointer-events-none" />
+          {/* Team Member search + list */}
+          <div className="rounded-xl border border-off-white dark:border-medium-gray/20 overflow-hidden flex flex-col max-h-[280px]">
+            <div className="px-4 py-3 border-b border-off-white dark:border-medium-gray/20 flex items-center gap-3 shrink-0">
+              <div className="w-9 h-9 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
+                <User className="w-4 h-4 text-blue-500" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-dark-gray dark:text-white text-sm">Select Team Member</p>
+                <p className="text-xs text-medium-gray truncate">Search by name or email</p>
               </div>
             </div>
+            <div className="px-3 py-2.5 border-b border-off-white dark:border-medium-gray/20 shrink-0">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-medium-gray pointer-events-none" />
+                <input
+                  type="text"
+                  value={employeeSearch}
+                  onChange={(e) => setEmployeeSearch(e.target.value)}
+                  placeholder="Search by name or email..."
+                  className="w-full pl-9 pr-4 py-2 rounded-xl border border-off-white dark:border-medium-gray/20 bg-off-white dark:bg-charcoal text-dark-gray dark:text-white placeholder:text-medium-gray focus:outline-none focus:ring-2 focus:ring-dark-gray/20 dark:focus:ring-white/20 text-sm"
+                />
+              </div>
+            </div>
+            <div className="p-3 overflow-y-auto min-h-0 flex-1">
+              {availableEmployees.length === 0 ? (
+                <div className="text-center py-4">
+                  <User className="w-8 h-8 text-light-gray mx-auto mb-1" />
+                  <p className="text-xs text-medium-gray">No team members available</p>
+                </div>
+              ) : filteredAvailableEmployees.length === 0 ? (
+                <p className="text-xs text-medium-gray text-center py-3">No matches for &quot;{employeeSearch}&quot;</p>
+              ) : (
+                <div className="grid gap-1.5">
+                  {filteredAvailableEmployees.map((emp) => (
+                    <button
+                      key={emp.id}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, employeeId: emp.id })}
+                      className={`flex items-center gap-3 p-2.5 rounded-xl border text-left transition-all ${
+                        formData.employeeId === emp.id
+                          ? 'border-dark-gray dark:border-white bg-dark-gray/5 dark:bg-white/5'
+                          : 'border-off-white dark:border-medium-gray/20 hover:border-medium-gray dark:hover:border-medium-gray/40'
+                      }`}
+                    >
+                      <div className="w-8 h-8 rounded-full bg-off-white dark:bg-dark-gray flex items-center justify-center shrink-0">
+                        <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                          {emp.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                        </span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-dark-gray dark:text-white text-sm truncate">{emp.name}</p>
+                        <p className="text-xs text-medium-gray truncate">{emp.email}</p>
+                      </div>
+                      {formData.employeeId === emp.id && (
+                        <div className="w-5 h-5 rounded-full bg-dark-gray dark:bg-white flex items-center justify-center shrink-0">
+                          <Check className="w-3 h-3 text-white dark:text-dark-gray" />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
 
+          {/* Frequency + Day */}
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-dark-gray dark:text-white mb-2">
                 Frequency
@@ -482,7 +575,6 @@ export function RecurringSchedulesClient({ employees, initialSchedules }: Props)
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-medium-gray pointer-events-none" />
               </div>
             </div>
-
           </div>
 
           {formData.employeeId && formData.dayOfWeek != null && (
@@ -558,7 +650,7 @@ export function RecurringSchedulesClient({ employees, initialSchedules }: Props)
 
           <div className="flex justify-end gap-3 mt-6">
             <button
-              onClick={() => setShowForm(false)}
+              onClick={() => { setShowForm(false); setEmployeeSearch('') }}
               className="px-4 py-2.5 text-medium-gray hover:text-dark-gray dark:hover:text-white transition-colors min-h-[44px]"
             >
               Cancel
@@ -707,21 +799,52 @@ export function RecurringSchedulesClient({ employees, initialSchedules }: Props)
                           </div>
                         </div>
 
-                        <div>
-                          <label className="block text-xs font-medium text-medium-gray mb-1.5">Time</label>
-                          <div className="relative">
-                            <select
-                              value={editData?.timeOfDay}
-                              onChange={(e) => setEditData({ ...editData!, timeOfDay: e.target.value })}
-                              className={selectClass}
-                            >
-                              {timeOptions.map((time) => (
-                                <option key={time} value={time}>{formatTime(time)}</option>
-                              ))}
-                            </select>
-                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-medium-gray pointer-events-none" />
+                      </div>
+
+                      {/* Available time slots for edit */}
+                      <div className="mt-4 rounded-xl border border-off-white dark:border-medium-gray/20 p-4">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center">
+                            <Clock className="w-4 h-4 text-purple-500" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-dark-gray dark:text-white">Available time slots</p>
+                            {editWorkingHoursLabel && (
+                              <p className="text-xs text-medium-gray">{editWorkingHoursLabel}</p>
+                            )}
                           </div>
                         </div>
+                        {editSlotsLoading ? (
+                          <p className="text-sm text-medium-gray flex items-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Loading slots for next {dayNames[editData?.dayOfWeek ?? 0]}...
+                          </p>
+                        ) : editSlots.length > 0 ? (
+                          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                            {editSlots.map((slot) => {
+                              const timeInTz = slotToTimeInTz(slot.start, editReporterTimeZone)
+                              const isSelected = editData?.timeOfDay === timeInTz
+                              return (
+                                <button
+                                  key={slot.start}
+                                  type="button"
+                                  onClick={() => setEditData({ ...editData!, timeOfDay: timeInTz })}
+                                  className={`py-2 px-2 rounded-xl border text-sm font-medium transition-colors ${
+                                    isSelected
+                                      ? 'border-orange bg-orange/10 text-orange dark:bg-orange/20'
+                                      : 'border-off-white dark:border-medium-gray/20 hover:border-orange/50 text-dark-gray dark:text-white'
+                                  }`}
+                                >
+                                  {formatSlotTime(slot.start)}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-medium-gray">
+                            No free slots in overlapping working hours for that day. Try a different day.
+                          </p>
+                        )}
                       </div>
 
                       <div className="flex justify-end gap-2 mt-4">

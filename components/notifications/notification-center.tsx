@@ -245,10 +245,10 @@ export function NotificationCenter() {
           role="dialog"
           aria-label="Notifications"
           style={dropdownStyle}
-          className="bg-white dark:bg-charcoal rounded-2xl border border-off-white dark:border-medium-gray/20 shadow-2xl overflow-hidden z-[100] animate-in fade-in-0 zoom-in-95 duration-200"
+          className="bg-white dark:bg-charcoal rounded-2xl border border-off-white dark:border-medium-gray/20 shadow-2xl overflow-hidden z-[100] animate-in fade-in-0 zoom-in-95 duration-200 flex flex-col"
         >
           {/* Header */}
-          <div className="px-4 py-3 border-b border-off-white dark:border-medium-gray/20 flex items-center justify-between">
+          <div className="px-4 py-3 border-b border-off-white dark:border-medium-gray/20 flex items-center justify-between shrink-0">
             <h3 className="font-semibold text-dark-gray dark:text-white">Notifications</h3>
             {unreadCount > 0 && (
               <button
@@ -262,7 +262,7 @@ export function NotificationCenter() {
           </div>
 
           {/* Notifications List */}
-          <div className="overflow-y-auto" style={{ maxHeight: 'calc(100% - 100px)' }}>
+          <div className="overflow-y-auto flex-1 min-h-0">
             {notifications.length === 0 ? (
               <div className="py-12 text-center">
                 <Bell className="w-12 h-12 text-light-gray mx-auto mb-3" />
@@ -318,7 +318,7 @@ export function NotificationCenter() {
 
           {/* Footer */}
           {notifications.length > 0 && (
-            <div className="px-4 py-2 border-t border-off-white dark:border-medium-gray/20">
+            <div className="px-4 py-2 border-t border-off-white dark:border-medium-gray/20 shrink-0">
               <button
                 onClick={() => {
                   setIsOpen(false)

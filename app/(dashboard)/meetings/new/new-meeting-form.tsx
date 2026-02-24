@@ -214,7 +214,7 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
           {/* Left: Team Member with search + scrollable list */}
           <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-hidden flex flex-col max-h-[520px]">
             <div className="px-6 py-4 border-b border-off-white dark:border-medium-gray/20 flex items-center gap-3 shrink-0">
-              <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
                 <User className="w-5 h-5 text-blue-500" />
               </div>
               <div className="min-w-0 flex-1">
@@ -315,7 +315,7 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
             {/* Date picker card */}
             <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-visible flex flex-col">
               <div className="px-6 py-4 border-b border-off-white dark:border-medium-gray/20 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
                   <Calendar className="w-5 h-5 text-green-500" />
                 </div>
                 <div>
@@ -341,7 +341,7 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
             {watchedEmployee && watchedDate && (
               <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-hidden">
                 <div className="px-6 py-4 border-b border-off-white dark:border-medium-gray/20 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
                     <Clock className="w-5 h-5 text-purple-500" />
                   </div>
                   <div>

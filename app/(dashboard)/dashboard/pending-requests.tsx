@@ -52,7 +52,7 @@ export function PendingRequests({ type, meetings }: PendingRequestsProps) {
               <Link
                 key={m.id}
                 href={`/meetings/${m.id}`}
-                className="flex items-center gap-4 px-5 sm:px-6 py-4 hover:bg-amber-500/5 dark:hover:bg-amber-500/10 transition-colors group active:scale-[0.98]"
+                className="flex items-center gap-4 px-5 sm:px-6 py-4 even:bg-amber-500/[0.03] dark:even:bg-amber-500/[0.06] hover:bg-amber-500/5 dark:hover:bg-amber-500/10 transition-colors group active:scale-[0.98]"
               >
                 <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
                   <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
@@ -112,7 +112,7 @@ export function PendingRequests({ type, meetings }: PendingRequestsProps) {
             <Link
               key={m.id}
               href={`/meetings/${m.id}`}
-              className="flex items-center gap-4 px-5 sm:px-6 py-4 hover:bg-blue-500/5 dark:hover:bg-blue-500/10 transition-colors group active:scale-[0.98]"
+              className="flex items-center gap-4 px-5 sm:px-6 py-4 even:bg-blue-500/[0.03] dark:even:bg-blue-500/[0.06] hover:bg-blue-500/5 dark:hover:bg-blue-500/10 transition-colors group active:scale-[0.98]"
             >
               <div className="w-10 h-10 rounded-xl bg-blue-500/15 flex items-center justify-center flex-shrink-0">
                 <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />

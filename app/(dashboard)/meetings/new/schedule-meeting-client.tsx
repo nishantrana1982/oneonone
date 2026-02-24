@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Calendar, Repeat, ArrowLeft, Loader2, Check, AlertCircle, Clock } from 'lucide-react'
+import { Calendar, Repeat, ArrowLeft, Loader2, Check, AlertCircle, Clock, Search, User } from 'lucide-react'
 import { RecurringFrequency } from '@prisma/client'
 import { NewMeetingForm } from './new-meeting-form'
 import { useToast } from '@/components/ui/toast'
@@ -25,7 +25,10 @@ function getNextOccurrenceDate(dayOfWeek: number): string {
   if (daysUntil < 0 || (daysUntil === 0 && now.getHours() >= 18)) daysUntil += 7
   const next = new Date(now)
   next.setDate(now.getDate() + daysUntil)
-  return next.toISOString().slice(0, 10)
+  const y = next.getFullYear()
+  const m = String(next.getMonth() + 1).padStart(2, '0')
+  const d = String(next.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 function slotToTimeInTz(slotStartIso: string, timeZone: string): string {
@@ -68,6 +71,16 @@ export function ScheduleMeetingClient({ employees, currentUserId }: ScheduleMeet
   const [recurringSlotsLoading, setRecurringSlotsLoading] = useState(false)
   const [recurringWorkingHoursLabel, setRecurringWorkingHoursLabel] = useState<string | null>(null)
   const [reporterTimeZone, setReporterTimeZone] = useState<string>('Asia/Kolkata')
+
+  const [recurringEmployeeSearch, setRecurringEmployeeSearch] = useState('')
+
+  const filteredRecurringEmployees = useMemo(() => {
+    const q = recurringEmployeeSearch.trim().toLowerCase()
+    if (!q) return employees
+    return employees.filter(
+      (e) => e.name.toLowerCase().includes(q) || e.email.toLowerCase().includes(q)
+    )
+  }, [employees, recurringEmployeeSearch])
 
   const [recurringAvailabilityLoading, setRecurringAvailabilityLoading] = useState(false)
   const [recurringAvailability, setRecurringAvailability] = useState<{
@@ -184,7 +197,7 @@ export function ScheduleMeetingClient({ employees, currentUserId }: ScheduleMeet
           <button
             type="button"
             onClick={() => setScheduleType('one-time')}
-            className="flex flex-col items-start gap-3 p-6 rounded-2xl border-2 border-off-white dark:border-medium-gray/20 hover:border-dark-gray dark:hover:border-white hover:bg-off-white/50 dark:hover:bg-charcoal/50 transition-all text-left"
+            className="flex flex-col items-start gap-3 p-6 rounded-2xl border-2 border-light-gray/40 dark:border-medium-gray/40 hover:border-dark-gray dark:hover:border-white hover:bg-off-white/50 dark:hover:bg-charcoal/50 transition-all text-left"
           >
             <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
               <Calendar className="w-6 h-6 text-blue-500" />
@@ -198,7 +211,7 @@ export function ScheduleMeetingClient({ employees, currentUserId }: ScheduleMeet
           <button
             type="button"
             onClick={() => setScheduleType('recurring')}
-            className="flex flex-col items-start gap-3 p-6 rounded-2xl border-2 border-off-white dark:border-medium-gray/20 hover:border-dark-gray dark:hover:border-white hover:bg-off-white/50 dark:hover:bg-charcoal/50 transition-all text-left"
+            className="flex flex-col items-start gap-3 p-6 rounded-2xl border-2 border-light-gray/40 dark:border-medium-gray/40 hover:border-dark-gray dark:hover:border-white hover:bg-off-white/50 dark:hover:bg-charcoal/50 transition-all text-left"
           >
             <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
               <Repeat className="w-6 h-6 text-green-500" />
@@ -254,23 +267,69 @@ export function ScheduleMeetingClient({ employees, currentUserId }: ScheduleMeet
         </div>
 
         <form onSubmit={handleRecurringSubmit} className="p-6 space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-dark-gray dark:text-white mb-2">
-              Team member
-            </label>
-            <select
-              value={recurringForm.employeeId}
-              onChange={(e) => setRecurringForm({ ...recurringForm, employeeId: e.target.value })}
-              className="w-full rounded-xl border border-off-white dark:border-medium-gray/20 bg-white dark:bg-charcoal px-4 py-3 text-dark-gray dark:text-white focus:outline-none focus:ring-2 focus:ring-dark-gray/20 dark:focus:ring-white/20"
-              required
-            >
-              <option value="">Select team member...</option>
-              {employees.map((emp) => (
-                <option key={emp.id} value={emp.id}>
-                  {emp.name} ({emp.email})
-                </option>
-              ))}
-            </select>
+          {/* Team Member search + list */}
+          <div className="rounded-xl border border-off-white dark:border-medium-gray/20 overflow-hidden flex flex-col max-h-[280px]">
+            <div className="px-4 py-3 border-b border-off-white dark:border-medium-gray/20 flex items-center gap-3 shrink-0">
+              <div className="w-9 h-9 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
+                <User className="w-4 h-4 text-blue-500" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-dark-gray dark:text-white text-sm">Select Team Member</p>
+                <p className="text-xs text-medium-gray truncate">Search by name or email</p>
+              </div>
+            </div>
+            <div className="px-3 py-2.5 border-b border-off-white dark:border-medium-gray/20 shrink-0">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-medium-gray pointer-events-none" />
+                <input
+                  type="text"
+                  value={recurringEmployeeSearch}
+                  onChange={(e) => setRecurringEmployeeSearch(e.target.value)}
+                  placeholder="Search by name or email..."
+                  className="w-full pl-9 pr-4 py-2 rounded-xl border border-off-white dark:border-medium-gray/20 bg-off-white dark:bg-charcoal text-dark-gray dark:text-white placeholder:text-medium-gray focus:outline-none focus:ring-2 focus:ring-dark-gray/20 dark:focus:ring-white/20 text-sm"
+                />
+              </div>
+            </div>
+            <div className="p-3 overflow-y-auto min-h-0 flex-1">
+              {employees.length === 0 ? (
+                <div className="text-center py-4">
+                  <User className="w-8 h-8 text-light-gray mx-auto mb-1" />
+                  <p className="text-xs text-medium-gray">No team members available</p>
+                </div>
+              ) : filteredRecurringEmployees.length === 0 ? (
+                <p className="text-xs text-medium-gray text-center py-3">No matches for &quot;{recurringEmployeeSearch}&quot;</p>
+              ) : (
+                <div className="grid gap-1.5">
+                  {filteredRecurringEmployees.map((emp) => (
+                    <button
+                      key={emp.id}
+                      type="button"
+                      onClick={() => setRecurringForm({ ...recurringForm, employeeId: emp.id })}
+                      className={`flex items-center gap-3 p-2.5 rounded-xl border text-left transition-all ${
+                        recurringForm.employeeId === emp.id
+                          ? 'border-dark-gray dark:border-white bg-dark-gray/5 dark:bg-white/5'
+                          : 'border-off-white dark:border-medium-gray/20 hover:border-medium-gray dark:hover:border-medium-gray/40'
+                      }`}
+                    >
+                      <div className="w-8 h-8 rounded-full bg-off-white dark:bg-dark-gray flex items-center justify-center shrink-0">
+                        <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                          {emp.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                        </span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-dark-gray dark:text-white text-sm truncate">{emp.name}</p>
+                        <p className="text-xs text-medium-gray truncate">{emp.email}</p>
+                      </div>
+                      {recurringForm.employeeId === emp.id && (
+                        <div className="w-5 h-5 rounded-full bg-dark-gray dark:bg-white flex items-center justify-center shrink-0">
+                          <Check className="w-3 h-3 text-white dark:text-dark-gray" />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="grid gap-6 sm:grid-cols-2">

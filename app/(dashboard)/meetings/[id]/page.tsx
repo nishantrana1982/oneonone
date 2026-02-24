@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation'
 import { Calendar, User, FileText, CheckSquare, Clock, ArrowLeft, Mic } from 'lucide-react'
 import { UserRole } from '@prisma/client'
 import { formatMeetingDateLong } from '@/lib/utils'
+import { getSettings } from '@/lib/settings'
 import { AddTodoForm } from './add-todo-form'
 import { MeetingRecorder } from './meeting-recorder'
 import { MarkCompletedButton } from './mark-completed-button'
@@ -54,6 +55,7 @@ export default async function MeetingDetailPage({
   if (!canAccess) return notFound()
 
   const isReporter = user.role === UserRole.REPORTER || user.role === UserRole.SUPER_ADMIN
+  const settings = isReporter ? await getSettings() : null
   const isEmployee = user.id === meeting.employeeId
   const meetingDate = new Date(meeting.meetingDate)
   const isPast = meetingDate < new Date()
@@ -66,12 +68,20 @@ export default async function MeetingDetailPage({
   // Proposal flow
   const isProposed = meeting.status === 'PROPOSED'
   const proposedById = meeting.proposedById
+  // When a Super Admin creates the meeting, proposedById is neither reporter nor employee
+  const proposerIsThirdParty = !!proposedById && proposedById !== meeting.reporterId && proposedById !== meeting.employeeId
   const isProposalReceiver = isProposed && (
     (proposedById === meeting.reporterId && user.id === meeting.employeeId) ||
-    (proposedById === meeting.employeeId && user.id === meeting.reporterId)
+    (proposedById === meeting.employeeId && user.id === meeting.reporterId) ||
+    (proposerIsThirdParty && user.id === meeting.employeeId)
   )
-  const isProposalProposer = isProposed && user.id === proposedById
-  const proposedByName = proposedById === meeting.reporterId ? meeting.reporter.name : meeting.employee.name
+  const isProposalProposer = isProposed && (
+    user.id === proposedById ||
+    (proposerIsThirdParty && user.id === meeting.reporterId)
+  )
+  const proposedByName = proposerIsThirdParty
+    ? meeting.reporter.name
+    : proposedById === meeting.reporterId ? meeting.reporter.name : meeting.employee.name
   const otherPartyName = user.id === meeting.employeeId ? meeting.reporter.name : meeting.employee.name
 
   const formSections = [
@@ -125,7 +135,7 @@ export default async function MeetingDetailPage({
               ? 'bg-red-500/10 text-red-600 dark:text-red-400'
               : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
           }`}>
-            {meeting.status === 'COMPLETED' ? 'Completed' : meeting.status === 'PROPOSED' ? 'Proposed' : meeting.status === 'CANCELLED' ? 'Cancelled' : isPast ? 'Form submitted' : 'Scheduled'}
+            {meeting.status === 'COMPLETED' ? 'Completed' : meeting.status === 'PROPOSED' ? 'Proposed' : meeting.status === 'CANCELLED' ? 'Cancelled' : formSubmitted && isPast ? 'Form submitted' : 'Scheduled'}
           </span>
         </div>
       </div>
@@ -223,8 +233,8 @@ export default async function MeetingDetailPage({
         </div>
       </div>
 
-      {/* Recording Section - Only for Reporters and Super Admins */}
-      {isReporter && (
+      {/* Recording Section - Reporters & Super Admins, all statuses except CANCELLED */}
+      {isReporter && meeting.status !== 'CANCELLED' && (
         <div className="space-y-4">
           <h2 className="text-xl font-semibold text-dark-gray dark:text-white flex items-center gap-2">
             <Mic className="w-5 h-5" />
@@ -236,6 +246,8 @@ export default async function MeetingDetailPage({
             hasExistingRecording={!!meeting.recording}
             recordingStatus={meeting.recording?.status}
             errorMessage={meeting.recording?.errorMessage}
+            meetingStatus={meeting.status}
+            maxRecordingMins={settings?.maxRecordingMins ?? 25}
           />
 
           {/* Transcript Viewer */}
@@ -282,12 +294,18 @@ export default async function MeetingDetailPage({
         canUpload={isReporter || isEmployee}
       />
 
-      {/* Form Responses */}
-      {hasFormData && (
+      {/* Form Responses – visible to the employee always (including drafts),
+           but only shown to reporters / super admins after official submission. */}
+      {hasFormData && (isEmployee || formSubmitted) && (
         <div className="space-y-4">
           <h2 className="text-xl font-semibold text-dark-gray dark:text-white flex items-center gap-2">
             <FileText className="w-5 h-5" />
             Form Responses
+            {isEmployee && !formSubmitted && (
+              <span className="ml-2 px-2.5 py-0.5 text-xs font-medium rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                Draft
+              </span>
+            )}
           </h2>
           <div className="space-y-4">
             {formSections.map((section, index) => (
@@ -333,7 +351,7 @@ export default async function MeetingDetailPage({
           <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-hidden">
             <div className="divide-y divide-off-white dark:divide-medium-gray/20">
               {meeting.todos.map((todo) => (
-                <div key={todo.id} className="p-4 sm:p-5">
+                <div key={todo.id} className="p-4 sm:p-5 even:bg-off-white/40 dark:even:bg-charcoal/40">
                   <div className="flex items-start gap-3 sm:gap-4">
                     <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
                       todo.status === 'DONE'

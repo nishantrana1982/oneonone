@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { fromZonedTime, toZonedTime } from 'date-fns-tz'
-import { addDays, addWeeks, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns'
 import { requireRole, getCurrentUser } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
-import { UserRole, RecurringFrequency } from '@prisma/client'
+import { UserRole } from '@prisma/client'
 import { createAuditLog } from '@/lib/audit'
 import { DEFAULT_WORK_END, DEFAULT_WORK_START } from '@/lib/timezones'
+import { calculateFirstOccurrence, advanceToNextOccurrence } from '@/lib/recurring-dates'
 
 const FALLBACK_TZ = 'Asia/Kolkata'
 
@@ -136,7 +135,7 @@ export async function POST(request: NextRequest) {
     const reporterTz = reporterProfile?.timeZone ?? FALLBACK_TZ
 
     // Calculate next meeting date in the reporter's timezone
-    const nextMeetingDate = calculateNextMeetingDate(
+    const nextMeetingDate = calculateFirstOccurrence(
       dayOfWeek,
       timeOfDay,
       frequency || 'BIWEEKLY',
@@ -204,6 +203,19 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    // Advance nextMeetingDate so the cron doesn't duplicate the first meeting
+    const secondOccurrence = advanceToNextOccurrence(
+      dayOfWeek,
+      timeOfDay,
+      frequency || 'BIWEEKLY',
+      nextMeetingDate,
+      reporterTz
+    )
+    await prisma.recurringSchedule.update({
+      where: { id: schedule.id },
+      data: { nextMeetingDate: secondOccurrence },
+    })
+
     // Send proposal email to the employee
     try {
       const employee = await prisma.user.findUnique({ where: { id: employeeId }, select: { email: true, name: true } })
@@ -250,30 +262,3 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function calculateNextMeetingDate(
-  dayOfWeek: number,
-  timeOfDay: string,
-  frequency: RecurringFrequency,
-  timeZone = FALLBACK_TZ
-): Date {
-  const [hours, minutes] = timeOfDay.split(':').map(Number)
-  const now = new Date()
-  const zoned = toZonedTime(now, timeZone)
-  const currentDay = zoned.getDay()
-  let daysUntil = dayOfWeek - currentDay
-  if (daysUntil < 0) daysUntil += 7
-  else if (daysUntil === 0) {
-    if (zoned.getHours() > hours || (zoned.getHours() === hours && zoned.getMinutes() >= minutes)) {
-      daysUntil += 7
-    }
-  }
-  let nextLocal = addDays(zoned, daysUntil)
-  nextLocal = setHours(nextLocal, hours)
-  nextLocal = setMinutes(nextLocal, minutes)
-  nextLocal = setSeconds(nextLocal, 0)
-  nextLocal = setMilliseconds(nextLocal, 0)
-  if (frequency === 'BIWEEKLY' && daysUntil < 7) {
-    nextLocal = addWeeks(nextLocal, 1)
-  }
-  return fromZonedTime(nextLocal, timeZone)
-}
