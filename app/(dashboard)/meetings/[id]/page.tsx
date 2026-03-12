@@ -44,6 +44,9 @@ export default async function MeetingDetailPage({
 
   if (!meeting) return notFound()
 
+  // Type-safe access for meetingType/meetingLink (Prisma client may be generated from older schema on server)
+  const meetingWithType = meeting as typeof meeting & { meetingType?: string; meetingLink?: string | null }
+
   const canAccess = canAccessEmployeeData(
     user.role,
     user.id,
@@ -119,15 +122,15 @@ export default async function MeetingDetailPage({
           </p>
           <div className="flex flex-wrap items-center gap-2 mt-2">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-off-white dark:bg-dark-gray text-medium-gray dark:text-light-gray">
-              {meeting.meetingType === 'ZOOM' ? (
+              {meetingWithType.meetingType === 'ZOOM' ? (
                 <><Video className="w-3.5 h-3.5" /> Over Zoom</>
               ) : (
                 <><MapPin className="w-3.5 h-3.5" /> In person</>
               )}
             </span>
-            {meeting.meetingLink && (
+            {meetingWithType.meetingLink && (
               <a
-                href={meeting.meetingLink}
+                href={meetingWithType.meetingLink}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
@@ -261,7 +264,7 @@ export default async function MeetingDetailPage({
             <Mic className="w-5 h-5" />
             Meeting Recording
           </h2>
-          {meeting.meetingType === 'ZOOM' && meeting.meetingLink && (
+          {meetingWithType.meetingType === 'ZOOM' && meetingWithType.meetingLink && (
             <p className="text-sm text-medium-gray">
               For Zoom calls, add the Fathom recorder to the meeting; the transcript will sync here automatically after the call ends.
             </p>
