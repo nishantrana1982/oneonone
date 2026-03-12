@@ -17,6 +17,24 @@ async function cancelFutureMeetingsForSchedule(
   scheduleId: string,
   reporterName: string
 ): Promise<number> {
+  const schedule = await prisma.recurringSchedule.findUnique({
+    where: { id: scheduleId },
+    select: { googleRecurringEventId: true, reporterId: true },
+  })
+
+  const { deleteCalendarEvent } = await import('@/lib/google-calendar')
+  if (schedule?.googleRecurringEventId) {
+    try {
+      await deleteCalendarEvent(schedule.googleRecurringEventId, schedule.reporterId)
+    } catch (error) {
+      console.error('Failed to delete recurring calendar series', error)
+    }
+    await prisma.recurringSchedule.update({
+      where: { id: scheduleId },
+      data: { googleRecurringEventId: null, googleCalendarLink: null },
+    })
+  }
+
   const now = new Date()
   const futureMeetings = await prisma.meeting.findMany({
     where: {
@@ -27,7 +45,6 @@ async function cancelFutureMeetingsForSchedule(
     include: { calendarEvent: true },
   })
 
-  const { deleteCalendarEvent } = await import('@/lib/google-calendar')
   const { notifyMeetingCancelled } = await import('@/lib/notifications')
 
   let cancelled = 0
@@ -123,7 +140,7 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const { frequency, dayOfWeek, timeOfDay, isActive, cancelFutureMeetings } = body
+    const { frequency, dayOfWeek, timeOfDay, isActive, cancelFutureMeetings, meetingType, meetingLink } = body
 
     const isSuperAdmin = user.role === UserRole.SUPER_ADMIN
     const existing = await prisma.recurringSchedule.findFirst({
@@ -152,6 +169,9 @@ export async function PATCH(
       ...(dayOfWeek !== undefined && { dayOfWeek }),
       ...(timeOfDay !== undefined && { timeOfDay }),
       ...(isActive !== undefined && { isActive }),
+      ...((meetingType === 'IN_PERSON' || meetingType === 'ZOOM') && { meetingType }),
+      ...(meetingType === 'ZOOM' && meetingLink !== undefined && { meetingLink: meetingLink ? String(meetingLink).trim() : null }),
+      ...(meetingType === 'IN_PERSON' && { meetingLink: null }),
     }
 
     // Recalculate nextMeetingDate when schedule timing changes
@@ -281,9 +301,18 @@ export async function DELETE(
       )
     }
 
+    if (!cancelFutureMeetings && existing.googleRecurringEventId) {
+      try {
+        const { deleteCalendarEvent } = await import('@/lib/google-calendar')
+        await deleteCalendarEvent(existing.googleRecurringEventId, existing.reporterId)
+      } catch (error) {
+        console.error('Failed to delete recurring calendar series', error)
+      }
+    }
+
     await prisma.recurringSchedule.update({
       where: { id },
-      data: { isActive: false },
+      data: { isActive: false, googleRecurringEventId: null, googleCalendarLink: null },
     })
 
     return NextResponse.json({

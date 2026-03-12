@@ -27,6 +27,8 @@ model User {
   timeZone           String?
   workDayStart       String?
   workDayEnd         String?
+  // Keka HR employee ID for leave/attendance integration
+  kekaEmployeeId     String?
   accounts           Account[]
   auditLogs          AuditLog[]
   dashboardWidgets   DashboardWidget[]
@@ -114,6 +116,9 @@ model Meeting {
   updatedAt                DateTime           @updatedAt
   notes                    String?
   recurringScheduleId      String?
+  meetingType               MeetingType       @default(IN_PERSON)
+  meetingLink               String?
+  zoomMeetingId             String?
   reminder24hSent          Boolean            @default(false)
   reminderSent             Boolean            @default(false)
   formReminderSent         Boolean            @default(false)
@@ -130,6 +135,7 @@ model Meeting {
   @@index([meetingDate])
   @@index([status])
   @@index([recurringScheduleId])
+  @@index([zoomMeetingId])
 }
 
 model Todo {
@@ -199,36 +205,42 @@ model MeetingRecording {
 }
 
 model SystemSettings {
-  id                   String   @id @default("system")
-  openaiApiKey         String?
-  openaiModel          String   @default("gpt-4o")
-  whisperModel         String   @default("whisper-1")
-  awsRegion            String?
-  awsAccessKeyId       String?
-  awsSecretKey         String?
-  awsS3Bucket          String?
-  maxRecordingMins     Int      @default(25)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-  enableEmailReminders Boolean  @default(true)
-  reminderHoursBefore  Int      @default(24)
+  id                        String   @id @default("system")
+  openaiApiKey              String?
+  openaiModel               String   @default("gpt-4o")
+  whisperModel              String   @default("whisper-1")
+  awsRegion                 String?
+  awsAccessKeyId            String?
+  awsSecretKey              String?
+  awsS3Bucket               String?
+  maxRecordingMins          Int      @default(25)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+  enableEmailReminders      Boolean  @default(true)
+  reminderHoursBefore       Int      @default(24)
+  // When true, meeting cannot be marked Completed until the check-in form is submitted
+  requireFormBeforeComplete Boolean  @default(true)
 }
 
 model RecurringSchedule {
-  id              String             @id @default(uuid())
-  reporterId      String
-  employeeId      String
-  frequency       RecurringFrequency @default(BIWEEKLY)
-  dayOfWeek       Int
-  timeOfDay       String
-  isActive        Boolean            @default(true)
-  nextMeetingDate DateTime?
-  lastGeneratedAt DateTime?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  meetings        Meeting[]
-  reporter        User               @relation("RecurringScheduleReporter", fields: [reporterId], references: [id])
-  employee        User               @relation("RecurringScheduleEmployee", fields: [employeeId], references: [id])
+  id                     String             @id @default(uuid())
+  reporterId             String
+  employeeId             String
+  frequency              RecurringFrequency @default(BIWEEKLY)
+  dayOfWeek              Int
+  timeOfDay              String
+  meetingType            MeetingType        @default(IN_PERSON)
+  meetingLink            String?
+  isActive               Boolean            @default(true)
+  nextMeetingDate        DateTime?
+  lastGeneratedAt        DateTime?
+  googleRecurringEventId String?
+  googleCalendarLink     String?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  meetings               Meeting[]
+  reporter               User               @relation("RecurringScheduleReporter", fields: [reporterId], references: [id])
+  employee               User               @relation("RecurringScheduleEmployee", fields: [employeeId], references: [id])
 
   @@index([reporterId])
   @@index([employeeId])
@@ -322,6 +334,11 @@ enum UserRole {
   EMPLOYEE
   REPORTER
   SUPER_ADMIN
+}
+
+enum MeetingType {
+  IN_PERSON
+  ZOOM
 }
 
 enum MeetingStatus {

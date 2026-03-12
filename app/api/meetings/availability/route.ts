@@ -51,6 +51,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid date format' }, { status: 400 })
     }
 
+    const { isDateUnavailableForEitherUser } = await import('@/lib/keka')
+    if (await isDateUnavailableForEitherUser(user.id, employeeId, parsedDate)) {
+      return NextResponse.json({
+        slots: [],
+        dateUnavailable: true,
+        workingHoursLabel: null,
+        message: 'This date is a public holiday or one of you is on leave (from Keka). Pick another day.',
+      })
+    }
+
     if (!yourCalendarConnected || !employeeCalendarConnected) {
       return NextResponse.json({
         slots: [],

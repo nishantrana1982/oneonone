@@ -19,6 +19,7 @@ import {
 import { UserRole, TodoStatus, TodoPriority } from '@prisma/client'
 import { useToast } from '@/components/ui/toast'
 import { useConfirm } from '@/components/ui/confirm-modal'
+import { isTodoOverdue } from '@/lib/utils'
 
 interface Todo {
   id: string
@@ -70,7 +71,7 @@ export function TodoDetail({ todo, currentUserId, userRole }: TodoDetailProps) {
   const priority = priorityConfig[todo.priority]
   const StatusIcon = status.icon
   const now = new Date()
-  const isOverdue = todo.dueDate && new Date(todo.dueDate) < now && currentStatus !== 'DONE'
+  const isOverdue = isTodoOverdue(todo.dueDate, now, currentStatus)
   const canEdit = todo.assignedTo.id === currentUserId || userRole === 'SUPER_ADMIN'
   const canDelete = todo.createdBy.id === currentUserId || userRole === 'SUPER_ADMIN'
 
@@ -125,7 +126,7 @@ export function TodoDetail({ todo, currentUserId, userRole }: TodoDetailProps) {
     })
 
   return (
-    <div className="space-y-5 max-w-3xl mx-auto">
+    <div className="w-full max-w-4xl mx-auto min-w-0 space-y-5">
       {/* Back Button */}
       <button
         onClick={() => router.back()}

@@ -52,8 +52,8 @@ export async function PATCH(
       return NextResponse.json({ error: 'Todo not found' }, { status: 404 })
     }
 
-    // Only assigned user or admin can update
-    if (todo.assignedToId !== user.id && user.role !== 'SUPER_ADMIN') {
+    // Assigned user, task creator (reporter), or admin can update
+    if (todo.assignedToId !== user.id && todo.createdById !== user.id && user.role !== 'SUPER_ADMIN') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 

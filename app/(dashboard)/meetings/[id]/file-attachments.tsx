@@ -153,14 +153,19 @@ export function FileAttachments({ meetingId, initialAttachments, canUpload }: Fi
         throw new Error(data.error || 'Failed to get download link')
       }
       const { downloadUrl } = await res.json()
-      // Open the signed S3 URL — browser will download the file
+      // Fetch the file as blob so the download attribute is respected (cross-origin S3 URLs ignore it)
+      const fileRes = await fetch(downloadUrl, { mode: 'cors' })
+      if (!fileRes.ok) throw new Error('Failed to fetch file')
+      const blob = await fileRes.blob()
+      const objectUrl = URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = downloadUrl
+      a.href = objectUrl
       a.download = attachment.fileName
       a.rel = 'noopener noreferrer'
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
+      URL.revokeObjectURL(objectUrl)
     } catch (error) {
       toastError(error instanceof Error ? error.message : 'Failed to download file')
     } finally {

@@ -22,6 +22,7 @@ interface User {
   timeZone: string | null
   workDayStart: string | null
   workDayEnd: string | null
+  kekaEmployeeId?: string | null
   department: { name: string } | null
   reportsTo: { name: string } | null
 }
@@ -58,6 +59,7 @@ export function UserManagement({ users, departments, reporters }: UserManagement
     timeZone: '',
     workDayStart: DEFAULT_WORK_START,
     workDayEnd: DEFAULT_WORK_END,
+    kekaEmployeeId: '',
   })
 
   const resetForm = () => {
@@ -72,6 +74,7 @@ export function UserManagement({ users, departments, reporters }: UserManagement
       timeZone: '',
       workDayStart: DEFAULT_WORK_START,
       workDayEnd: DEFAULT_WORK_END,
+      kekaEmployeeId: '',
     })
   }
 
@@ -93,6 +96,7 @@ export function UserManagement({ users, departments, reporters }: UserManagement
       timeZone: user.timeZone || '',
       workDayStart: user.workDayStart || DEFAULT_WORK_START,
       workDayEnd: user.workDayEnd || DEFAULT_WORK_END,
+      kekaEmployeeId: user.kekaEmployeeId || '',
     })
     setEditingUser(user)
     setIsAddOpen(true)
@@ -196,6 +200,7 @@ export function UserManagement({ users, departments, reporters }: UserManagement
           timeZone: formData.timeZone || null,
           workDayStart: formData.workDayStart || null,
           workDayEnd: formData.workDayEnd || null,
+          kekaEmployeeId: formData.kekaEmployeeId?.trim() || null,
         }),
       })
 
@@ -632,6 +637,22 @@ export function UserManagement({ users, departments, reporters }: UserManagement
                   </div>
                 </div>
               </div>
+
+              {editingUser && (
+                <div>
+                  <label className="block text-sm font-medium text-dark-gray dark:text-white mb-1">
+                    Keka Employee ID (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.kekaEmployeeId}
+                    onChange={(e) => setFormData({ ...formData, kekaEmployeeId: e.target.value })}
+                    placeholder="UUID from Keka for leave integration"
+                    className="w-full rounded-xl border border-off-white dark:border-medium-gray/20 bg-off-white dark:bg-charcoal px-4 py-3 text-dark-gray dark:text-white placeholder:text-medium-gray focus:border-orange focus:outline-none focus:ring-2 focus:ring-orange/20"
+                  />
+                  <p className="mt-1 text-xs text-medium-gray">Used to check leave in Keka when finding available meeting slots.</p>
+                </div>
+              )}
 
               {editingUser && (
                 <div className="flex items-center gap-3">

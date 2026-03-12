@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, Clock, Calendar, Loader2, AlertCircle, X } from 'lucide-react'
+import { Check, Clock, Calendar, Loader2, AlertCircle } from 'lucide-react'
 import { DatePicker } from '@/components/ui/date-picker'
 import { useToast } from '@/components/ui/toast'
 
@@ -35,7 +35,6 @@ export function ProposalActions({
   const [suggestDate, setSuggestDate] = useState('')
   const [suggestTime, setSuggestTime] = useState('')
   const [submittingSuggest, setSubmittingSuggest] = useState(false)
-  const [cancelling, setCancelling] = useState(false)
 
   // Availability slots for suggest flow
   const [slots, setSlots] = useState<FreeSlot[]>([])
@@ -73,28 +72,6 @@ export function ProposalActions({
       toastError(error instanceof Error ? error.message : 'Failed to accept meeting')
     } finally {
       setAccepting(false)
-    }
-  }
-
-  const handleCancel = async () => {
-    if (!confirm('Cancel this meeting proposal? This cannot be undone.')) return
-    setCancelling(true)
-    try {
-      const res = await fetch(`/api/meetings/${meetingId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'CANCELLED' }),
-      })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Failed to cancel')
-      }
-      toastSuccess('Meeting proposal cancelled.')
-      router.refresh()
-    } catch (error) {
-      toastError(error instanceof Error ? error.message : 'Failed to cancel proposal')
-    } finally {
-      setCancelling(false)
     }
   }
 
@@ -323,7 +300,7 @@ export function ProposalActions({
     )
   }
 
-  // Proposer view: waiting for response — can change time or cancel
+  // Proposer view: waiting for response — can change time (cancel not allowed)
   if (isProposer) {
     return (
       <div className="space-y-4">
@@ -339,12 +316,12 @@ export function ProposalActions({
               <p className="text-medium-gray mt-1">
                 You proposed this meeting for <strong>{formattedDate}</strong>.{' '}
                 {isPast
-                  ? `${otherPartyName} did not respond in time. Change the time or cancel the proposal.`
+                  ? `${otherPartyName} did not respond in time. You can suggest a new time below.`
                   : `Waiting for ${otherPartyName} to accept or suggest a new time.`}
               </p>
               {isPast && (
                 <p className="text-sm text-red-600 dark:text-red-400 mt-2">
-                  The proposed time has passed. Please reschedule or cancel.
+                  The proposed time has passed. Please suggest a new time below.
                 </p>
               )}
 
@@ -355,18 +332,6 @@ export function ProposalActions({
                 >
                   <Clock className="w-4 h-4" />
                   Change Time
-                </button>
-                <button
-                  onClick={handleCancel}
-                  disabled={cancelling}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 text-red-500 bg-red-500/10 rounded-xl font-medium hover:bg-red-500/20 disabled:opacity-50 transition-all min-h-[44px]"
-                >
-                  {cancelling ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <X className="w-4 h-4" />
-                  )}
-                  Cancel Proposal
                 </button>
               </div>
             </div>

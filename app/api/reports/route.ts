@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { UserRole, Prisma } from '@prisma/client'
+import { isTodoOverdue } from '@/lib/utils'
 
 // Simple sentiment keywords
 const positiveWords = ['great', 'excellent', 'good', 'amazing', 'fantastic', 'happy', 'success', 'achieved', 'completed', 'progress', 'improved', 'better', 'love', 'excited', 'proud', 'wonderful', 'awesome']
@@ -172,8 +173,9 @@ export async function GET(request: NextRequest) {
     const scheduledMeetings = meetings.filter(m => m.status === 'SCHEDULED').length
     const completedTasks = todos.filter(t => t.status === 'DONE').length
     const pendingTasks = todos.filter(t => t.status !== 'DONE').length
-    const overdueTasks = todos.filter(t => 
-      t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'DONE'
+    const now = new Date()
+    const overdueTasks = todos.filter(t =>
+      isTodoOverdue(t.dueDate, now, t.status)
     ).length
 
     // Analyze sentiment from meeting responses

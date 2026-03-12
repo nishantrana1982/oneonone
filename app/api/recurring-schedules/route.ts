@@ -4,9 +4,11 @@ import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
 import { createAuditLog } from '@/lib/audit'
 import { DEFAULT_WORK_END, DEFAULT_WORK_START } from '@/lib/timezones'
-import { calculateFirstOccurrence, advanceToNextOccurrence } from '@/lib/recurring-dates'
+import { calculateFirstOccurrence, advanceToNextOccurrence, getNextOccurrenceDates } from '@/lib/recurring-dates'
 
 const FALLBACK_TZ = 'Asia/Kolkata'
+/** When creating a recurring schedule, check this many future occurrences; use the first free one (one-off holiday/leave shouldn't block). */
+const MAX_OCCURRENCES_TO_CHECK = 6
 
 // Get all recurring schedules for the current user
 export async function GET(request: NextRequest) {
@@ -55,11 +57,17 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { employeeId, frequency, dayOfWeek, timeOfDay } = body
+    const { employeeId, frequency, dayOfWeek, timeOfDay, meetingType, meetingLink } = body
 
     // Validate
     if (!employeeId || dayOfWeek === undefined || !timeOfDay) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+    if (meetingType === 'ZOOM' && (!meetingLink || typeof meetingLink !== 'string' || !meetingLink.trim())) {
+      return NextResponse.json(
+        { error: 'Zoom meeting invite link is required when the meeting type is Over Zoom.' },
+        { status: 400 }
+      )
     }
 
     // Check if schedule already exists for this employee
@@ -134,15 +142,16 @@ export async function POST(request: NextRequest) {
 
     const reporterTz = reporterProfile?.timeZone ?? FALLBACK_TZ
 
-    // Calculate next meeting date in the reporter's timezone
-    const nextMeetingDate = calculateFirstOccurrence(
+    // Find the first free occurrence among the next few (one-off holiday/leave shouldn't block the whole recurring slot)
+    const upcomingDates = getNextOccurrenceDates(
       dayOfWeek,
       timeOfDay,
       frequency || 'BIWEEKLY',
-      reporterTz
+      reporterTz,
+      MAX_OCCURRENCES_TO_CHECK
     )
+    let nextMeetingDate = upcomingDates[0]!
 
-    // Check both calendars for the first occurrence (if both connected)
     try {
       const { isCalendarEnabled, isDateTimeFreeForBoth } = await import('@/lib/google-calendar')
       const [reporterConnected, employeeConnected] = await Promise.all([
@@ -150,6 +159,7 @@ export async function POST(request: NextRequest) {
         isCalendarEnabled(employeeId),
       ])
       if (reporterConnected && employeeConnected) {
+        const { isDateUnavailableForEitherUser } = await import('@/lib/keka')
         const availabilityOptions = {
           reporterTimeZone: reporterTz,
           reporterWorkStart: reporterProfile?.workDayStart ?? DEFAULT_WORK_START,
@@ -158,8 +168,18 @@ export async function POST(request: NextRequest) {
           employeeWorkStart: employeeProfile?.workDayStart ?? DEFAULT_WORK_START,
           employeeWorkEnd: employeeProfile?.workDayEnd ?? DEFAULT_WORK_END,
         }
-        const free = await isDateTimeFreeForBoth(user.id, employeeId, nextMeetingDate, 30, availabilityOptions)
-        if (!free) {
+        let foundFree = false
+        for (const date of upcomingDates) {
+          const kekaUnavailable = await isDateUnavailableForEitherUser(user.id, employeeId, date)
+          if (kekaUnavailable) continue
+          const free = await isDateTimeFreeForBoth(user.id, employeeId, date, 30, availabilityOptions)
+          if (free) {
+            nextMeetingDate = date
+            foundFree = true
+            break
+          }
+        }
+        if (!foundFree) {
           const formatted = nextMeetingDate.toLocaleDateString('en-US', {
             weekday: 'short',
             month: 'short',
@@ -170,7 +190,7 @@ export async function POST(request: NextRequest) {
             timeZone: reporterTz,
           })
           return NextResponse.json(
-            { error: `One or both of you have a calendar conflict on the first occurrence (${formatted}). Please choose a different day or time.` },
+            { error: `Each of the next ${MAX_OCCURRENCES_TO_CHECK} occurrences has a calendar conflict (e.g. first: ${formatted}). Please choose a different day or time.` },
             { status: 409 }
           )
         }
@@ -188,6 +208,8 @@ export async function POST(request: NextRequest) {
         dayOfWeek,
         timeOfDay,
         nextMeetingDate,
+        meetingType: meetingType === 'ZOOM' ? 'ZOOM' : 'IN_PERSON',
+        meetingLink: meetingType === 'ZOOM' && meetingLink ? String(meetingLink).trim() || null : null,
       },
     })
 
@@ -200,6 +222,8 @@ export async function POST(request: NextRequest) {
         recurringScheduleId: schedule.id,
         status: 'PROPOSED',
         proposedById: user.id,
+        meetingType: schedule.meetingType,
+        meetingLink: schedule.meetingLink,
       },
     })
 

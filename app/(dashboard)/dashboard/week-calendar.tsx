@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { Calendar, Clock, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 
@@ -15,6 +15,8 @@ interface CalendarMeeting {
 interface WeekCalendarProps {
   initialMeetings: CalendarMeeting[]
   initialWeekStart: string
+  /** End of preloaded range (e.g. 1 year). When navigating within this range, filter from initialMeetings instead of fetching. */
+  initialRangeEnd?: string
   userRole: string
 }
 
@@ -397,15 +399,24 @@ function MonthView({ meetings, monthDate, today, userRole }: {
 
 // ── Main Calendar Component ──────────────────────────────────────────────────
 
-export function WeekCalendar({ initialMeetings, initialWeekStart, userRole }: WeekCalendarProps) {
+export function WeekCalendar({ initialMeetings, initialWeekStart, initialRangeEnd, userRole }: WeekCalendarProps) {
   const todayMonday = getMonday(new Date())
   const today = new Date()
+  const rangeEnd = useMemo(() => (initialRangeEnd ? new Date(initialRangeEnd) : null), [initialRangeEnd])
 
   const [view, setView] = useState<ViewMode>('week')
 
   // Week state
   const [weekStart, setWeekStart] = useState<Date>(new Date(initialWeekStart))
-  const [weekMeetings, setWeekMeetings] = useState<CalendarMeeting[]>(initialMeetings)
+  const [weekMeetings, setWeekMeetings] = useState<CalendarMeeting[]>(() => {
+    const start = new Date(initialWeekStart)
+    const end = new Date(start)
+    end.setDate(end.getDate() + 7)
+    return initialMeetings.filter((m) => {
+      const d = new Date(m.meetingDate).getTime()
+      return d >= start.getTime() && d < end.getTime()
+    })
+  })
   const [weekLoading, setWeekLoading] = useState(false)
 
   // Month state
@@ -427,40 +438,69 @@ export function WeekCalendar({ initialMeetings, initialWeekStart, userRole }: We
     return []
   }, [])
 
-  // Fetch week meetings when week changes
+  // Week meetings: use preloaded 1-year data when in range, otherwise fetch
   useEffect(() => {
-    if (!isSameWeek(weekStart, new Date(initialWeekStart))) {
-      setWeekLoading(true)
-      const end = new Date(weekStart)
-      end.setDate(end.getDate() + 7)
-      fetchRange(weekStart, end).then((data) => {
-        setWeekMeetings(data)
-        setWeekLoading(false)
-      }).catch(() => setWeekLoading(false))
-    } else {
-      setWeekMeetings(initialMeetings)
-    }
-  }, [weekStart, initialWeekStart, initialMeetings, fetchRange])
+    const weekEnd = new Date(weekStart)
+    weekEnd.setDate(weekEnd.getDate() + 7)
+    const inPreloadedRange =
+      rangeEnd &&
+      weekStart.getTime() >= new Date(initialWeekStart).getTime() &&
+      weekEnd.getTime() <= rangeEnd.getTime()
 
-  // Fetch month meetings when month changes or first time month view opens
+    if (inPreloadedRange) {
+      const filtered = initialMeetings.filter((m) => {
+        const t = new Date(m.meetingDate).getTime()
+        return t >= weekStart.getTime() && t < weekEnd.getTime()
+      })
+      setWeekMeetings(filtered)
+      return
+    }
+
+    setWeekLoading(true)
+    fetchRange(weekStart, weekEnd)
+      .then((data) => {
+        setWeekMeetings(data)
+      })
+      .catch(() => {})
+      .finally(() => setWeekLoading(false))
+  }, [weekStart, initialWeekStart, initialMeetings, rangeEnd, fetchRange])
+
+  // Month meetings: use preloaded 1-year data when in range, otherwise fetch
   useEffect(() => {
     if (view !== 'month') return
     const key = `${monthDate.getFullYear()}-${monthDate.getMonth()}`
     if (monthFetched === key) return
 
-    setMonthLoading(true)
     const gridDays = getMonthGridDays(monthDate.getFullYear(), monthDate.getMonth())
     const start = gridDays[0]
     const end = gridDays[gridDays.length - 1]
     const endPlusOne = new Date(end)
     endPlusOne.setDate(endPlusOne.getDate() + 1)
 
-    fetchRange(start, endPlusOne).then((data) => {
-      setMonthMeetings(data)
+    const inPreloadedRange =
+      rangeEnd &&
+      start.getTime() >= new Date(initialWeekStart).getTime() &&
+      endPlusOne.getTime() <= rangeEnd.getTime()
+
+    if (inPreloadedRange) {
+      const filtered = initialMeetings.filter((m) => {
+        const t = new Date(m.meetingDate).getTime()
+        return t >= start.getTime() && t < endPlusOne.getTime()
+      })
+      setMonthMeetings(filtered)
       setMonthFetched(key)
-      setMonthLoading(false)
-    }).catch(() => setMonthLoading(false))
-  }, [view, monthDate, monthFetched, fetchRange])
+      return
+    }
+
+    setMonthLoading(true)
+    fetchRange(start, endPlusOne)
+      .then((data) => {
+        setMonthMeetings(data)
+        setMonthFetched(key)
+      })
+      .catch(() => setMonthFetched(key))
+      .finally(() => setMonthLoading(false))
+  }, [view, monthDate, monthFetched, initialWeekStart, initialMeetings, rangeEnd, fetchRange])
 
   // Navigation
   const goToPreviousWeek = () => {

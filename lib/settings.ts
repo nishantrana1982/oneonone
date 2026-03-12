@@ -10,6 +10,8 @@ export interface SystemSettings {
   awsSecretKey: string | null
   awsS3Bucket: string | null
   maxRecordingMins: number
+  /** When true, meeting cannot be marked Completed until the check-in form is submitted. */
+  requireFormBeforeComplete: boolean
 }
 
 // Cache settings for 5 minutes to avoid frequent DB calls
@@ -38,6 +40,7 @@ export async function getSettings(): Promise<SystemSettings> {
       awsSecretKey: process.env.AWS_SECRET_ACCESS_KEY || null,
       awsS3Bucket: process.env.AWS_S3_BUCKET || null,
       maxRecordingMins: 25,
+      requireFormBeforeComplete: true,
     }
   }
 
@@ -51,6 +54,7 @@ export async function getSettings(): Promise<SystemSettings> {
     awsSecretKey: settings.awsSecretKey ? decrypt(settings.awsSecretKey) : process.env.AWS_SECRET_ACCESS_KEY || null,
     awsS3Bucket: settings.awsS3Bucket || process.env.AWS_S3_BUCKET || null,
     maxRecordingMins: settings.maxRecordingMins,
+    requireFormBeforeComplete: settings.requireFormBeforeComplete ?? true,
   }
 
   // Update cache
@@ -62,7 +66,7 @@ export async function getSettings(): Promise<SystemSettings> {
 
 export async function updateSettings(updates: Partial<SystemSettings>): Promise<SystemSettings> {
   // Encrypt sensitive fields if provided
-  const dataToUpdate: Record<string, string | number | null> = {}
+  const dataToUpdate: Record<string, string | number | boolean | null> = {}
 
   if (updates.openaiApiKey !== undefined) {
     dataToUpdate.openaiApiKey = updates.openaiApiKey ? encrypt(updates.openaiApiKey) : null
@@ -87,6 +91,9 @@ export async function updateSettings(updates: Partial<SystemSettings>): Promise<
   }
   if (updates.maxRecordingMins !== undefined) {
     dataToUpdate.maxRecordingMins = updates.maxRecordingMins
+  }
+  if (updates.requireFormBeforeComplete !== undefined) {
+    dataToUpdate.requireFormBeforeComplete = updates.requireFormBeforeComplete
   }
 
   await prisma.systemSettings.upsert({

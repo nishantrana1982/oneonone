@@ -63,20 +63,41 @@ export async function POST(
       },
     })
 
-    // Create Google Calendar event now that both sides agreed
+    // Create Google Calendar event(s) now that both sides agreed
     try {
-      const { createCalendarEvent, isCalendarEnabled } = await import('@/lib/google-calendar')
+      const { createCalendarEvent, createRecurringCalendarEvent, isCalendarEnabled } = await import('@/lib/google-calendar')
       const calendarEnabled = await isCalendarEnabled(meeting.reporterId)
       if (calendarEnabled) {
-        await createCalendarEvent(
-          meeting.id,
-          meeting.employee.email,
-          meeting.reporter.email,
-          meeting.reporterId,
-          meeting.meetingDate,
-          meeting.employee.name,
-          meeting.reporter.name
-        )
+        if (meeting.recurringScheduleId) {
+          const schedule = await prisma.recurringSchedule.findUnique({
+            where: { id: meeting.recurringScheduleId },
+            select: { googleRecurringEventId: true, frequency: true, reporter: { select: { timeZone: true } } },
+          })
+          if (schedule && !schedule.googleRecurringEventId) {
+            await createRecurringCalendarEvent(
+              meeting.recurringScheduleId,
+              meeting.id,
+              meeting.reporterId,
+              meeting.employee.email,
+              meeting.reporter.email,
+              meeting.meetingDate,
+              meeting.employee.name,
+              meeting.reporter.name,
+              schedule.frequency,
+              schedule.reporter?.timeZone ?? 'Asia/Kolkata'
+            )
+          }
+        } else {
+          await createCalendarEvent(
+            meeting.id,
+            meeting.employee.email,
+            meeting.reporter.email,
+            meeting.reporterId,
+            meeting.meetingDate,
+            meeting.employee.name,
+            meeting.reporter.name
+          )
+        }
       }
     } catch (error) {
       console.error('Failed to create calendar event on acceptance:', error)
@@ -139,7 +160,7 @@ export async function POST(
           })
 
           if (!alreadyExists) {
-            const nextMeeting = await prisma.meeting.create({
+            await prisma.meeting.create({
               data: {
                 employeeId: schedule.employeeId,
                 reporterId: schedule.reporterId,
@@ -163,24 +184,7 @@ export async function POST(
               data: { nextMeetingDate: futureDate, lastGeneratedAt: new Date() },
             })
 
-            // Book calendar event for the auto-scheduled meeting
-            try {
-              const { createCalendarEvent, isCalendarEnabled } = await import('@/lib/google-calendar')
-              const calendarEnabled = await isCalendarEnabled(schedule.reporterId)
-              if (calendarEnabled && schedule.reporter && schedule.employee) {
-                await createCalendarEvent(
-                  nextMeeting.id,
-                  schedule.employee.email,
-                  schedule.reporter.email,
-                  schedule.reporterId,
-                  nextDate,
-                  schedule.employee.name,
-                  schedule.reporter.name
-                )
-              }
-            } catch (calError) {
-              console.error('Failed to create calendar event for next recurring meeting:', calError)
-            }
+            // No calendar event: 1-year recurring series is already on both calendars
           }
         }
       } catch (recurError) {

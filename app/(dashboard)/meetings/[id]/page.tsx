@@ -3,14 +3,13 @@ import { prisma } from '@/lib/prisma'
 import { canAccessEmployeeData } from '@/lib/auth-helpers'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { Calendar, User, FileText, CheckSquare, Clock, ArrowLeft, Mic } from 'lucide-react'
+import { Calendar, User, FileText, CheckSquare, Clock, ArrowLeft, Mic, Video, MapPin, ExternalLink } from 'lucide-react'
 import { UserRole } from '@prisma/client'
 import { formatMeetingDateLong } from '@/lib/utils'
 import { getSettings } from '@/lib/settings'
 import { AddTodoForm } from './add-todo-form'
 import { MeetingRecorder } from './meeting-recorder'
 import { MarkCompletedButton } from './mark-completed-button'
-import { DeleteMeetingButton } from './delete-meeting-button'
 import { TranscriptViewer } from './transcript-viewer'
 import { MeetingNotes } from './meeting-notes'
 import { FileAttachments } from './file-attachments'
@@ -98,7 +97,7 @@ export default async function MeetingDetailPage({
   ].filter(section => section.content)
 
   return (
-    <div className="space-y-8 max-w-4xl min-w-0">
+    <div className="w-full max-w-4xl mx-auto min-w-0 space-y-8">
       {/* Back Button */}
       <Link
         href="/meetings"
@@ -118,13 +117,35 @@ export default async function MeetingDetailPage({
             <Calendar className="w-4 h-4 flex-shrink-0" />
             {formatMeetingDateLong(meetingDate)}
           </p>
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-off-white dark:bg-dark-gray text-medium-gray dark:text-light-gray">
+              {meeting.meetingType === 'ZOOM' ? (
+                <><Video className="w-3.5 h-3.5" /> Over Zoom</>
+              ) : (
+                <><MapPin className="w-3.5 h-3.5" /> In person</>
+              )}
+            </span>
+            {meeting.meetingLink && (
+              <a
+                href={meeting.meetingLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+              >
+                <Video className="w-4 h-4" />
+                Join Zoom meeting
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {isReporter && meeting.status === 'SCHEDULED' && (
-            <MarkCompletedButton meetingId={meeting.id} />
-          )}
-          {user.role === UserRole.SUPER_ADMIN && (
-            <DeleteMeetingButton meetingId={meeting.id} />
+            <MarkCompletedButton
+              meetingId={meeting.id}
+              formSubmitted={formSubmitted}
+              requireFormBeforeComplete={settings?.requireFormBeforeComplete ?? true}
+            />
           )}
           <span className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium ${
             meeting.status === 'COMPLETED'
@@ -240,7 +261,11 @@ export default async function MeetingDetailPage({
             <Mic className="w-5 h-5" />
             Meeting Recording
           </h2>
-          
+          {meeting.meetingType === 'ZOOM' && meeting.meetingLink && (
+            <p className="text-sm text-medium-gray">
+              For Zoom calls, add the Fathom recorder to the meeting; the transcript will sync here automatically after the call ends.
+            </p>
+          )}
           <MeetingRecorder
             meetingId={meeting.id}
             hasExistingRecording={!!meeting.recording}

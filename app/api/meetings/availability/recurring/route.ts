@@ -1,45 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { fromZonedTime, toZonedTime } from 'date-fns-tz'
-import { addDays, addWeeks, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns'
 import { requireRole } from '@/lib/auth-helpers'
 import { UserRole } from '@prisma/client'
 import { RecurringFrequency } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { DEFAULT_WORK_END, DEFAULT_WORK_START } from '@/lib/timezones'
+import { getNextOccurrenceDates } from '@/lib/recurring-dates'
 
 const FALLBACK_TZ = 'Asia/Kolkata'
-
-/**
- * Compute next occurrence of (dayOfWeek, timeOfDay) in the given timezone.
- * timeOfDay is "HH:mm" in that timezone.
- */
-function calculateNextMeetingDate(
-  dayOfWeek: number,
-  timeOfDay: string,
-  frequency: RecurringFrequency,
-  timeZone: string
-): Date {
-  const [hours, minutes] = timeOfDay.split(':').map(Number)
-  const now = new Date()
-  const zoned = toZonedTime(now, timeZone)
-  const currentDay = zoned.getDay()
-  let daysUntil = dayOfWeek - currentDay
-  if (daysUntil < 0) daysUntil += 7
-  else if (daysUntil === 0) {
-    const localHour = zoned.getHours()
-    const localMin = zoned.getMinutes()
-    if (localHour > hours || (localHour === hours && localMin >= minutes)) daysUntil += 7
-  }
-  let nextLocal = addDays(zoned, daysUntil)
-  nextLocal = setHours(nextLocal, hours)
-  nextLocal = setMinutes(nextLocal, minutes)
-  nextLocal = setSeconds(nextLocal, 0)
-  nextLocal = setMilliseconds(nextLocal, 0)
-  if (frequency === 'BIWEEKLY' && daysUntil < 7) {
-    nextLocal = addWeeks(nextLocal, 1)
-  }
-  return fromZonedTime(nextLocal, timeZone)
-}
+/** Number of future occurrences to check (e.g. 6 = next 6 weeks for weekly); one-off holiday/leave shouldn't block the whole slot. */
+const MAX_OCCURRENCES_TO_CHECK = 6
 
 /**
  * GET /api/meetings/availability/recurring?employeeId=&dayOfWeek=&timeOfDay=&frequency=
@@ -105,7 +74,6 @@ export async function GET(request: NextRequest) {
     const employeeStart = employee?.workDayStart ?? DEFAULT_WORK_START
     const employeeEnd = employee?.workDayEnd ?? DEFAULT_WORK_END
 
-    const firstDate = calculateNextMeetingDate(dayOfWeek, timeOfDay, frequency, reporterTz)
     const availabilityOptions = {
       reporterTimeZone: reporterTz,
       reporterWorkStart: reporterStart,
@@ -114,7 +82,22 @@ export async function GET(request: NextRequest) {
       employeeWorkStart: employeeStart,
       employeeWorkEnd: employeeEnd,
     }
-    const available = await isDateTimeFreeForBoth(user.id, employeeId, firstDate, 30, availabilityOptions)
+
+    // Check up to MAX_OCCURRENCES_TO_CHECK future occurrences; use the first free one (one-off holiday/leave shouldn't block the whole recurring slot)
+    const { isDateUnavailableForEitherUser } = await import('@/lib/keka')
+    const upcomingDates = getNextOccurrenceDates(dayOfWeek, timeOfDay, frequency, reporterTz, MAX_OCCURRENCES_TO_CHECK)
+    let firstFreeDate: Date | null = null
+    for (const date of upcomingDates) {
+      const kekaUnavailable = await isDateUnavailableForEitherUser(user.id, employeeId, date)
+      if (kekaUnavailable) continue
+      const free = await isDateTimeFreeForBoth(user.id, employeeId, date, 30, availabilityOptions)
+      if (free) {
+        firstFreeDate = date
+        break
+      }
+    }
+    const firstDate = firstFreeDate ?? upcomingDates[0]!
+    const available = firstFreeDate !== null
 
     const formatted = firstDate.toLocaleDateString('en-US', {
       weekday: 'short',
@@ -135,7 +118,7 @@ export async function GET(request: NextRequest) {
       employeeCalendarConnected: true,
       message: available
         ? `This time is free for both of you. First meeting: ${formatted}`
-        : `One or both have a conflict on the first occurrence (${formatted}). Choose another time or create anyway.`,
+        : `Each of the next ${MAX_OCCURRENCES_TO_CHECK} occurrences has a conflict. Choose another time or create anyway.`,
     })
   } catch (error) {
     console.error('Error fetching recurring availability:', error)

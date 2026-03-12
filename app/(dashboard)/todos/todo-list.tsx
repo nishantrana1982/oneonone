@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { CheckSquare, AlertTriangle, Circle, CheckCircle2, Clock, Calendar, ChevronDown, ChevronRight } from 'lucide-react'
 import { UserRole, TodoStatus, TodoPriority } from '@prisma/client'
 import { useToast } from '@/components/ui/toast'
+import { isTodoOverdue } from '@/lib/utils'
 
 interface Todo {
   id: string
@@ -118,7 +119,7 @@ export function TodoList({ todos, currentUserId, userRole }: TodoListProps) {
             paginatedTodos.map((todo) => {
               const status = statusConfig[todo.status]
               const priority = priorityConfig[todo.priority]
-              const isOverdue = todo.dueDate && new Date(todo.dueDate) < now && todo.status !== 'DONE'
+              const isOverdue = isTodoOverdue(todo.dueDate, now, todo.status)
               const StatusIcon = status.icon
 
               const nextStatus: TodoStatus =

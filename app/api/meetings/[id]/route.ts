@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { logMeetingUpdated, logMeetingDeleted } from '@/lib/audit'
+import { parseZoomMeetingId } from '@/lib/zoom'
 
 export async function PATCH(
   request: NextRequest,
@@ -10,7 +11,7 @@ export async function PATCH(
   try {
     const user = await requireAuth()
     const body = await request.json()
-    const { meetingDate, status } = body
+    const { meetingDate, status, meetingType, meetingLink } = body
 
     const meeting = await prisma.meeting.findUnique({
       where: { id: params.id },
@@ -30,9 +31,46 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    const updateData: { meetingDate?: Date; status?: 'SCHEDULED' | 'COMPLETED' | 'CANCELLED' } = {}
+    // Block marking as Completed until the check-in form is submitted when setting requires it
+    if (status === 'COMPLETED') {
+      const sys = await prisma.systemSettings.findUnique({
+        where: { id: 'system' },
+        select: { requireFormBeforeComplete: true },
+      })
+      const requireForm = sys?.requireFormBeforeComplete ?? true
+      if (requireForm && !meeting.formSubmittedAt) {
+        return NextResponse.json(
+          { error: 'Please submit the required meeting form before marking this meeting as completed.' },
+          { status: 400 }
+        )
+      }
+    }
+
+    const updateData: {
+      meetingDate?: Date
+      status?: 'SCHEDULED' | 'COMPLETED' | 'CANCELLED'
+      meetingType?: 'IN_PERSON' | 'ZOOM'
+      meetingLink?: string | null
+      zoomMeetingId?: string | null
+    } = {}
     if (meetingDate) updateData.meetingDate = new Date(meetingDate)
-    if (status === 'COMPLETED' || status === 'SCHEDULED' || status === 'CANCELLED') updateData.status = status
+    if (status === 'CANCELLED') {
+      return NextResponse.json(
+        { error: 'You do not have permission to cancel meetings.' },
+        { status: 403 }
+      )
+    }
+    if (status === 'COMPLETED' || status === 'SCHEDULED') updateData.status = status
+    if (meetingType === 'IN_PERSON' || meetingType === 'ZOOM') {
+      updateData.meetingType = meetingType
+      const link = meetingType === 'IN_PERSON' ? null : (meetingLink !== undefined ? (meetingLink ? String(meetingLink).trim() : null) : undefined)
+      updateData.meetingLink = link
+      updateData.zoomMeetingId = meetingType === 'IN_PERSON' ? null : (link ? parseZoomMeetingId(link) : undefined)
+    } else if (meetingLink !== undefined && meeting.meetingType === 'ZOOM') {
+      const link = meetingLink ? String(meetingLink).trim() : null
+      updateData.meetingLink = link
+      updateData.zoomMeetingId = link ? parseZoomMeetingId(link) : null
+    }
 
     const updatedMeeting = await prisma.meeting.update({
       where: { id: params.id },

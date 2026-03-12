@@ -36,6 +36,26 @@ export function calculateFirstOccurrence(
 }
 
 /**
+ * Return the next N occurrence dates for a recurring slot (e.g. next 4 Mondays at 3pm).
+ * Used to find the first free occurrence when the immediate next one may be blocked (holiday, leave).
+ */
+export function getNextOccurrenceDates(
+  dayOfWeek: number,
+  timeOfDay: string,
+  frequency: RecurringFrequency,
+  timeZone = FALLBACK_TZ,
+  count: number
+): Date[] {
+  const dates: Date[] = []
+  let current = calculateFirstOccurrence(dayOfWeek, timeOfDay, frequency, timeZone)
+  for (let i = 0; i < count; i++) {
+    dates.push(current)
+    current = advanceToNextOccurrence(dayOfWeek, timeOfDay, frequency, current, timeZone)
+  }
+  return dates
+}
+
+/**
  * Given an already-generated meeting date, advance to the next occurrence.
  */
 export function advanceToNextOccurrence(

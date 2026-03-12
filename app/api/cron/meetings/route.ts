@@ -115,6 +115,8 @@ async function generateRecurringMeetings(results: { recurringMeetingsCreated: nu
           recurringScheduleId: schedule.id,
           status: autoSchedule ? 'SCHEDULED' : 'PROPOSED',
           proposedById: schedule.reporterId,
+          meetingType: schedule.meetingType ?? 'IN_PERSON',
+          meetingLink: schedule.meetingLink,
         },
       })
 
@@ -132,23 +134,25 @@ async function generateRecurringMeetings(results: { recurringMeetingsCreated: nu
       })
 
       if (autoSchedule) {
-        // Book calendar event immediately for auto-scheduled meetings
-        try {
-          const { createCalendarEvent, isCalendarEnabled } = await import('@/lib/google-calendar')
-          const calendarEnabled = await isCalendarEnabled(schedule.reporterId)
-          if (calendarEnabled) {
-            await createCalendarEvent(
-              meeting.id,
-              schedule.employee.email,
-              schedule.reporter.email,
-              schedule.reporterId,
-              meetingDate,
-              schedule.employee.name,
-              schedule.reporter.name
-            )
+        // Recurring series: 1-year event is created on accept; only create single event when no series exists
+        if (!schedule.googleRecurringEventId) {
+          try {
+            const { createCalendarEvent, isCalendarEnabled } = await import('@/lib/google-calendar')
+            const calendarEnabled = await isCalendarEnabled(schedule.reporterId)
+            if (calendarEnabled) {
+              await createCalendarEvent(
+                meeting.id,
+                schedule.employee.email,
+                schedule.reporter.email,
+                schedule.reporterId,
+                meetingDate,
+                schedule.employee.name,
+                schedule.reporter.name
+              )
+            }
+          } catch (calError) {
+            console.error('Failed to create calendar event for auto-scheduled recurring meeting:', calError)
           }
-        } catch (calError) {
-          console.error('Failed to create calendar event for auto-scheduled recurring meeting:', calError)
         }
 
         // Notify employee about the scheduled meeting

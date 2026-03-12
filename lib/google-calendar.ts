@@ -1,5 +1,6 @@
 import { google } from 'googleapis'
 import { fromZonedTime, toZonedTime } from 'date-fns-tz'
+import { RecurringFrequency } from '@prisma/client'
 import { prisma } from './prisma'
 import { DEFAULT_WORK_END, DEFAULT_WORK_START } from './timezones'
 
@@ -140,6 +141,86 @@ export async function createCalendarEvent(
     
     throw error
   }
+}
+
+/** Build RRULE for 1 year of occurrences. COUNT: weekly 52, biweekly 26, monthly 12. */
+function buildRecurrenceRule(frequency: RecurringFrequency): string[] {
+  switch (frequency) {
+    case 'WEEKLY':
+      return ['RRULE:FREQ=WEEKLY;WKST=MO;COUNT=52']
+    case 'BIWEEKLY':
+      return ['RRULE:FREQ=WEEKLY;INTERVAL=2;WKST=MO;COUNT=26']
+    case 'MONTHLY':
+      return ['RRULE:FREQ=MONTHLY;COUNT=12']
+    default:
+      return ['RRULE:FREQ=WEEKLY;WKST=MO;COUNT=52']
+  }
+}
+
+/**
+ * Create a recurring Google Calendar event (1 year of occurrences) so both reporter and employee
+ * see the series on their calendars. Uses reporter's calendar as organizer; employee gets invite.
+ */
+export async function createRecurringCalendarEvent(
+  scheduleId: string,
+  firstMeetingId: string,
+  reporterId: string,
+  employeeEmail: string,
+  reporterEmail: string,
+  firstOccurrenceDate: Date,
+  employeeName: string,
+  reporterName: string,
+  frequency: RecurringFrequency,
+  timeZone: string
+): Promise<{ eventId: string; calendarLink: string | null }> {
+  const FALLBACK_TZ = 'Asia/Kolkata'
+  const calendarTz = timeZone || FALLBACK_TZ
+
+  const oauth2Client = await getAuthenticatedClient(reporterId)
+  const calendar = google.calendar({ version: 'v3', auth: oauth2Client })
+
+  const endDate = new Date(firstOccurrenceDate.getTime() + 30 * 60 * 1000)
+  const event = {
+    summary: `One-on-One (recurring): ${employeeName} & ${reporterName}`,
+    description: `AMI One-on-One Recurring Meeting\n\nView meeting details: ${process.env.NEXTAUTH_URL}/meetings/${firstMeetingId}`,
+    start: {
+      dateTime: firstOccurrenceDate.toISOString(),
+      timeZone: calendarTz,
+    },
+    end: {
+      dateTime: endDate.toISOString(),
+      timeZone: calendarTz,
+    },
+    recurrence: buildRecurrenceRule(frequency),
+    attendees: [
+      { email: employeeEmail },
+      { email: reporterEmail },
+    ],
+    reminders: {
+      useDefault: false,
+      overrides: [
+        { method: 'email', minutes: 24 * 60 },
+        { method: 'popup', minutes: 15 },
+      ],
+    },
+  }
+
+  const response = await calendar.events.insert({
+    calendarId: 'primary',
+    requestBody: event,
+    sendUpdates: 'all',
+  })
+
+  const eventId = response.data.id
+  const calendarLink = response.data.htmlLink ?? null
+  if (!eventId) throw new Error('Failed to create recurring calendar event')
+
+  await prisma.recurringSchedule.update({
+    where: { id: scheduleId },
+    data: { googleRecurringEventId: eventId, googleCalendarLink: calendarLink },
+  })
+
+  return { eventId, calendarLink }
 }
 
 export async function updateCalendarEvent(

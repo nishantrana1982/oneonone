@@ -1,7 +1,7 @@
 import { getCurrentUser } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
-import { formatMeetingDateShort } from '@/lib/utils'
+import { formatMeetingDateShort, isTodoOverdue } from '@/lib/utils'
 import Link from 'next/link'
 import { Calendar, CheckSquare, Users, TrendingUp, Clock, AlertCircle, ChevronRight } from 'lucide-react'
 import { WeekCalendar } from './week-calendar'
@@ -52,7 +52,7 @@ export default async function DashboardPage() {
     } catch { /* PROPOSED enum not yet in DB */ }
     stats.upcomingMeetings = meetings + proposedCount
     stats.pendingTodos = todos.length
-    stats.overdueTodos = todos.filter(t => t.dueDate && new Date(t.dueDate) < now).length
+    stats.overdueTodos = todos.filter(t => isTodoOverdue(t.dueDate, now, t.status)).length
     stats.completedMeetings = completedMeetings
   } else {
     const directReports = user.role === UserRole.SUPER_ADMIN
@@ -92,7 +92,7 @@ export default async function DashboardPage() {
     } catch { /* PROPOSED enum not yet in DB */ }
     stats.upcomingMeetings = meetings + proposedCount
     stats.pendingTodos = todos.length
-    stats.overdueTodos = todos.filter(t => t.dueDate && new Date(t.dueDate) < now).length
+    stats.overdueTodos = todos.filter(t => isTodoOverdue(t.dueDate, now, t.status)).length
     stats.directReports = directReports
     stats.completedMeetings = completedMeetings
   }
@@ -140,20 +140,20 @@ export default async function DashboardPage() {
     // proposedById column may not exist yet if migration hasn't run
   }
 
-  // ── Week calendar meetings ─────────────────────────────────────
+  // ── Week calendar meetings (1 year ahead so calendar shows full year) ─────
   const dayOfWeek = now.getDay()
   const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
   const weekStart = new Date(now)
   weekStart.setHours(0, 0, 0, 0)
   weekStart.setDate(weekStart.getDate() + mondayOffset)
-  const weekEnd = new Date(weekStart)
-  weekEnd.setDate(weekEnd.getDate() + 7)
+  const calendarEnd = new Date(weekStart)
+  calendarEnd.setDate(calendarEnd.getDate() + 365)
 
   const weekMeetingsWhere = user.role === UserRole.EMPLOYEE
-    ? { employeeId: user.id, meetingDate: { gte: weekStart, lt: weekEnd }, status: { in: ['SCHEDULED', 'PROPOSED', 'COMPLETED'] as ('SCHEDULED' | 'PROPOSED' | 'COMPLETED')[] } }
+    ? { employeeId: user.id, meetingDate: { gte: weekStart, lt: calendarEnd }, status: { in: ['SCHEDULED', 'PROPOSED', 'COMPLETED'] as ('SCHEDULED' | 'PROPOSED' | 'COMPLETED')[] } }
     : user.role === UserRole.REPORTER
-      ? { OR: [{ employeeId: user.id }, { reporterId: user.id }], meetingDate: { gte: weekStart, lt: weekEnd }, status: { in: ['SCHEDULED', 'PROPOSED', 'COMPLETED'] as ('SCHEDULED' | 'PROPOSED' | 'COMPLETED')[] } }
-      : { meetingDate: { gte: weekStart, lt: weekEnd }, status: { in: ['SCHEDULED', 'PROPOSED', 'COMPLETED'] as ('SCHEDULED' | 'PROPOSED' | 'COMPLETED')[] } }
+      ? { OR: [{ employeeId: user.id }, { reporterId: user.id }], meetingDate: { gte: weekStart, lt: calendarEnd }, status: { in: ['SCHEDULED', 'PROPOSED', 'COMPLETED'] as ('SCHEDULED' | 'PROPOSED' | 'COMPLETED')[] } }
+      : { meetingDate: { gte: weekStart, lt: calendarEnd }, status: { in: ['SCHEDULED', 'PROPOSED', 'COMPLETED'] as ('SCHEDULED' | 'PROPOSED' | 'COMPLETED')[] } }
 
   let weekMeetings: { id: string; meetingDate: Date; status: string; employee: { name: string | null }; reporter: { name: string | null } }[] = []
   try {
@@ -168,10 +168,10 @@ export default async function DashboardPage() {
   } catch {
     // PROPOSED status may not exist yet; fallback to simpler query
     const fallbackWhere = user.role === UserRole.EMPLOYEE
-      ? { employeeId: user.id, meetingDate: { gte: weekStart, lt: weekEnd } }
+      ? { employeeId: user.id, meetingDate: { gte: weekStart, lt: calendarEnd } }
       : user.role === UserRole.REPORTER
-        ? { OR: [{ employeeId: user.id }, { reporterId: user.id }], meetingDate: { gte: weekStart, lt: weekEnd } }
-        : { meetingDate: { gte: weekStart, lt: weekEnd } }
+        ? { OR: [{ employeeId: user.id }, { reporterId: user.id }], meetingDate: { gte: weekStart, lt: calendarEnd } }
+        : { meetingDate: { gte: weekStart, lt: calendarEnd } }
     weekMeetings = await prisma.meeting.findMany({
       where: fallbackWhere,
       include: {
@@ -312,6 +312,7 @@ export default async function DashboardPage() {
           reporter: m.reporter,
         }))}
         initialWeekStart={weekStart.toISOString()}
+        initialRangeEnd={calendarEnd.toISOString()}
         userRole={user.role}
       />
 

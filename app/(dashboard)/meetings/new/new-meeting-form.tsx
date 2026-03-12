@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Calendar, Clock, User, ArrowLeft, Check, Search, Loader2, AlertCircle } from 'lucide-react'
+import { Calendar, Clock, User, ArrowLeft, Check, Search, Loader2, AlertCircle, Video, MapPin } from 'lucide-react'
 import { DatePicker } from '@/components/ui/date-picker'
 import { useToast } from '@/components/ui/toast'
 
@@ -48,6 +48,8 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
     employeeName: string | null
     message: string
   } | null>(null)
+  const [meetingType, setMeetingType] = useState<'IN_PERSON' | 'ZOOM'>('IN_PERSON')
+  const [meetingLink, setMeetingLink] = useState('')
 
   const {
     register,
@@ -155,6 +157,10 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
   }, [watchedEmployee, watchedDate, fetchAvailability])
 
   const onSubmit = async (data: FormData) => {
+    if (meetingType === 'ZOOM' && !meetingLink.trim()) {
+      toastError('Please enter the Zoom meeting invite link.')
+      return
+    }
     setIsLoading(true)
     try {
       const response = await fetch('/api/meetings', {
@@ -163,6 +169,8 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
         body: JSON.stringify({
           employeeId: data.employeeId,
           meetingDate: data.meetingTime,
+          meetingType,
+          meetingLink: meetingType === 'ZOOM' ? meetingLink.trim() : undefined,
         }),
       })
 
@@ -437,6 +445,46 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
               </div>
             )}
 
+            {/* Meeting type: In person or Zoom */}
+            <div className="rounded-2xl bg-white dark:bg-charcoal border border-off-white dark:border-medium-gray/20 overflow-hidden">
+              <div className="px-6 py-4 border-b border-off-white dark:border-medium-gray/20 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-indigo-500/10 flex items-center justify-center">
+                  <Video className="w-5 h-5 text-indigo-500" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-dark-gray dark:text-white">Meeting type</h2>
+                  <p className="text-sm text-medium-gray">In person or over Zoom</p>
+                </div>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="flex gap-3">
+                  <label className={`flex-1 flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${meetingType === 'IN_PERSON' ? 'border-dark-gray dark:border-white bg-dark-gray/5 dark:bg-white/5' : 'border-off-white dark:border-medium-gray/20 hover:border-medium-gray dark:hover:border-medium-gray/40'}`}>
+                    <input type="radio" name="meetingType" checked={meetingType === 'IN_PERSON'} onChange={() => setMeetingType('IN_PERSON')} className="sr-only" />
+                    <MapPin className="w-5 h-5 text-medium-gray shrink-0" />
+                    <span className="font-medium text-dark-gray dark:text-white">In person</span>
+                  </label>
+                  <label className={`flex-1 flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${meetingType === 'ZOOM' ? 'border-dark-gray dark:border-white bg-dark-gray/5 dark:bg-white/5' : 'border-off-white dark:border-medium-gray/20 hover:border-medium-gray dark:hover:border-medium-gray/40'}`}>
+                    <input type="radio" name="meetingType" checked={meetingType === 'ZOOM'} onChange={() => setMeetingType('ZOOM')} className="sr-only" />
+                    <Video className="w-5 h-5 text-medium-gray shrink-0" />
+                    <span className="font-medium text-dark-gray dark:text-white">Over Zoom</span>
+                  </label>
+                </div>
+                {meetingType === 'ZOOM' && (
+                  <div>
+                    <label className="block text-sm font-medium text-dark-gray dark:text-white mb-2">Meeting invite <span className="text-red-500">*</span></label>
+                    <input
+                      type="url"
+                      value={meetingLink}
+                      onChange={(e) => setMeetingLink(e.target.value)}
+                      placeholder="https://zoom.us/j/..."
+                      className="w-full px-4 py-2.5 rounded-xl border border-off-white dark:border-medium-gray/20 bg-off-white dark:bg-charcoal text-dark-gray dark:text-white placeholder:text-medium-gray focus:outline-none focus:ring-2 focus:ring-dark-gray/20 dark:focus:ring-white/20 text-sm"
+                    />
+                    <p className="mt-1.5 text-xs text-medium-gray">Paste the Zoom meeting invite link. The Fathom recorder can join this call; the transcript will sync to this meeting automatically after the call ends.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Submit */}
             <div className="flex flex-col sm:flex-row justify-end gap-3">
               <button
@@ -448,7 +496,7 @@ export function NewMeetingForm({ employees, currentUserId }: NewMeetingFormProps
               </button>
               <button
                 type="submit"
-                disabled={isLoading || employees.length === 0 || !watchedTime}
+                disabled={isLoading || employees.length === 0 || !watchedTime || (meetingType === 'ZOOM' && !meetingLink.trim())}
                 className="px-6 py-3 rounded-xl bg-dark-gray dark:bg-white text-white dark:text-dark-gray font-medium hover:bg-charcoal dark:hover:bg-off-white disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 order-1 sm:order-2 min-h-[44px]"
               >
                 {isLoading ? (

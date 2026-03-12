@@ -1,6 +1,7 @@
 import { getCurrentUser } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
+import { isTodoOverdue } from '@/lib/utils'
 import { TodoList } from './todo-list'
 import { CheckSquare, AlertTriangle, Clock, CheckCircle2 } from 'lucide-react'
 
@@ -29,7 +30,7 @@ export default async function TodosPage() {
   const notStarted = todos.filter(t => t.status === 'NOT_STARTED')
   const inProgress = todos.filter(t => t.status === 'IN_PROGRESS')
   const done = todos.filter(t => t.status === 'DONE')
-  const overdue = todos.filter(t => t.dueDate && new Date(t.dueDate) < now && t.status !== 'DONE')
+  const overdue = todos.filter(t => isTodoOverdue(t.dueDate, now, t.status))
 
   return (
     <div className="space-y-5 sm:space-y-8">

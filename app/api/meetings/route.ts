@@ -3,6 +3,7 @@ import { requireRole } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { UserRole, Prisma, MeetingStatus } from '@prisma/client'
 import { logMeetingCreated } from '@/lib/audit'
+import { parseZoomMeetingId } from '@/lib/zoom'
 
 export async function GET(request: NextRequest) {
   try {
@@ -61,7 +62,14 @@ export async function POST(request: NextRequest) {
   try {
     const user = await requireRole([UserRole.REPORTER, UserRole.SUPER_ADMIN])
     const body = await request.json()
-    const { employeeId, meetingDate } = body
+    const { employeeId, meetingDate, meetingType, meetingLink } = body
+
+    if (meetingType === 'ZOOM' && (!meetingLink || typeof meetingLink !== 'string' || !meetingLink.trim())) {
+      return NextResponse.json(
+        { error: 'Zoom meeting invite link is required when scheduling over Zoom.' },
+        { status: 400 }
+      )
+    }
 
     const employee = await prisma.user.findUnique({
       where: { id: employeeId },
@@ -113,6 +121,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const link = meetingType === 'ZOOM' && meetingLink ? String(meetingLink).trim() || null : null
     const meeting = await prisma.meeting.create({
       data: {
         employeeId,
@@ -120,6 +129,9 @@ export async function POST(request: NextRequest) {
         meetingDate: new Date(meetingDate),
         status: 'PROPOSED',
         proposedById: user.id,
+        meetingType: meetingType === 'ZOOM' ? 'ZOOM' : 'IN_PERSON',
+        meetingLink: link,
+        zoomMeetingId: link ? parseZoomMeetingId(link) : null,
       },
       include: {
         employee: { select: { id: true, name: true, email: true } },

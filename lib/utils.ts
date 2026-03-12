@@ -68,3 +68,26 @@ export function formatMeetingDateLong(date: Date | string): string {
     timeZone: MEETING_DISPLAY_TIMEZONE,
   }).format(d)
 }
+
+/**
+ * Overdue only after the scheduled date has completely passed.
+ * - Date-only (midnight): overdue after end-of-day (23:59:59.999) in UTC.
+ * - With time: overdue after that exact time.
+ */
+export function isTodoOverdue(
+  dueDate: Date | string | null,
+  now: Date,
+  status: string
+): boolean {
+  if (!dueDate || status === 'DONE') return false
+  const d = typeof dueDate === 'string' ? new Date(dueDate) : new Date(dueDate.getTime())
+  const hasTime =
+    d.getUTCHours() !== 0 ||
+    d.getUTCMinutes() !== 0 ||
+    d.getUTCSeconds() !== 0 ||
+    d.getUTCMilliseconds() !== 0
+  if (hasTime) return now.getTime() > d.getTime()
+  const endOfDay = new Date(d)
+  endOfDay.setUTCHours(23, 59, 59, 999)
+  return now.getTime() > endOfDay.getTime()
+}

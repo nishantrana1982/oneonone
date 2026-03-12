@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Calendar, Repeat, ArrowLeft, Loader2, Check, AlertCircle, Clock, Search, User } from 'lucide-react'
+import { Calendar, Repeat, ArrowLeft, Loader2, Check, AlertCircle, Clock, Search, User, Video, MapPin } from 'lucide-react'
 import { RecurringFrequency } from '@prisma/client'
 import { NewMeetingForm } from './new-meeting-form'
 import { useToast } from '@/components/ui/toast'
@@ -65,6 +65,8 @@ export function ScheduleMeetingClient({ employees, currentUserId }: ScheduleMeet
     frequency: 'BIWEEKLY' as RecurringFrequency,
     dayOfWeek: 1,
     timeOfDay: '',
+    meetingType: 'IN_PERSON' as 'IN_PERSON' | 'ZOOM',
+    meetingLink: '',
   })
 
   const [recurringSlots, setRecurringSlots] = useState<FreeSlot[]>([])
@@ -157,12 +159,19 @@ export function ScheduleMeetingClient({ employees, currentUserId }: ScheduleMeet
   const handleRecurringSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!recurringForm.employeeId) return
+    if (recurringForm.meetingType === 'ZOOM' && !recurringForm.meetingLink.trim()) {
+      toastError('Please enter the Zoom meeting invite link.')
+      return
+    }
     setRecurringLoading(true)
     try {
       const res = await fetch('/api/recurring-schedules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(recurringForm),
+        body: JSON.stringify({
+          ...recurringForm,
+          meetingLink: recurringForm.meetingType === 'ZOOM' && recurringForm.meetingLink.trim() ? recurringForm.meetingLink.trim() : undefined,
+        }),
       })
       if (res.ok) {
         router.push('/meetings')
@@ -372,6 +381,35 @@ export function ScheduleMeetingClient({ employees, currentUserId }: ScheduleMeet
             </div>
           </div>
 
+          <div className="rounded-2xl border border-off-white dark:border-medium-gray/20 p-4 sm:p-5">
+            <p className="font-semibold text-dark-gray dark:text-white mb-3">Meeting type</p>
+            <div className="flex gap-3 mb-4">
+              <label className={`flex-1 flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${recurringForm.meetingType === 'IN_PERSON' ? 'border-dark-gray dark:border-white bg-dark-gray/5 dark:bg-white/5' : 'border-off-white dark:border-medium-gray/20'}`}>
+                <input type="radio" name="recurringMeetingType" checked={recurringForm.meetingType === 'IN_PERSON'} onChange={() => setRecurringForm({ ...recurringForm, meetingType: 'IN_PERSON', meetingLink: '' })} className="sr-only" />
+                <MapPin className="w-4 h-4 text-medium-gray" />
+                <span className="text-sm font-medium text-dark-gray dark:text-white">In person</span>
+              </label>
+              <label className={`flex-1 flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${recurringForm.meetingType === 'ZOOM' ? 'border-dark-gray dark:border-white bg-dark-gray/5 dark:bg-white/5' : 'border-off-white dark:border-medium-gray/20'}`}>
+                <input type="radio" name="recurringMeetingType" checked={recurringForm.meetingType === 'ZOOM'} onChange={() => setRecurringForm({ ...recurringForm, meetingType: 'ZOOM' })} className="sr-only" />
+                <Video className="w-4 h-4 text-medium-gray" />
+                <span className="text-sm font-medium text-dark-gray dark:text-white">Over Zoom</span>
+              </label>
+            </div>
+            {recurringForm.meetingType === 'ZOOM' && (
+              <div>
+                <label className="block text-sm font-medium text-dark-gray dark:text-white mb-1.5">Meeting invite <span className="text-red-500">*</span></label>
+                <input
+                  type="url"
+                  value={recurringForm.meetingLink}
+                  onChange={(e) => setRecurringForm({ ...recurringForm, meetingLink: e.target.value })}
+                  placeholder="https://zoom.us/j/..."
+                  className="w-full rounded-xl border border-off-white dark:border-medium-gray/20 bg-white dark:bg-charcoal px-4 py-2.5 text-dark-gray dark:text-white placeholder:text-medium-gray focus:outline-none focus:ring-2 focus:ring-dark-gray/20 text-sm"
+                />
+                <p className="mt-1.5 text-xs text-medium-gray">Paste the Zoom meeting invite. Fathom recorder can join; the transcript will sync to each meeting automatically.</p>
+              </div>
+            )}
+          </div>
+
           {recurringForm.employeeId && recurringForm.dayOfWeek != null && (
             <div className="rounded-2xl border border-off-white dark:border-medium-gray/20 p-4 sm:p-5">
               <div className="flex items-center gap-3 mb-1">
@@ -453,7 +491,7 @@ export function ScheduleMeetingClient({ employees, currentUserId }: ScheduleMeet
             </button>
             <button
               type="submit"
-              disabled={recurringLoading || !recurringForm.employeeId || !recurringForm.timeOfDay}
+              disabled={recurringLoading || !recurringForm.employeeId || !recurringForm.timeOfDay || (recurringForm.meetingType === 'ZOOM' && !recurringForm.meetingLink.trim())}
               className="px-6 py-3 rounded-xl bg-dark-gray dark:bg-white text-white dark:text-dark-gray font-medium hover:bg-charcoal dark:hover:bg-off-white disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
             >
               {recurringLoading ? (
