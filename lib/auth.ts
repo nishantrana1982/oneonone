@@ -4,6 +4,15 @@ import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import { prisma } from './prisma'
 import { logLogin } from './audit'
 
+// Validate Google OAuth env vars so we fail fast with a clear error instead of "client_id is required"
+const googleClientId = process.env.GOOGLE_CLIENT_ID
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET
+if (!googleClientId || !googleClientSecret) {
+  throw new Error(
+    'Google OAuth is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env or .env.local. See SETUP_GUIDE.md Step 3.'
+  )
+}
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   events: {
@@ -26,8 +35,8 @@ export const authOptions: NextAuthOptions = {
   },
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: googleClientId,
+      clientSecret: googleClientSecret,
       // Allow same email to sign in again (e.g. after sign-out); only Google is used and domain is restricted
       allowDangerousEmailAccountLinking: true,
       authorization: {
@@ -55,8 +64,9 @@ export const authOptions: NextAuthOptions = {
       }
 
       const domain = email.split('@')[1]
-      if (domain !== allowedDomain) {
-        return false
+      if (domain?.toLowerCase() !== allowedDomain.toLowerCase()) {
+        // Redirect to sign-in with a clear message instead of generic error page
+        return '/auth/signin?error=AccessDenied'
       }
 
       // Block inactive users from signing in

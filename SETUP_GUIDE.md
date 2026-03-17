@@ -65,13 +65,7 @@ This will create all the tables in your database.
 3. Name it "AMI One-on-One" (or any name)
 4. Click "Create"
 
-### 3.2 Enable Google+ API
-
-1. In your project, go to "APIs & Services" → "Library"
-2. Search for "Google+ API"
-3. Click "Enable"
-
-### 3.3 Create OAuth Credentials
+### 3.2 Create OAuth Credentials (no extra API needed for sign-in)
 
 1. Go to "APIs & Services" → "Credentials"
 2. Click "Create Credentials" → "OAuth client ID"
@@ -94,15 +88,25 @@ This will create all the tables in your database.
    - Click "Create"
    - **Copy the Client ID and Client Secret**
 
-5. **Update .env file**:
+5. **Update .env or .env.local** (use `.env.local` for local dev so Next.js loads it):
    ```
    GOOGLE_CLIENT_ID="paste-your-client-id-here"
    GOOGLE_CLIENT_SECRET="paste-your-client-secret-here"
    GOOGLE_WORKSPACE_DOMAIN="yourcompany.com"
+   NEXTAUTH_URL="http://localhost:3000"
+   NEXTAUTH_SECRET="generate-with-openssl-rand-base64-32"
    ```
-   (Replace `yourcompany.com` with your actual company domain)
+   (Replace `yourcompany.com` with your actual company domain. For production, set `NEXTAUTH_URL` to your app URL, e.g. `https://oneonone.yourcompany.com`.)
 
-### 3.4 Enable Google Calendar API (for calendar integration)
+   **Important:** The **Authorized redirect URI** in Google Console must exactly match `{NEXTAUTH_URL}/api/auth/callback/google` (e.g. `http://localhost:3000/api/auth/callback/google` for local dev).
+
+**If Google login doesn’t work:**
+- Ensure `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set in `.env` or `.env.local` (restart the dev server after changing env).
+- Ensure `NEXTAUTH_URL` matches how you open the app (e.g. `http://localhost:3000` for local).
+- In Google Cloud Console → Credentials → your OAuth client, add the exact redirect URI: `{NEXTAUTH_URL}/api/auth/callback/google`.
+- If you see "Access denied", sign in with an email whose domain matches `GOOGLE_WORKSPACE_DOMAIN`.
+
+### 3.3 Enable Google Calendar API (for calendar integration)
 
 1. In Google Cloud Console, go to "APIs & Services" → "Library"
 2. Search for "Google Calendar API"
