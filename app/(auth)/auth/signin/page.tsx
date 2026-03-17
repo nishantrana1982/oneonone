@@ -38,7 +38,15 @@ function SignInContent() {
                   ? 'Access denied. Please use your company email.'
                   : error === 'OAuthAccountNotLinked'
                   ? 'This email is already linked to another account.'
-                  : 'An error occurred. Please try again.'}
+                  : error === 'OAuthCallback' || error === 'Callback'
+                  ? 'Google sign-in could not complete. Ensure the server NEXTAUTH_URL matches this site and the Google Cloud Console redirect URI is exactly: [your-site]/api/auth/callback/google. Clear cookies and try again.'
+                  : error === 'OAuthSignin'
+                  ? 'Could not start Google sign-in. Check that GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set on the server.'
+                  : error === 'Configuration'
+                  ? 'Server auth is misconfigured. Administrator: set NEXTAUTH_URL, NEXTAUTH_SECRET, GOOGLE_CLIENT_ID, and GOOGLE_CLIENT_SECRET in .env on the server.'
+                  : error === 'Verification'
+                  ? 'Sign-in link expired or already used. Please try again.'
+                  : `Sign-in failed (${error}). Please try again or contact your administrator.`}
               </p>
             </div>
           )}

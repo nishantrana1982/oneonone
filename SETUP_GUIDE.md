@@ -102,9 +102,10 @@ This will create all the tables in your database.
 
 **If Google login doesn’t work:**
 - Ensure `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set in `.env` or `.env.local` (restart the dev server after changing env).
-- Ensure `NEXTAUTH_URL` matches how you open the app (e.g. `http://localhost:3000` for local).
-- In Google Cloud Console → Credentials → your OAuth client, add the exact redirect URI: `{NEXTAUTH_URL}/api/auth/callback/google`.
+- Ensure `NEXTAUTH_URL` matches **exactly** how users open the app (e.g. `https://oneonone.yourcompany.com` with no trailing slash). Wrong URL causes "OAuthCallback" errors.
+- In Google Cloud Console → Credentials → your OAuth client, add the **exact** redirect URI: `https://your-domain.com/api/auth/callback/google` (same as `NEXTAUTH_URL` + `/api/auth/callback/google`).
 - If you see "Access denied", sign in with an email whose domain matches `GOOGLE_WORKSPACE_DOMAIN`.
+- On the server, check logs (e.g. `pm2 logs`) for `[NextAuth] signIn callback error` to see database or callback failures.
 
 ### 3.3 Enable Google Calendar API (for calendar integration)
 

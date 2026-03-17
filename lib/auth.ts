@@ -51,34 +51,38 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
-      // Restrict to company domain only
-      const allowedDomain = process.env.GOOGLE_WORKSPACE_DOMAIN
-      if (!allowedDomain) {
-        console.warn('GOOGLE_WORKSPACE_DOMAIN not set, allowing all domains')
+      try {
+        // Restrict to company domain only
+        const allowedDomain = process.env.GOOGLE_WORKSPACE_DOMAIN
+        if (!allowedDomain) {
+          console.warn('GOOGLE_WORKSPACE_DOMAIN not set, allowing all domains')
+          return true
+        }
+
+        const email = user.email || profile?.email
+        if (!email) {
+          return '/auth/signin?error=AccessDenied'
+        }
+
+        const domain = email.split('@')[1]
+        if (domain?.toLowerCase() !== allowedDomain.toLowerCase()) {
+          return '/auth/signin?error=AccessDenied'
+        }
+
+        // Block inactive users from signing in
+        const existingUser = await prisma.user.findUnique({
+          where: { email },
+          select: { isActive: true },
+        })
+        if (existingUser && !existingUser.isActive) {
+          return '/auth/signin?error=AccountInactive'
+        }
+
         return true
+      } catch (err) {
+        console.error('[NextAuth] signIn callback error:', err)
+        return '/auth/signin?error=Callback'
       }
-
-      const email = user.email || profile?.email
-      if (!email) {
-        return false
-      }
-
-      const domain = email.split('@')[1]
-      if (domain?.toLowerCase() !== allowedDomain.toLowerCase()) {
-        // Redirect to sign-in with a clear message instead of generic error page
-        return '/auth/signin?error=AccessDenied'
-      }
-
-      // Block inactive users from signing in
-      const existingUser = await prisma.user.findUnique({
-        where: { email },
-        select: { isActive: true },
-      })
-      if (existingUser && !existingUser.isActive) {
-        return '/auth/signin?error=AccountInactive'
-      }
-
-      return true
     },
     async session({ session, user }) {
       if (session.user) {
