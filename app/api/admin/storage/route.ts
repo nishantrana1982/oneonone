@@ -3,6 +3,8 @@ import { requireAdmin } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { getLocalStorageStats, getLocalStorageDir, isS3Configured } from '@/lib/s3'
 
+export const dynamic = 'force-dynamic'
+
 // GET - Storage usage (admin only)
 export async function GET() {
   try {

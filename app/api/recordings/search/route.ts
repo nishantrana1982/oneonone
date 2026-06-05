@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { searchTranscripts } from '@/lib/openai'
 import { UserRole, Prisma } from '@prisma/client'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     let user

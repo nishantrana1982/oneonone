@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
 import { logUserUpdated, logUserDeleted } from '@/lib/audit'
 
+export const dynamic = 'force-dynamic'
+
 const ALLOWED_EMAIL_DOMAIN = '@whitelabeliq.com'
 
 export async function GET(

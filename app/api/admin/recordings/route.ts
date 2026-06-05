@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+
 // GET - List all recordings (admin only), for storage management
 export async function GET() {
   try {

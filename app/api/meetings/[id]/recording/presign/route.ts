@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { generateSessionKey, isS3Configured } from '@/lib/s3'
 import { UserRole } from '@prisma/client'
 
+export const dynamic = 'force-dynamic'
+
 // POST — Start a recording session (creates DB record + returns session key)
 export async function POST(
   request: NextRequest,

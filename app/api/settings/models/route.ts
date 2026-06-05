@@ -4,6 +4,8 @@ import { getSettings } from '@/lib/settings'
 import OpenAI from 'openai'
 import { UserRole } from '@prisma/client'
 
+export const dynamic = 'force-dynamic'
+
 // Model metadata for display
 const modelMetadata: Record<string, { name: string; description: string; category: string }> = {
   // Latest GPT-4.5 and GPT-4o models

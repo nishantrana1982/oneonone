@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
 import { getSignedUploadUrl, getSignedDownloadUrl, deleteFromS3 } from '@/lib/s3'
 
+export const dynamic = 'force-dynamic'
+
 // Get attachments for a meeting, or get a signed download URL for a specific attachment
 export async function GET(
   request: NextRequest,

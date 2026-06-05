@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
 import { randomBytes } from 'crypto'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   // Block in production unless explicitly enabled
   if (

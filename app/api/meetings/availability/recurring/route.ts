@@ -6,6 +6,8 @@ import { prisma } from '@/lib/prisma'
 import { DEFAULT_WORK_END, DEFAULT_WORK_START } from '@/lib/timezones'
 import { getNextOccurrenceDates } from '@/lib/recurring-dates'
 
+export const dynamic = 'force-dynamic'
+
 const FALLBACK_TZ = 'Asia/Kolkata'
 /** Number of future occurrences to check (e.g. 6 = next 6 weeks for weekly); one-off holiday/leave shouldn't block the whole slot. */
 const MAX_OCCURRENCES_TO_CHECK = 6

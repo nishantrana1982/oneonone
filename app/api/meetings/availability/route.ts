@@ -5,6 +5,8 @@ import { prisma } from '@/lib/prisma'
 import { fromZonedTime, toZonedTime } from 'date-fns-tz'
 import { DEFAULT_WORK_END, DEFAULT_WORK_START, formatWorkHoursLabel } from '@/lib/timezones'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const user = await requireRole([UserRole.REPORTER, UserRole.SUPER_ADMIN])

@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { getSignedDownloadUrl, deleteS3Prefix, isS3Configured } from '@/lib/s3'
 import { UserRole } from '@prisma/client'
 
+export const dynamic = 'force-dynamic'
+
 // GET — fetch recording status and playback URL
 export async function GET(
   request: NextRequest,

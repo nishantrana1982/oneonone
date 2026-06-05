@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { UserRole, MeetingStatus } from '@prisma/client'
 import { calculateFirstOccurrence } from '@/lib/recurring-dates'
 
+export const dynamic = 'force-dynamic'
+
 const FALLBACK_TZ = 'Asia/Kolkata'
 
 function getScheduleId(params: { id?: string }): string | null {

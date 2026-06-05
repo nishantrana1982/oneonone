@@ -5,6 +5,8 @@ import { UserRole, Prisma, MeetingStatus } from '@prisma/client'
 import { logMeetingCreated } from '@/lib/audit'
 import { parseZoomMeetingId } from '@/lib/zoom'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const user = await requireRole([UserRole.REPORTER, UserRole.SUPER_ADMIN, UserRole.EMPLOYEE])

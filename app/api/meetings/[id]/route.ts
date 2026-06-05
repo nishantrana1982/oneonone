@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { logMeetingUpdated, logMeetingDeleted } from '@/lib/audit'
 import { parseZoomMeetingId } from '@/lib/zoom'
 
+export const dynamic = 'force-dynamic'
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }

@@ -5,6 +5,8 @@ import { maskApiKey } from '@/lib/encryption'
 import { UserRole } from '@prisma/client'
 import { logSettingsChanged } from '@/lib/audit'
 
+export const dynamic = 'force-dynamic'
+
 // GET - Fetch settings (masked for security)
 export async function GET() {
   try {

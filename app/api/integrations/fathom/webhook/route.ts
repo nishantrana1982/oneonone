@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { verifyFathomWebhook } from '@/lib/fathom-webhook'
 import { notifyRecordingReady } from '@/lib/notifications'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * Fathom webhook: receive meeting transcript/summary when a Zoom (or other) call
  * recorded by Fathom is ready. Match to our Meeting and create/update MeetingRecording.

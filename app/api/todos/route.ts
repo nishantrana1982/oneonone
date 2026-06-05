@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { TodoPriority, TodoStatus } from '@prisma/client'
 import { logTodoCreated } from '@/lib/audit'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const user = await requireAuth()

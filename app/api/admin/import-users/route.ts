@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
 import { logBulkImport } from '@/lib/audit'
 
+export const dynamic = 'force-dynamic'
+
 const ALLOWED_EMAIL_DOMAIN = '@whitelabeliq.com'
 
 interface ImportUser {

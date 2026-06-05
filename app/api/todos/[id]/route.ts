@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { TodoStatus, TodoPriority } from '@prisma/client'
 import { logTodoUpdated, logTodoDeleted } from '@/lib/audit'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }

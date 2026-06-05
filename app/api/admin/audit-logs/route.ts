@@ -3,6 +3,8 @@ import { requireAdmin } from '@/lib/auth-helpers'
 import { getAuditLogs } from '@/lib/audit'
 import { AuditAction } from '@prisma/client'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     await requireAdmin()

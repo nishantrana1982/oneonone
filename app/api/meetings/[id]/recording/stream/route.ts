@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { getSignedDownloadUrl, isS3Configured } from '@/lib/s3'
 import { UserRole } from '@prisma/client'
 
+export const dynamic = 'force-dynamic'
+
 // GET — redirect to S3 signed URL for audio playback
 export async function GET(
   request: NextRequest,

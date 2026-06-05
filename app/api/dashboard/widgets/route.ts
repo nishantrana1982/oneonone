@@ -3,6 +3,8 @@ import { getCurrentUser } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { WidgetType } from '@prisma/client'
 
+export const dynamic = 'force-dynamic'
+
 // Default widgets for each role
 const defaultWidgets: Record<string, WidgetType[]> = {
   EMPLOYEE: ['UPCOMING_MEETINGS', 'PENDING_TODOS', 'RECENT_ACTIVITY', 'QUICK_ACTIONS'],

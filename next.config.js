@@ -2,9 +2,9 @@
 const nextConfig = {
   reactStrictMode: true,
   // output: 'standalone', // Disabled for simpler deployment with npm start
-  // Keep ffmpeg-static binary external so recording compression works in production
-  serverExternalPackages: ['ffmpeg-static'],
   experimental: {
+    // Keep ffmpeg-static binary external so recording compression works in production (Next.js 14)
+    serverComponentsExternalPackages: ['ffmpeg-static'],
     // Allow large recording uploads (default can truncate at 1MB)
     serverActions: {
       bodySizeLimit: '50mb',

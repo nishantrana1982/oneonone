@@ -3,6 +3,8 @@ import { requireAuth } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/prisma'
 import { logMeetingUpdated } from '@/lib/audit'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }

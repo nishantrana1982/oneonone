@@ -13,6 +13,8 @@ import { UserRole } from '@prisma/client'
 import { getSettings } from '@/lib/settings'
 import { logRecordingProcessed } from '@/lib/audit'
 
+export const dynamic = 'force-dynamic'
+
 export const maxDuration = 900
 
 // POST — Finalize recording: combine chunks, transcribe, analyze

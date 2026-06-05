@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { generateOrganizationInsights } from '@/lib/openai'
 import { UserRole, Prisma, MeetingStatus } from '@prisma/client'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     let user

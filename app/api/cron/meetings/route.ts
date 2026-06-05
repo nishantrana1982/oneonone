@@ -4,6 +4,8 @@ import { notifyMeetingProposed, notifyMeetingReminder, notifyFormReminder } from
 import { sendMeetingProposalEmail, sendMeetingReminderEmail, sendFormReminderEmail } from '@/lib/email'
 import { advanceToNextOccurrence } from '@/lib/recurring-dates'
 
+export const dynamic = 'force-dynamic'
+
 const FALLBACK_TZ = 'Asia/Kolkata'
 const LOOK_AHEAD_MS = 7 * 24 * 60 * 60 * 1000 // generate meetings 7 days before they're due
 

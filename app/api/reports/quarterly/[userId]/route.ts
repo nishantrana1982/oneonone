@@ -3,6 +3,8 @@ import { requireRole, canAccessEmployeeData, getCurrentUser } from '@/lib/auth-h
 import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
 
+export const dynamic = 'force-dynamic'
+
 // Simple sentiment keywords
 const positiveWords = ['great', 'excellent', 'good', 'amazing', 'fantastic', 'happy', 'success', 'achieved', 'completed', 'progress', 'improved', 'better', 'love', 'excited', 'proud']
 const negativeWords = ['bad', 'poor', 'issue', 'problem', 'difficult', 'struggle', 'challenge', 'frustrated', 'concerned', 'worried', 'stuck', 'blocked', 'delay', 'missed', 'failed']

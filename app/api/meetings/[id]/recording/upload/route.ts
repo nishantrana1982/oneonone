@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { chunkKey, uploadToS3 } from '@/lib/s3'
 import { UserRole } from '@prisma/client'
 
+export const dynamic = 'force-dynamic'
+
 export const maxDuration = 300
 
 // POST — Upload a single audio chunk during recording

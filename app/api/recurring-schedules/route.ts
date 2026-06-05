@@ -6,6 +6,8 @@ import { createAuditLog } from '@/lib/audit'
 import { DEFAULT_WORK_END, DEFAULT_WORK_START } from '@/lib/timezones'
 import { calculateFirstOccurrence, advanceToNextOccurrence, getNextOccurrenceDates } from '@/lib/recurring-dates'
 
+export const dynamic = 'force-dynamic'
+
 const FALLBACK_TZ = 'Asia/Kolkata'
 /** When creating a recurring schedule, check this many future occurrences; use the first free one (one-off holiday/leave shouldn't block). */
 const MAX_OCCURRENCES_TO_CHECK = 6

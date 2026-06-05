@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { UserRole, Prisma } from '@prisma/client'
 import { isTodoOverdue } from '@/lib/utils'
 
+export const dynamic = 'force-dynamic'
+
 // Simple sentiment keywords
 const positiveWords = ['great', 'excellent', 'good', 'amazing', 'fantastic', 'happy', 'success', 'achieved', 'completed', 'progress', 'improved', 'better', 'love', 'excited', 'proud', 'wonderful', 'awesome']
 const negativeWords = ['bad', 'poor', 'issue', 'problem', 'difficult', 'struggle', 'challenge', 'frustrated', 'concerned', 'worried', 'stuck', 'blocked', 'delay', 'missed', 'failed', 'stress', 'overwhelmed']
